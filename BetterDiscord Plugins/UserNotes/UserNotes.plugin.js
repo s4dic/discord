@@ -2,8 +2,8 @@
  * @name UserNotes
  * @author DevilBro & Sleek
  * @authorId 108351165988618240
- * @version 2.2
- * @description Allows you to write User Notes locally (File-based storage with dynamic modal)
+ * @version 2.3
+ * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color
  * @invite B5kBdSsED2
  * @website https://github.com/s4dic/discord
  * @source https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/UserNotes/
@@ -11,7 +11,7 @@
  */
 
 module.exports = (_ => {
-    const changeLog = { };
+    const changeLog = {};
 
     return !window.BDFDB_Global || (!window.BDFDB_Global.loaded && !window.BDFDB_Global.started) ? class {
         constructor (meta) {for (let key in meta) this[key] = meta[key];}
@@ -19,7 +19,7 @@ module.exports = (_ => {
         getAuthor () {return this.author;}
         getVersion () {return this.version;}
         getDescription () {return `The Library Plugin needed for ${this.name} is missing. Open the Plugin Settings to download it. \n\n${this.description}`;}
-        
+
         downloadLibrary () {
             BdApi.Net.fetch("https://mwittrien.github.io/BetterDiscordAddons/Library/0BDFDB.plugin.js").then(r => {
                 if (!r || r.status != 200) throw new Error();
@@ -31,11 +31,11 @@ module.exports = (_ => {
                     b,
                     _ => BdApi.UI.showToast("Finished downloading BDFDB Library", {type: "success"})
                 );
-            }).catch(error => {
+            }).catch(_error => {
                 BdApi.UI.alert("Error", "Could not download BDFDB Library Plugin. Try again later or download it manually from GitHub: https://mwittrien.github.io/downloader/?library");
             });
         }
-        
+
         load () {
             if (!window.BDFDB_Global || !Array.isArray(window.BDFDB_Global.pluginQueue))
                 window.BDFDB_Global = Object.assign({}, window.BDFDB_Global, {pluginQueue: []});
@@ -65,68 +65,107 @@ module.exports = (_ => {
     } : (([Plugin, BDFDB]) => {
         const path = require("path");
         const fs = require("fs");
-        
+
         return class UserNotes extends Plugin {
             onLoad () {
                 this.notesDir = path.join(BdApi.Plugins.folder, "UserNotesData");
                 this.labels = this.setLabelsByLanguage();
             }
-            
+
             onStart () {
                 if (!fs.existsSync(this.notesDir)) {
                     fs.mkdirSync(this.notesDir, { recursive: true });
                 }
-                
+                this.injectMenuCSS();   // ✅ NEW: force context menu item color
                 this.patchContextMenu();
             }
-            
+
             onStop () {
                 const customStyle = document.getElementById("usernotes-custom-css");
                 if (customStyle) customStyle.remove();
-                
+
+                const menuStyle = document.getElementById("usernotes-menu-css");
+                if (menuStyle) menuStyle.remove();
+
                 if (this.observer) {
                     this.observer.disconnect();
                     this.observer = null;
                 }
             }
-            
+
+            // safer than BDFDB.LanguageUtils.LanguageStrings.* when Discord changes placeholders
+            getLangStringSafe(key, fallback) {
+                try {
+                    const v = BDFDB?.LanguageUtils?.LanguageStrings?.[key];
+                    if (typeof v === "string" && v.trim()) return v;
+                } catch (_) {}
+                return fallback;
+            }
+
+            // ✅ Hard-force colors for the injected context menu item (theme-proof)
+            injectMenuCSS () {
+                if (document.getElementById("usernotes-menu-css")) return;
+                const style = document.createElement("style");
+                style.id = "usernotes-menu-css";
+                style.textContent = `
+                    /* 1) Neutralise tout filtre appliqué AU MENU (souvent la cause du "blanc -> noir") */
+                    #user-context, #user-context * {
+                        filter: none !important;
+                        -webkit-filter: none !important;
+                        mix-blend-mode: normal !important;
+                    }
+
+                    /* 2) Force la couleur en BLANC pour l'item (et ses enfants) */
+                    #user-note-context,
+                    #user-note-context * {
+                        color: #ffffff !important;
+                        -webkit-text-fill-color: #ffffff !important;
+                    }
+
+                    /* Hover */
+                    #user-note-context:hover {
+                        background: var(--menu-item-default-hover-bg) !important;
+                    }
+                    #user-note-context:hover,
+                    #user-note-context:hover * {
+                        color: #ffffff !important;
+                        -webkit-text-fill-color: #ffffff !important;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
             patchContextMenu() {
                 this.observer = new MutationObserver((mutations) => {
                     for (const mutation of mutations) {
                         for (const node of mutation.addedNodes) {
                             if (node.nodeType !== 1) continue;
-                            
-                            const menu = node.id === 'user-context'
+
+                            const menu = node.id === "user-context"
                                 ? node
-                                : node.querySelector && node.querySelector('#user-context');
-                            
+                                : node.querySelector && node.querySelector("#user-context");
+
                             if (menu && !menu.dataset.userNotesPatched) {
-                                menu.dataset.userNotesPatched = 'true';
-                                try {
-                                    this.injectMenuItem(menu);
-                                } catch (e) {
-                                    console.error("[UserNotes] Error while injecting menu item:", e);
-                                }
+                                menu.dataset.userNotesPatched = "true";
+                                try { this.injectMenuItem(menu); }
+                                catch (e) { console.error("[UserNotes] Error while injecting menu item:", e); }
                             }
                         }
                     }
                 });
-                
-                this.observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                });
+
+                this.observer.observe(document.body, { childList: true, subtree: true });
             }
-            
+
             injectMenuItem(menu) {
-                const reactFiberKey = Object.keys(menu).find(k => k.startsWith('__reactFiber'));
+                const reactFiberKey = Object.keys(menu).find(k => k.startsWith("__reactFiber") || k.startsWith("__reactContainer"));
                 if (!reactFiberKey) return;
-                
+
                 let userId = null;
                 let userName = "User";
-                
+
                 let fiber = menu[reactFiberKey];
-                let maxDepth = 20;
+                let maxDepth = 40;
                 while (fiber && maxDepth-- > 0) {
                     const props = fiber.memoizedProps || fiber.pendingProps;
                     if (props?.user?.id) {
@@ -136,102 +175,77 @@ module.exports = (_ => {
                     }
                     fiber = fiber.return;
                 }
-                
                 if (!userId) return;
-                
+
                 const note = this.loadNote(userId);
                 const hasNote = note && note.trim() !== "";
-                
+
                 const groups = menu.querySelectorAll('[role="group"]');
                 if (!groups || !groups.length) return;
-                
+
                 const lastGroup = groups[groups.length - 1];
                 if (!lastGroup || !lastGroup.parentNode) return;
-                
+
+                // avoid duplicates if Discord reuses DOM nodes
+                if (menu.querySelector("#user-note-context")) return;
+
                 const noteItem = this.createMenuItem(userId, userName, hasNote);
                 if (!noteItem) return;
-                
-                const newGroup = document.createElement('div');
-                newGroup.setAttribute('role', 'group');
+
+                const newGroup = document.createElement("div");
+                newGroup.setAttribute("role", "group");
                 newGroup.appendChild(noteItem);
-                
-                const separator = document.createElement('div');
-                separator.className = 'separator_c9dda3';
-                separator.setAttribute('role', 'separator');
-                
+
+                const separator = document.createElement("div");
+                separator.className = "separator_c9dda3";
+                separator.setAttribute("role", "separator");
+
                 if (!lastGroup.parentNode) return;
-                
                 lastGroup.parentNode.insertBefore(separator, lastGroup.nextSibling);
                 if (!separator.parentNode) return;
                 separator.parentNode.insertBefore(newGroup, separator.nextSibling);
             }
-            
+
             createMenuItem(userId, userName, hasNote) {
-                const item = document.createElement('div');
-                item.className = 'item_c91bad labelContainer_c91bad colorDefault_c91bad';
-                item.setAttribute('role', 'menuitem');
-                item.setAttribute('tabindex', '-1');
-                item.id = 'user-note-context';
-                
+                const item = document.createElement("div");
+                item.className = "item_c91bad labelContainer_c91bad colorDefault_c91bad";
+                item.setAttribute("role", "menuitem");
+                item.setAttribute("tabindex", "-1");
+                item.id = "user-note-context";
+
                 const labelText = (this.labels && this.labels.user_note) || "User Note";
-                
+
                 item.style.cssText = `
-                    background: transparent !important; 
-                    color: var(--interactive-normal) !important;
+                    background: transparent !important;
                     padding: 6px 8px !important;
                     min-height: 32px !important;
                     display: flex !important;
                     align-items: center !important;
                     box-sizing: border-box !important;
                 `;
-                
+
                 item.innerHTML = `
-                    <div class="label_c91bad" style="color: inherit !important; flex: 1 1 auto;">🕵️ ${labelText}</div>
-                    ${hasNote ? '<div class="hint_c91bad" style="color: inherit !important;">✓</div>' : ''}
+                    <div style="flex: 1 1 auto;">🕵️ ${labelText}</div>
+                    ${hasNote ? '<div>✓</div>' : ""}
                 `;
-                
-                // ⬇️ PATCH ICI : on ne supprime plus le menu contextuel manuellement
+
                 item.addEventListener("click", (e) => {
-                    // on laisse Discord fermer le menu tout seul
                     e.stopPropagation();
                     this.openNotesModal({ id: userId, username: userName });
                 });
-                
-                item.addEventListener('mouseenter', () => {
-                    item.classList.add('focused_c1e9c4');
-                    item.style.cssText = `
-                        background: var(--menu-item-default-hover-bg) !important; 
-                        color: var(--interactive-hover) !important;
-                        padding: 6px 8px !important;
-                        min-height: 32px !important;
-                        display: flex !important;
-                        align-items: center !important;
-                        box-sizing: border-box !important;
-                    `;
-                });
-                
-                item.addEventListener('mouseleave', () => {
-                    item.classList.remove('focused_c1e9c4');
-                    item.style.cssText = `
-                        background: transparent !important; 
-                        color: var(--interactive-normal) !important;
-                        padding: 6px 8px !important;
-                        min-height: 32px !important;
-                        display: flex !important;
-                        align-items: center !important;
-                        box-sizing: border-box !important;
-                    `;
-                });
-                
+
+                // optional: keep Discord "focused" behavior
+                item.addEventListener("mouseenter", () => item.classList.add("focused_c1e9c4"));
+                item.addEventListener("mouseleave", () => item.classList.remove("focused_c1e9c4"));
+
                 return item;
             }
 
             getSettingsPanel (collapseStates = {}) {
-                let settingsPanel;
-                return settingsPanel = BDFDB.PluginUtils.createSettingsPanel(this, {
-                    collapseStates: collapseStates,
+                return BDFDB.PluginUtils.createSettingsPanel(this, {
+                    collapseStates,
                     children: _ => {
-                        let settingsItems = [];
+                        const settingsItems = [];
                         settingsItems.push(BDFDB.ReactUtils.createElement(BDFDB.LibraryComponents.SettingsItem, {
                             type: "Button",
                             color: BDFDB.LibraryComponents.Button.Colors.RED,
@@ -247,24 +261,38 @@ module.exports = (_ => {
                     }
                 });
             }
-            
+
             openNotesModal (user) {
                 if (!user || !user.id) return;
 
                 let note = this.loadNote(user.id);
+                const initialNote = note;
+                let preventAutoSave = false;
+
                 const screenHeight = window.innerHeight;
-                const screenWidth = window.innerWidth;
                 const modalHeight = Math.floor(screenHeight * 0.7);
-                const modalWidth = Math.min(Math.floor(screenWidth * 0.6), 900);
-                const textareaRows = Math.floor((modalHeight - 150) / 20);
-                
+                const textareaRows = Math.max(6, Math.floor((modalHeight - 150) / 20));
+
                 this.injectCustomCSS();
-                
+
+                const SAVE_TEXT = this.getLangStringSafe("SAVE", "Save");
+                const CANCEL_TEXT = this.getLangStringSafe("CANCEL", "Cancel");
+
+                const tryAutoSave = () => {
+                    if (preventAutoSave) return;
+                    const a = (initialNote ?? "").trimEnd();
+                    const b = (note ?? "").trimEnd();
+                    if (a === b) return;
+                    try { this.saveNote(user.id, note); }
+                    catch (e) { console.error("[UserNotes] autosave failed:", e); }
+                };
+
                 BDFDB.ModalUtils.open(this, {
                     size: "LARGE",
                     header: "User Note",
                     subHeader: user.username,
                     className: "usernotes-modal-custom",
+                    onClose: () => tryAutoSave(),
                     children: [
                         BDFDB.ReactUtils.createElement(BDFDB.LibraryComponents.TextArea, {
                             value: note,
@@ -281,18 +309,24 @@ module.exports = (_ => {
                         })
                     ],
                     buttons: [{
-                        contents: BDFDB.LanguageUtils.LanguageStrings.SAVE,
+                        contents: SAVE_TEXT,
                         color: "BRAND",
                         close: true,
-                        onClick: _ => this.saveNote(user.id, note)
+                        onClick: _ => {
+                            preventAutoSave = true;
+                            this.saveNote(user.id, note);
+                        }
                     }, {
-                        contents: BDFDB.LanguageUtils.LanguageStrings.CANCEL,
+                        contents: CANCEL_TEXT,
                         color: "TRANSPARENT",
-                        close: true
+                        close: true,
+                        onClick: _ => {
+                            preventAutoSave = true; // discard changes
+                        }
                     }]
                 });
             }
-            
+
             injectCustomCSS () {
                 if (document.getElementById("usernotes-custom-css")) return;
                 const style = document.createElement("style");
@@ -305,15 +339,13 @@ module.exports = (_ => {
                 `;
                 document.head.appendChild(style);
             }
-            
+
             loadNote (userId) {
                 const notePath = path.join(this.notesDir, `${userId}.txt`);
-                if (fs.existsSync(notePath)) {
-                    return fs.readFileSync(notePath, "utf8");
-                }
+                if (fs.existsSync(notePath)) return fs.readFileSync(notePath, "utf8");
                 return "";
             }
-            
+
             saveNote (userId, content) {
                 const notePath = path.join(this.notesDir, `${userId}.txt`);
                 if (!content || content.trim() === "") {
@@ -326,18 +358,16 @@ module.exports = (_ => {
                     BDFDB.NotificationUtils.toast("Note saved", {type: "success"});
                 }
             }
-            
+
             deleteAllNotes () {
                 if (!fs.existsSync(this.notesDir)) return;
                 const files = fs.readdirSync(this.notesDir);
                 files.forEach(file => {
-                    if (file.endsWith(".txt")) {
-                        fs.unlinkSync(path.join(this.notesDir, file));
-                    }
+                    if (file.endsWith(".txt")) fs.unlinkSync(path.join(this.notesDir, file));
                 });
                 BDFDB.NotificationUtils.toast("All notes removed", {type: "success"});
             }
-            
+
             setLabelsByLanguage () {
                 switch (BDFDB.LanguageUtils.getLanguage().id) {
                     case "bg": return { user_note: "Потребителска бележка" };
