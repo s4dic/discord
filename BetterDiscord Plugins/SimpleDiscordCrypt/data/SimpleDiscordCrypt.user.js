@@ -2193,38 +2193,134 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     findWithFallbacks(config) {
       let match = null;
 
+      // Strategy 0: Special case for MessageDispatcher - use BdApi.Webpack.getModule with filter
+      if (config.isDispatcher && this.useBdApi) {
+        console.log('[SDC] Trying isDispatcher strategy with BdApi.Webpack.getModule...');
+        try {
+          // Stratégie 1: Chercher via _dispatcher (Store._dispatcher contient le Dispatcher réel)
+          let dispatcher = null;
+          try {
+            const storeWithDispatcher = BdApi.Webpack.getByKeys('_dispatcher');
+            if (storeWithDispatcher?._dispatcher && typeof storeWithDispatcher._dispatcher.dispatch === 'function') {
+              dispatcher = storeWithDispatcher._dispatcher;
+              console.log('[SDC] Found Dispatcher via Store._dispatcher:', dispatcher);
+            }
+          } catch (e) {
+            console.log('[SDC] Strategy 1 (_dispatcher) failed:', e);
+          }
+
+          // Stratégie 2: Chercher par propriétés internes Flux (_actionHandlers, _subscriptions)
+          if (!dispatcher) {
+            dispatcher = BdApi.Webpack.getModule((m) => {
+              if (!m || typeof m !== 'object') return false;
+              if (m === Object || m === Function) return false;
+              if (typeof Atomics !== 'undefined' && m === Atomics) return false;
+
+              // Vérifier les propriétés internes du Dispatcher Flux
+              const hasInternalProps = m._currentDispatchActionType !== undefined ||
+                m._actionHandlers !== undefined ||
+                m._subscriptions !== undefined;
+              const hasDispatch = typeof m.dispatch === 'function';
+
+              if (hasInternalProps && hasDispatch) {
+                console.log('[SDC] Found Dispatcher via internal props:', m);
+                return true;
+              }
+              return false;
+            });
+          }
+
+          // Stratégie 3: Si pas trouvé, chercher par signature classique
+          if (!dispatcher) {
+            dispatcher = BdApi.Webpack.getModule((m) => {
+              if (!m || typeof m !== 'object') return false;
+              if (m === Object || m === Function) return false;
+              if (typeof Atomics !== 'undefined' && m === Atomics) return false;
+              if (typeof SharedArrayBuffer !== 'undefined' && m === SharedArrayBuffer) return false;
+
+              // Vérifier signature Flux Dispatcher
+              const hasDispatch = typeof m.dispatch === 'function';
+              const hasRegister = typeof m.register === 'function';
+              const hasSubscribe = typeof m.subscribe === 'function';
+              const hasUnsubscribe = typeof m.unsubscribe === 'function';
+
+              if (hasDispatch && hasRegister && hasSubscribe && hasUnsubscribe) {
+                console.log('[SDC] Found Dispatcher via function signature:', m);
+                return true;
+              }
+              return false;
+            });
+          }
+
+          if (dispatcher) {
+            console.log('[SDC] ✓ Dispatcher found via BdApi.Webpack.getModule!');
+            match = {
+              module: dispatcher,
+              path: 'BdApi.Webpack.getModule',
+              pattern: 'Flux Dispatcher filter'
+            };
+          } else {
+            console.warn('[SDC] BdApi.Webpack.getModule returned null/undefined for Dispatcher');
+          }
+        } catch (e) {
+          console.error('[SDC] Erreur lors de la recherche du Dispatcher via BdApi:', e);
+        }
+      }
+
       // Strategy 1: BdApi Store (if store name provided)
-      if (this.useBdApi && config.storeName && BdApi.Webpack.Stores?.[config.storeName]) {
-        match = {
-          module: BdApi.Webpack.Stores[config.storeName],
-          path: `BdApi.Webpack.Stores.${config.storeName}`,
-          pattern: 'BdApi Store'
-        };
+      if (!match && this.useBdApi && config.storeName) {
+        try {
+          const store = BdApi.Webpack.Stores?.[config.storeName];
+          if (store) {
+            match = {
+              module: store,
+              path: `BdApi.Webpack.Stores.${config.storeName}`,
+              pattern: 'BdApi Store'
+            };
+          }
+        } catch (e) {
+          // Ignorer les erreurs d'accès aux stores
+        }
       }
 
       // Strategy 2: BdApi getStore (if store name provided)
       if (!match && this.useBdApi && config.storeName) {
-        const store = BdApi.Webpack.getStore(config.storeName);
-        if (store) {
-          match = {
-            module: store,
-            path: 'BdApi.Webpack.getStore',
-            pattern: 'BdApi getStore'
-          };
+        try {
+          const store = BdApi.Webpack.getStore(config.storeName);
+          if (store) {
+            match = {
+              module: store,
+              path: 'BdApi.Webpack.getStore',
+              pattern: 'BdApi getStore'
+            };
+          }
+        } catch (e) {
+          // Ignorer les erreurs lors de getStore
         }
       }
 
       // Strategy 3: BdApi getByKeys (if keys provided)
       if (!match && this.useBdApi && config.keys && config.keys.length > 0) {
         for (const keySet of config.keys) {
-          const bdModule = BdApi.Webpack.getByKeys(...keySet);
-          if (bdModule) {
-            match = {
-              module: bdModule,
-              path: 'BdApi',
-              pattern: `BdApi.Webpack.getByKeys(${keySet.join(', ')})`
-            };
-            break;
+          try {
+            const bdModule = BdApi.Webpack.getByKeys(...keySet);
+            // Exclure les objets natifs JavaScript (Atomics, SharedArrayBuffer, etc.)
+            if (bdModule &&
+              bdModule !== Object &&
+              bdModule !== Function &&
+              (typeof Atomics === 'undefined' || bdModule !== Atomics) &&
+              (typeof SharedArrayBuffer === 'undefined' || bdModule !== SharedArrayBuffer) &&
+              bdModule?.constructor?.name !== 'Atomics') {
+              match = {
+                module: bdModule,
+                path: 'BdApi',
+                pattern: `BdApi.Webpack.getByKeys(${keySet.join(', ')})`
+              };
+              break;
+            }
+          } catch (e) {
+            // Ignorer les erreurs lors de getByKeys
+            continue;
           }
         }
       }
@@ -2263,6 +2359,41 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   var Discord;
   var Utils = {
+    // Mode debug persistant - activable via: window.SDC_DEBUG = true
+    get debugMode() {
+      if (typeof window.SDC_DEBUG !== 'undefined') return window.SDC_DEBUG;
+      try {
+        const stored = localStorage.getItem('SDC_DEBUG');
+        return stored === 'true';
+      } catch (e) {
+        return false;
+      }
+    },
+    set debugMode(value) {
+      window.SDC_DEBUG = value;
+      try {
+        localStorage.setItem('SDC_DEBUG', value ? 'true' : 'false');
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+    },
+    Debug: (message, data) => {
+      if (!Utils.debugMode) return;
+      if (data !== undefined) {
+        console.log(
+          `%c[SDC:DEBUG] %c${message}`,
+          `color:${BaseColor};font-weight:bold`,
+          '',
+          data
+        );
+      } else {
+        console.log(
+          `%c[SDC:DEBUG] %c${message}`,
+          `color:${BaseColor};font-weight:bold`,
+          ''
+        );
+      }
+    },
     Log: (message) => {
       console.log(
         `%c[SimpleDiscordCrypt] %c${message}`,
@@ -2283,6 +2414,119 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         `color:${BaseColor};font-weight:bold`,
         ''
       );
+    },
+    validateModule: (module, moduleName, expectedMethods = []) => {
+      const result = {
+        valid: false,
+        reason: '',
+        foundMethods: [],
+        moduleType: 'unknown'
+      };
+
+      if (!module) {
+        result.reason = 'Module is null or undefined';
+        return result;
+      }
+
+      // Détecter objets natifs JavaScript (avec vérifications d'existence)
+      const nativeObjects = [
+        Object, Function, Array, Promise,
+        typeof Atomics !== 'undefined' ? Atomics : null,
+        typeof SharedArrayBuffer !== 'undefined' ? SharedArrayBuffer : null
+      ].filter(Boolean);
+
+      if (nativeObjects.includes(module)) {
+        result.reason = `Module is native JavaScript object: ${module.constructor?.name}`;
+        result.moduleType = 'native';
+        return result;
+      }
+
+      // Collecter méthodes trouvées AVANT de vérifier le constructor
+      // (certains modules Discord légitimes ont constructor.name === 'Object')
+      try {
+        result.foundMethods = Object.keys(module).filter(k => {
+          try {
+            return typeof module[k] === 'function';
+          } catch (e) {
+            return false;
+          }
+        });
+      } catch (e) {
+        result.reason = 'Cannot enumerate module properties';
+        return result;
+      }
+
+      // Analyser constructeur
+      try {
+        const constructorName = module.constructor?.name;
+        // IMPORTANT: Ne rejeter 'Object'/'Function' QUE si le module n'a pas de méthodes Discord
+        // (MessageQueue a constructor.name='Object' mais c'est un vrai module Discord)
+        if (['Atomics', 'SharedArrayBuffer'].includes(constructorName)) {
+          result.reason = `Constructor name indicates native object: ${constructorName}`;
+          result.moduleType = 'native';
+          return result;
+        }
+        if (['Object', 'Function'].includes(constructorName)) {
+          // Vérifier si c'est vraiment un objet natif ou un module Discord
+          // Si le module a des méthodes, c'est probablement un module Discord légitime
+          if (result.foundMethods.length === 0) {
+            result.reason = `Constructor name indicates native object with no methods: ${constructorName}`;
+            result.moduleType = 'native';
+            return result;
+          }
+          // Sinon, c'est un module Discord valide (comme MessageQueue)
+        }
+        result.moduleType = constructorName || 'anonymous';
+      } catch (e) {
+        // Ignore
+      }
+
+      // Vérifier méthodes attendues
+      if (expectedMethods.length > 0) {
+        const missing = expectedMethods.filter(method => !result.foundMethods.includes(method));
+        if (missing.length > 0) {
+          result.reason = `Missing expected methods: ${missing.join(', ')}`;
+          return result;
+        }
+      }
+
+      // Validation spéciale pour MessageDispatcher
+      if (moduleName === 'MessageDispatcher') {
+        if (typeof module.dispatch !== 'function') {
+          result.reason = 'Missing dispatch function';
+          return result;
+        }
+
+        // Vérifier les propriétés internes du Dispatcher Flux (nouveau format Discord)
+        const hasInternalProps = module._currentDispatchActionType !== undefined ||
+          module._actionHandlers !== undefined ||
+          module._subscriptions !== undefined ||
+          module._processingWaitQueue !== undefined;
+
+        // Vérifier présence méthodes Flux (au moins 2 sur 4)
+        const fluxMethods = [
+          typeof module.register === 'function',
+          typeof module.subscribe === 'function',
+          typeof module.wait === 'function',
+          typeof module.isDispatching === 'function'
+        ];
+        const fluxMethodCount = fluxMethods.filter(Boolean).length;
+        const hasFluxMethods = fluxMethodCount >= 2;
+
+        // Accepter le module si:
+        // 1. Il a des propriétés internes Flux OU
+        // 2. Il a au moins 2 méthodes Flux classiques
+        if (!hasInternalProps && !hasFluxMethods) {
+          result.reason = 'Not a valid Flux Dispatcher (missing internal props and Flux methods)';
+          return result;
+        }
+
+        Utils.Debug(`MessageDispatcher validation - hasInternalProps: ${hasInternalProps}, fluxMethodCount: ${fluxMethodCount}`);
+      }
+
+      result.valid = true;
+      result.reason = 'Valid module';
+      return result;
     },
     Webpack: function () {
       if (this.cachedWebpack) return this.cachedWebpack;
@@ -2369,16 +2613,31 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
 
         for (const module of moduleCache.values()) {
-          if (filter(module)) return module;
+          try {
+            if (filter(module)) return module;
+          } catch (e) {
+            // Ignorer les erreurs liées aux objets Proxy lors du filtrage
+            continue;
+          }
         }
 
         return null;
       };
 
       const findModuleByUniqueProperties = (propNames) =>
-        findModule((module) =>
-          propNames.every((prop) => module[prop] !== undefined)
-        );
+        findModule((module) => {
+          try {
+            return propNames.every((prop) => {
+              try {
+                return module[prop] !== undefined;
+              } catch (e) {
+                return false;
+              }
+            });
+          } catch (e) {
+            return false;
+          }
+        });
 
       // Fonction pour explorer les exports minifiés (Z, ZP, default, etc.)
       const getAllExports = (module) => {
@@ -2391,9 +2650,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (module.default) exports.push(module.default);
 
         // Exports avec une seule clé (pattern de minification)
-        const keys = Object.keys(module);
-        if (keys.length === 1 && typeof module[keys[0]] === 'object') {
-          exports.push(module[keys[0]]);
+        try {
+          const keys = Object.keys(module);
+          if (keys.length === 1 && typeof module[keys[0]] === 'object') {
+            exports.push(module[keys[0]]);
+          }
+        } catch (e) {
+          // Ignorer les erreurs liées aux objets Proxy
         }
 
         return exports;
@@ -2423,40 +2686,62 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
             let score = 0;
             let matchedPattern = null;
-            const path = i === 0 ? '' : (module.Z === exp ? '.Z' : module.ZP === exp ? '.ZP' : module.default === exp ? '.default' : `.${Object.keys(module).find(k => module[k] === exp)}`);
+            let path = '';
+            try {
+              path = i === 0 ? '' : (module.Z === exp ? '.Z' : module.ZP === exp ? '.ZP' : module.default === exp ? '.default' : `.${Object.keys(module).find(k => module[k] === exp)}`);
+            } catch (e) {
+              path = '';
+            }
 
             // Tester chaque pattern
             for (const pattern of patterns) {
-              if (pattern.props && Array.isArray(pattern.props)) {
-                // Chercher par propriétés
-                const matches = pattern.props.filter(prop => exp[prop] !== undefined);
-                if (matches.length > 0) {
-                  score += matches.length * 10;
-                  matchedPattern = pattern;
-                }
-              }
-
-              if (pattern.filter && typeof pattern.filter === 'function') {
-                // Chercher par fonction filter
-                try {
-                  if (pattern.filter(exp)) {
-                    score += 50;
+              try {
+                if (pattern.props && Array.isArray(pattern.props)) {
+                  // Chercher par propriétés
+                  const matches = pattern.props.filter(prop => {
+                    try {
+                      return exp[prop] !== undefined;
+                    } catch (e) {
+                      return false;
+                    }
+                  });
+                  if (matches.length > 0) {
+                    score += matches.length * 10;
                     matchedPattern = pattern;
                   }
-                } catch (e) { }
-              }
+                }
 
-              if (pattern.displayName && exp.displayName === pattern.displayName) {
-                score += 100;
-                matchedPattern = pattern;
-              }
+                if (pattern.filter && typeof pattern.filter === 'function') {
+                  // Chercher par fonction filter
+                  try {
+                    if (pattern.filter(exp)) {
+                      score += 50;
+                      matchedPattern = pattern;
+                    }
+                  } catch (e) { }
+                }
 
-              if (pattern.prototype && exp.prototype) {
-                const protoProps = pattern.prototype.filter(prop => exp.prototype[prop] !== undefined);
-                if (protoProps.length > 0) {
-                  score += protoProps.length * 20;
+                if (pattern.displayName && exp.displayName === pattern.displayName) {
+                  score += 100;
                   matchedPattern = pattern;
                 }
+
+                if (pattern.prototype && exp.prototype) {
+                  const protoProps = pattern.prototype.filter(prop => {
+                    try {
+                      return exp.prototype[prop] !== undefined;
+                    } catch (e) {
+                      return false;
+                    }
+                  });
+                  if (protoProps.length > 0) {
+                    score += protoProps.length * 20;
+                    matchedPattern = pattern;
+                  }
+                }
+              } catch (e) {
+                // Ignorer les erreurs lors du test de ce pattern
+                continue;
               }
             }
 
@@ -2471,12 +2756,23 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return bestMatch;
       };
 
+      // Utilitaire de validation de modules
       // Logger exhaustif d'un module
       const deepLogModule = (module, name) => {
         if (!module) return;
 
         // Analyser les fonctions
-        const funcs = Object.keys(module).filter(k => typeof module[k] === 'function');
+        try {
+          const funcs = Object.keys(module).filter(k => {
+            try {
+              return typeof module[k] === 'function';
+            } catch (e) {
+              return false;
+            }
+          });
+        } catch (e) {
+          // Ignorer les erreurs liées aux objets Proxy
+        }
 
         // Analyser les sous-exports
       };
@@ -2525,32 +2821,133 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     // Configuration déclarative pour tous les modules Discord nécessaires
     const MODULE_CONFIG = {
+      /**
+       * MODULE_CONFIG - Configuration de recherche des modules Discord
+       * 
+       * Structure pour chaque module:
+       * {
+       *   storeName: string|null - Nom du store Flux (si applicable)
+       *   keys: Array<string[]> - Combinaisons de propriétés à rechercher via BdApi.Webpack
+       *   patterns: Array<{props: string[]}|{filter: Function}> - Patterns de matching
+       * }
+       * 
+       * ORDRE DE SPÉCIFICITÉ: Toujours du plus strict au plus permissif
+       * - Pattern 1: Le plus spécifique (4+ méthodes, checks avancés)
+       * - Pattern 2-3: Spécificité moyenne (2-3 méthodes)
+       * - Pattern 4: Fallback permissif (1-2 méthodes, avec validations)
+       * 
+       * ✅ BON EXEMPLE (MessageDispatcher):
+       *   patterns: [
+       *     { filter: (m) => {
+       *         // Exclusion explicite objets natifs
+       *         if (m === Atomics || m === SharedArrayBuffer) return false;
+       *         // Vérifier 3+ méthodes Flux spécifiques
+       *         return typeof m.dispatch === 'function' &&
+       *                typeof m.subscribe === 'function' &&
+       *                typeof m.wait === 'function';
+       *       }
+       *     },
+       *     { props: ['dispatch', 'subscribe', 'register'] }, // Fallback
+       *   ]
+       * 
+       * ❌ MAUVAIS EXEMPLE:
+       *   patterns: [
+       *     { props: ['dispatch'] }, // Trop générique!
+       *     { filter: (m) => typeof m.dispatch === 'function' } // Match Atomics!
+       *   ]
+       * 
+       * CHECKLIST AVANT AJOUT/MODIFICATION:
+       * □ Exclure objets natifs JS (Atomics, SharedArrayBuffer, Object, etc.)
+       * □ Vérifier 3+ méthodes simultanément dans pattern principal
+       * □ Tester contre faux positifs: Atomics.wait, Object.keys, etc.
+       * □ Ordonner patterns du plus strict au plus permissif
+       * □ Ajouter commentaire si logique métier spécifique
+       * 
+       * CONFIG_VERSION: 2.0 (2026-01-30 - Fix MessageDispatcher + validation)
+       */
       MessageQueue: {
         storeName: null,
         keys: [
           ['sendMessage', 'editMessage', 'deleteMessage'],
-          ['enqueue', 'handleSend'],
+          ['sendMessage', 'editMessage', 'receiveMessage'],
           ['sendMessage', 'editMessage'],
         ],
         patterns: [
-          { props: ['enqueue', 'handleSend', 'handleEdit'] },
           { props: ['sendMessage', 'editMessage', 'deleteMessage'] },
+          { props: ['sendMessage', 'editMessage', 'receiveMessage'] },
           { props: ['sendMessage', 'editMessage'] },
           { filter: (m) => typeof m.sendMessage === 'function' && typeof m.editMessage === 'function' },
         ]
       },
       MessageDispatcher: {
-        storeName: null,
+        isDispatcher: true, // Flag pour utiliser la stratégie spéciale BdApi
+        storeName: null, // Pas un store, mais le Dispatcher Flux
         keys: [
+          // IMPORTANT: Ne jamais inclure 'wait' seul car Atomics.wait existe!
+          ['_currentDispatchActionType', '_processingWaitQueue', '_subscriptions'],
+          ['_actionHandlers', '_subscriptions'],
+          ['dispatch', 'subscribe', 'register'], // Removed 'wait' - Atomics has wait()
           ['dispatch', 'register', 'subscribe'],
-          ['dispatch', 'wait'],
-          ['dispatch', 'isDispatching'],
+          ['dispatch', 'isDispatching', 'register'], // Use isDispatching instead of wait
         ],
         patterns: [
-          { props: ['dispatch', 'register', 'subscribe'] },
-          { props: ['dispatch', 'wait'] },
-          { props: ['dispatch', 'register'] },
-          { filter: (m) => typeof m.dispatch === 'function' && typeof m.register === 'function' },
+          // PATTERN PRIORITAIRE: Utiliser BdApi pour trouver le vrai Dispatcher
+          {
+            filter: (m) => {
+              // Exclusion immédiate objets natifs
+              if (m === Object || m === Function) return false;
+              if (typeof Atomics !== 'undefined' && m === Atomics) return false;
+              if (typeof SharedArrayBuffer !== 'undefined' && m === SharedArrayBuffer) return false;
+
+              try {
+                const constructorName = m.constructor?.name;
+                // Atomics a constructor.name === 'Object', donc on exclut les 'Object' sans autre propriété Discord
+                if (constructorName === 'Object') {
+                  // Vérifier si c'est vraiment un objet Discord ou juste un natif
+                  const keys = Object.keys(m);
+                  // Atomics a des méthodes spécifiques: load, store, add, sub, and, or, xor, compareExchange
+                  const atomicsMethods = ['load', 'store', 'add', 'sub', 'and', 'or', 'xor', 'compareExchange'];
+                  const hasAtomicsMethods = atomicsMethods.filter(k => keys.includes(k)).length >= 6;
+                  if (hasAtomicsMethods) return false; // C'est Atomics
+                }
+                if (['Atomics', 'SharedArrayBuffer', 'Function'].includes(constructorName)) {
+                  return false;
+                }
+              } catch (e) {
+                // Ignore
+              }
+
+              // Vérifier signature Flux Dispatcher
+              if (typeof m.dispatch !== 'function') return false;
+              if (typeof m.register !== 'function') return false;
+              if (typeof m.wait !== 'function') return false;
+
+              // Dispatcher a typiquement _subscriptions ou _callbacks
+              const hasInternals = '_subscriptions' in m || '_callbacks' in m || '_isDispatching' in m;
+
+              return hasInternals || typeof m.isDispatching === 'function';
+            }
+          },
+          // FALLBACKS: Combinaisons spécifiques de 3+ méthodes
+          { props: ['dispatch', 'subscribe', 'register', 'wait'] },
+          { props: ['dispatch', 'subscribe', 'register'] },
+          { props: ['dispatch', 'register', 'wait', 'isDispatching'] },
+          // DERNIER RECOURS: Avec validation supplémentaire
+          {
+            filter: (m) => {
+              // Exclusion objets natifs même en fallback
+              if (typeof Atomics !== 'undefined' && m === Atomics) return false;
+              if (typeof SharedArrayBuffer !== 'undefined' && m === SharedArrayBuffer) return false;
+              try {
+                const constructorName = m.constructor?.name;
+                if (['Atomics', 'SharedArrayBuffer'].includes(constructorName)) return false;
+              } catch (e) { }
+
+              return typeof m.dispatch === 'function' &&
+                typeof m.register === 'function' &&
+                typeof m.wait === 'function';
+            }
+          },
         ]
       },
       UserCache: {
@@ -2616,26 +3013,58 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       PermissionStore: {
         storeName: 'PermissionStore',
         keys: [
-          ['can', 'canAccessGuildSettings'],
-          ['can'],
+          ['can', 'canAccessGuildSettings', 'getGuildPermissions'],
+          ['can', 'canManageUser'],
+          ['can', 'getGuildPermissions'],
         ],
         patterns: [
-          { props: ['can', 'getGuildPermissions'] },
-          { props: ['can'] },
+          // Pattern strict: méthodes Discord-specific ensemble
+          { props: ['can', 'getGuildPermissions', 'getHighestRole'] },
+          { props: ['can', 'canAccessGuildSettings', 'getGuildPermissions'] },
+          { props: ['can', 'canManageUser', 'getGuildPermissions'] },
+          // Fallback avec validation
+          {
+            filter: (m) => {
+              // Exiger 'can' + au moins une autre méthode permission
+              if (typeof m.can !== 'function') return false;
+              const hasOtherPermMethod = (
+                typeof m.getGuildPermissions === 'function' ||
+                typeof m.canAccessGuildSettings === 'function' ||
+                typeof m.canManageUser === 'function'
+              );
+              return hasOtherPermMethod;
+            }
+          },
         ]
       },
       FileUploader: {
         storeName: null,
         keys: [
-          ['upload', 'uploadFiles'],
-          ['instantBatchUpload'],
-          ['upload'],
+          ['upload', 'uploadFiles', 'cancel', 'instantBatchUpload'],
+          ['upload', 'uploadFiles', 'cancel'],
+          ['instantBatchUpload', 'upload'],
         ],
         patterns: [
+          // Pattern strict: uploader complet avec cancel
+          { props: ['upload', 'uploadFiles', 'cancel', 'instantBatchUpload'] },
+          { props: ['upload', 'uploadFiles', 'cancel'] },
+          { props: ['instantBatchUpload', 'upload', 'cancel'] },
+          // Fallback: au moins 2 méthodes upload
           { props: ['upload', 'uploadFiles'] },
-          { props: ['instantBatchUpload'] },
-          { props: ['upload'] },
-          { filter: (m) => typeof m.upload === 'function' },
+          { props: ['instantBatchUpload', 'upload'] },
+          // Dernier recours avec validation
+          {
+            filter: (m) => {
+              if (typeof m.upload !== 'function') return false;
+              // Exiger au moins une autre méthode d'upload
+              const hasOtherUploadMethod = (
+                typeof m.uploadFiles === 'function' ||
+                typeof m.instantBatchUpload === 'function' ||
+                typeof m.cancel === 'function'
+              );
+              return hasOtherUploadMethod;
+            }
+          },
         ]
       },
       CloudUploader: {
@@ -2669,65 +3098,90 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           const checkExport = (obj, path = '') => {
             if (!obj || typeof obj !== 'object') return;
 
-            const keys = Object.keys(obj);
+            try {
+              const keys = Object.keys(obj);
 
-            // Chercher des fonctions de message
-            const messageFuncs = keys.filter(k => {
-              const val = obj[k];
-              return typeof val === 'function' && (
-                k === 'sendMessage' || k === 'editMessage' || k === 'deleteMessage' ||
-                k === 'createMessage' || k === 'receiveMessage'
-              );
-            });
-            if (messageFuncs.length > 0) {
-              discoveredModules.message.push({ id: key, path, funcs: messageFuncs, keys: keys.slice(0, 20), obj });
-            }
+              // Chercher des fonctions de message
+              const messageFuncs = keys.filter(k => {
+                try {
+                  const val = obj[k];
+                  return typeof val === 'function' && (
+                    k === 'sendMessage' || k === 'editMessage' || k === 'deleteMessage' ||
+                    k === 'createMessage' || k === 'receiveMessage'
+                  );
+                } catch (e) {
+                  return false;
+                }
+              });
+              if (messageFuncs.length > 0) {
+                discoveredModules.message.push({ id: key, path, funcs: messageFuncs, keys: keys.slice(0, 20), obj });
+              }
 
-            // Chercher des fonctions user
-            const userFuncs = keys.filter(k => {
-              const val = obj[k];
-              return typeof val === 'function' && (
-                k === 'getUser' || k === 'getUsers' || k === 'getCurrentUser' || k === 'findByTag'
-              );
-            });
-            if (userFuncs.length > 0) {
-              discoveredModules.user.push({ id: key, path, funcs: userFuncs, keys: keys.slice(0, 20), obj });
-            }
+              // Chercher des fonctions user
+              const userFuncs = keys.filter(k => {
+                try {
+                  const val = obj[k];
+                  return typeof val === 'function' && (
+                    k === 'getUser' || k === 'getUsers' || k === 'getCurrentUser' || k === 'findByTag'
+                  );
+                } catch (e) {
+                  return false;
+                }
+              });
+              if (userFuncs.length > 0) {
+                discoveredModules.user.push({ id: key, path, funcs: userFuncs, keys: keys.slice(0, 20), obj });
+              }
 
-            // Chercher des fonctions channel
-            const channelFuncs = keys.filter(k => {
-              const val = obj[k];
-              return typeof val === 'function' && (
-                k === 'getChannel' || k === 'getDMFromUserId' || k === 'getChannelId'
-              );
-            });
-            if (channelFuncs.length > 0) {
-              discoveredModules.channel.push({ id: key, path, funcs: channelFuncs, keys: keys.slice(0, 20), obj });
-            }
+              // Chercher des fonctions channel
+              const channelFuncs = keys.filter(k => {
+                try {
+                  const val = obj[k];
+                  return typeof val === 'function' && (
+                    k === 'getChannel' || k === 'getDMFromUserId' || k === 'getChannelId'
+                  );
+                } catch (e) {
+                  return false;
+                }
+              });
+              if (channelFuncs.length > 0) {
+                discoveredModules.channel.push({ id: key, path, funcs: channelFuncs, keys: keys.slice(0, 20), obj });
+              }
 
-            // Chercher dispatcher
-            if (keys.includes('dispatch') && typeof obj.dispatch === 'function') {
-              discoveredModules.dispatcher.push({ id: key, path, keys: keys.slice(0, 20), obj });
-            }
+              // Chercher dispatcher
+              if (keys.includes('dispatch') && typeof obj.dispatch === 'function') {
+                discoveredModules.dispatcher.push({ id: key, path, keys: keys.slice(0, 20), obj });
+              }
 
-            // Chercher upload
-            const uploadFuncs = keys.filter(k => {
-              const val = obj[k];
-              return typeof val === 'function' && (
-                k === 'upload' || k === 'instantBatchUpload' || k === 'uploadFiles'
-              );
-            });
-            if (uploadFuncs.length > 0) {
-              discoveredModules.upload.push({ id: key, path, funcs: uploadFuncs, keys: keys.slice(0, 20), obj });
+              // Chercher upload
+              const uploadFuncs = keys.filter(k => {
+                try {
+                  const val = obj[k];
+                  return typeof val === 'function' && (
+                    k === 'upload' || k === 'instantBatchUpload' || k === 'uploadFiles'
+                  );
+                } catch (e) {
+                  return false;
+                }
+              });
+              if (uploadFuncs.length > 0) {
+                discoveredModules.upload.push({ id: key, path, funcs: uploadFuncs, keys: keys.slice(0, 20), obj });
+              }
+            } catch (e) {
+              // Ignorer les erreurs liées aux objets Proxy ou objets natifs
+              return;
             }
           };
 
-          checkExport(exp, '');
+          try {
+            checkExport(exp, '');
 
-          // Aussi vérifier les sous-exports (exp.Z, exp.default, etc.)
-          if (exp.Z) checkExport(exp.Z, '.Z');
-          if (exp.ZP) checkExport(exp.ZP, '.ZP');
-          if (exp.default) checkExport(exp.default, '.default');
+            // Aussi vérifier les sous-exports (exp.Z, exp.default, etc.)
+            if (exp.Z) checkExport(exp.Z, '.Z');
+            if (exp.ZP) checkExport(exp.ZP, '.ZP');
+            if (exp.default) checkExport(exp.default, '.default');
+          } catch (e) {
+            // Ignorer les erreurs pour ce module spécifique
+          }
 
           analyzed++;
         }
@@ -2744,57 +3198,73 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     findModule((module) => {
       moduleCount++;
       if (typeof module === 'object' && module !== null) {
-        const moduleKeys = Object.keys(module);
+        try {
+          const moduleKeys = Object.keys(module);
 
-        // Chercher des fonctions qui semblent liées aux messages
-        const messageFuncs = moduleKeys.filter(key => {
-          const keyLower = key.toLowerCase();
-          return (keyLower.includes('sendmessage') ||
-            keyLower.includes('editmessage') ||
-            keyLower.includes('deletemessage') ||
-            (keyLower.includes('send') && keyLower.includes('message')) ||
-            (keyLower.includes('create') && keyLower.includes('message')));
-        });
-
-        if (messageFuncs.length > 0) {
-          discordModules.push({
-            category: 'Messages',
-            funcs: messageFuncs,
-            allKeys: moduleKeys,
-            sample: module
+          // Chercher des fonctions qui semblent liées aux messages
+          const messageFuncs = moduleKeys.filter(key => {
+            try {
+              const keyLower = key.toLowerCase();
+              return (keyLower.includes('sendmessage') ||
+                keyLower.includes('editmessage') ||
+                keyLower.includes('deletemessage') ||
+                (keyLower.includes('send') && keyLower.includes('message')) ||
+                (keyLower.includes('create') && keyLower.includes('message')));
+            } catch (e) {
+              return false;
+            }
           });
-        }
 
-        // Chercher UserStore, ChannelStore, etc.
-        const storeFuncs = moduleKeys.filter(key => {
-          const keyLower = key.toLowerCase();
-          return (keyLower.includes('getuser') ||
-            keyLower.includes('getchannel') ||
-            keyLower.includes('currentuser'));
-        });
+          if (messageFuncs.length > 0) {
+            discordModules.push({
+              category: 'Messages',
+              funcs: messageFuncs,
+              allKeys: moduleKeys,
+              sample: module
+            });
+          }
 
-        if (storeFuncs.length > 0) {
-          discordModules.push({
-            category: 'Stores',
-            funcs: storeFuncs,
-            allKeys: moduleKeys,
-            sample: module
+          // Chercher UserStore, ChannelStore, etc.
+          const storeFuncs = moduleKeys.filter(key => {
+            try {
+              const keyLower = key.toLowerCase();
+              return (keyLower.includes('getuser') ||
+                keyLower.includes('getchannel') ||
+                keyLower.includes('currentuser'));
+            } catch (e) {
+              return false;
+            }
           });
-        }
 
-        // Chercher upload
-        const uploadFuncs = moduleKeys.filter(key => {
-          const keyLower = key.toLowerCase();
-          return keyLower.includes('upload') && !keyLower.includes('__wbg');
-        });
+          if (storeFuncs.length > 0) {
+            discordModules.push({
+              category: 'Stores',
+              funcs: storeFuncs,
+              allKeys: moduleKeys,
+              sample: module
+            });
+          }
 
-        if (uploadFuncs.length > 0) {
-          discordModules.push({
-            category: 'Upload',
-            funcs: uploadFuncs,
-            allKeys: moduleKeys,
-            sample: module
+          // Chercher upload
+          const uploadFuncs = moduleKeys.filter(key => {
+            try {
+              const keyLower = key.toLowerCase();
+              return keyLower.includes('upload') && !keyLower.includes('__wbg');
+            } catch (e) {
+              return false;
+            }
           });
+
+          if (uploadFuncs.length > 0) {
+            discordModules.push({
+              category: 'Upload',
+              funcs: uploadFuncs,
+              allKeys: moduleKeys,
+              sample: module
+            });
+          }
+        } catch (e) {
+          // Ignorer les erreurs liées aux objets Proxy ou objets natifs
         }
       }
       return false;
@@ -2813,10 +3283,54 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       });
 
       if (match && match.module) {
-        modules[moduleName] = match.module;
         if (moduleName === 'MessageQueue') {
+          console.log('[SDC] MessageQueue trouvé via:', match.pattern);
+          console.log('[SDC] MessageQueue module:', match.module);
+          console.log('[SDC] MessageQueue keys:', Object.keys(match.module).slice(0, 20));
           deepLogModule(match.module, 'MessageQueue');
         }
+        // Validation du module trouvé
+        const validation = Utils.validateModule(match.module, moduleName, []);
+
+        if (moduleName === 'MessageQueue') {
+          console.log('[SDC] MessageQueue validation:', validation);
+          console.log('[SDC] MessageQueue valid:', validation.valid);
+          console.log('[SDC] MessageQueue reason:', validation.reason);
+          console.log('[SDC] MessageQueue foundMethods:', validation.foundMethods.slice(0, 10));
+        }
+
+        if (moduleName === 'MessageDispatcher') {
+          console.log('[SDC] MessageDispatcher trouvé:', match.module);
+          console.log('[SDC] Type:', validation.moduleType);
+          console.log('[SDC] Méthodes:', validation.foundMethods.join(', '));
+          console.log('[SDC] Validation:', validation.valid ? '✅ VALIDE' : '❌ INVALIDE - ' + validation.reason);
+
+          if (!validation.valid) {
+            console.error('[SDC] ⚠️ ATTENTION: Module trouvé mais validation échouée!');
+            console.error('[SDC] Raison:', validation.reason);
+            console.error('[SDC] Le module sera REJETÉ pour éviter "dispatch is not a function"');
+          }
+        }
+
+        // Rejeter le module si validation échoue
+        if (validation.valid) {
+          modules[moduleName] = match.module;
+          Utils.Debug(`Module ${moduleName} found and validated`, {
+            type: validation.moduleType,
+            methods: validation.foundMethods,
+          });
+        } else {
+          Utils.Debug(`Module ${moduleName} found but REJECTED`, {
+            type: validation.moduleType,
+            reason: validation.reason,
+            methods: validation.foundMethods
+          });
+        }
+      } else {
+        if (moduleName === 'MessageDispatcher') {
+          console.warn('[SDC] MessageDispatcher NON trouvé!');
+        }
+        Utils.Debug(`Module ${moduleName} NOT found`);
       }
     }
 
@@ -2829,6 +3343,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       Utils.Log(`Module discovery: ${foundCount}/${totalCount} found`);
       const missing = Object.keys(MODULE_CONFIG).filter(name => modules[name] == null);
       Utils.Warn(`Missing modules: ${missing.join(', ')}`);
+    }
+
+    // Message d'aide debug
+    if (Utils.debugMode) {
+      console.log('%c[SDC] Mode DEBUG actif', 'color:#00ff00;font-weight:bold;font-size:14px');
+      console.log('%cCommandes disponibles:', 'color:#00ff00;font-weight:bold');
+      console.log('  window.SDC_DEBUG = false  - Désactiver le mode debug');
+      console.log('  Utils.Webpack().validateModule(module, "ModuleName")  - Valider un module');
+      console.log('  Discord  - Accéder aux modules Discord chargés');
+    } else {
+      console.log('%c[SDC] Pour activer le mode debug: window.SDC_DEBUG = true puis rechargez (Ctrl+R)', 'color:#888');
     }
 
     // Legacy variable names for backward compatibility
@@ -3644,7 +4169,47 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         console.log('[SDC] InitKeyExchange: User whitelisted', { userId });
 
         if (channelId == null) {
-          channelId = await Discord.ensurePrivateChannel(userId);
+          // ensurePrivateChannel n'existe plus dans l'API Discord moderne
+          // Alternative : créer le canal DM via l'API REST
+          try {
+            console.log('[SDC] InitKeyExchange: Creating DM channel with user', { userId });
+
+            // Trouver le token depuis les modules internes
+            const tokenModule = Discord.modules && Object.values(Discord.modules).find(
+              m => m?.default?.getToken || m?.getToken
+            );
+            const token = tokenModule?.default?.getToken ? tokenModule.default.getToken() : tokenModule?.getToken?.();
+
+            if (!token) {
+              console.error('[SDC] InitKeyExchange: Could not find auth token');
+              console.warn('[SDC] InitKeyExchange: Please send a regular message to this user first to create a DM channel.');
+              return 0;
+            }
+
+            const response = await fetch('/api/v9/users/@me/channels', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token
+              },
+              body: JSON.stringify({ recipients: [userId] })
+            });
+
+            if (response.ok) {
+              const channel = await response.json();
+              channelId = channel.id;
+              console.log('[SDC] InitKeyExchange: DM channel created', { channelId });
+            } else {
+              const errorText = await response.text();
+              console.error('[SDC] InitKeyExchange: Failed to create DM channel', errorText);
+              console.warn('[SDC] InitKeyExchange: Please send a regular message to this user first.');
+              return 0;
+            }
+          } catch (error) {
+            console.error('[SDC] InitKeyExchange: Error creating DM channel', error);
+            console.warn('[SDC] InitKeyExchange: Please send a regular message to this user first.');
+            return 0;
+          }
         }
 
         let dhPublicKeyPayload = this.PayloadEncode(
@@ -3740,11 +4305,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         let requestId = keyHash + user.id;
         let ongoing = this.ongoingKeyExchangesWithRequest[requestId];
         if (ongoing && autoOnMessage) return false;
-        let initKeyExchangeStatus = await this.InitKeyExchange(
-          user,
-          autoOnMessage,
-          keyHash
-        );
+
+        let initKeyExchangeStatus;
+        try {
+          initKeyExchangeStatus = await this.InitKeyExchange(
+            user,
+            autoOnMessage,
+            keyHash
+          );
+        } catch (error) {
+          console.error('[SDC] InitKeyExchangeAndRequestKey: Error in InitKeyExchange', error);
+          return false;
+        }
+
         if (initKeyExchangeStatus === 0) return false;
         if (ongoing) return false;
         this.ongoingKeyExchangesWithRequest[requestId] = true;
@@ -4114,13 +4687,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       // Si toujours pas trouvée, chercher dans les objets à une seule clé
       if (typeof originalFunction !== 'function') {
-        const keys = Object.keys(module);
-        if (keys.length === 1 && typeof module[keys[0]] === 'object') {
-          const singleKey = module[keys[0]];
-          if (typeof singleKey[functionName] === 'function') {
-            originalFunction = singleKey[functionName];
-            targetExport = singleKey;
+        try {
+          const keys = Object.keys(module);
+          if (keys.length === 1 && typeof module[keys[0]] === 'object') {
+            const singleKey = module[keys[0]];
+            if (typeof singleKey[functionName] === 'function') {
+              originalFunction = singleKey[functionName];
+              targetExport = singleKey;
+            }
           }
+        } catch (e) {
+          // Ignorer les erreurs liées aux objets Proxy
         }
       }
 
@@ -4243,7 +4820,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       // Mirror MessageDispatcher.dispatch si disponible
       if (modules.MessageDispatcher && typeof modules.MessageDispatcher.dispatch === 'function') {
+        console.log('[SDC] MessageDispatcher disponible, miroring dispatch...');
         if (mirrorFunction('MessageDispatcher', 'dispatch')) {
+          console.log('[SDC] ✓ Discord.dispatch mirrored successfully');
           // Initialiser le detour (sera remplacé par Load())
           let detourFunction = Discord.dispatch;
           Object.defineProperty(Discord, 'detour_dispatch', {
@@ -4258,7 +4837,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               return Reflect.apply(detourFunction, this, arguments);
             };
           }
+        } else {
+          console.error('[SDC] ✗ Failed to mirror MessageDispatcher.dispatch');
         }
+      } else {
+        console.error('[SDC] ✗ MessageDispatcher NOT available or dispatch function missing');
+        console.log('[SDC] modules.MessageDispatcher:', modules.MessageDispatcher);
       }
 
       mirrorFunction('UserCache', 'getUser');
@@ -4271,16 +4855,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // FileUploader - Skip si vide (pas critique pour chiffrement de messages)
       let fileUploaderSuccess = false;
       if (modules.FileUploader) {
-        const uploaderKeys = Object.keys(modules.FileUploader);
-        if (uploaderKeys.length > 0) {
-          // Essayer silencieusement sans logger les erreurs (module non critique)
-          const originalConsoleError = console.error;
-          console.error = () => { }; // Supprimer temporairement les logs d'erreur
-          const uploadResult = mirrorFunction('FileUploader', 'upload');
-          const batchResult = mirrorFunction('FileUploader', 'instantBatchUpload');
-          const filesResult = mirrorFunction('FileUploader', 'uploadFiles');
-          console.error = originalConsoleError; // Restaurer console.error
-          fileUploaderSuccess = uploadResult || batchResult || filesResult;
+        try {
+          const uploaderKeys = Object.keys(modules.FileUploader);
+          if (uploaderKeys.length > 0) {
+            // Essayer silencieusement sans logger les erreurs (module non critique)
+            const originalConsoleError = console.error;
+            console.error = () => { }; // Supprimer temporairement les logs d'erreur
+            const uploadResult = mirrorFunction('FileUploader', 'upload');
+            const batchResult = mirrorFunction('FileUploader', 'instantBatchUpload');
+            const filesResult = mirrorFunction('FileUploader', 'uploadFiles');
+            console.error = originalConsoleError; // Restaurer console.error
+            fileUploaderSuccess = uploadResult || batchResult || filesResult;
+          }
+        } catch (e) {
+          // Ignorer les erreurs liées aux objets Proxy
         }
       }
 
@@ -4288,9 +4876,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         mirrorFunction('RelationshipStore', 'isFriend');
       }
 
-      if (modules.PrivateChannelManager && typeof modules.PrivateChannelManager.ensurePrivateChannel === 'function') {
-        mirrorFunction('PrivateChannelManager', 'ensurePrivateChannel');
-      }
+      // ensurePrivateChannel n'existe plus dans l'API Discord moderne
+      // La création de canaux DM est maintenant gérée via l'API REST dans InitKeyExchange
+      // if (modules.PrivateChannelManager && typeof modules.PrivateChannelManager.ensurePrivateChannel === 'function') {
+      //   mirrorFunction('PrivateChannelManager', 'ensurePrivateChannel');
+      // }
 
       let cloudUploadHelperSuccess = false;
       if (modules.CloudUploadHelper && typeof modules.CloudUploadHelper.getUploadPayload === 'function') {
@@ -4887,7 +5477,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
 
       /*if(message.channel_id !== Cache.channelId) return;
-
+ 
         let displayHeight = height;
         if(!spoiler || mediaType === 'video') {
             if(width > 400 || height > 300) { //image will be resized
