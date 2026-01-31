@@ -1,7 +1,7 @@
 /**
  * @name FakeDeafen
  * @description Lets you appear deafened while still being able to hear and talk (universal ETF+JSON support)
- * @version 1.1
+ * @version 1.2
  * @author Sleek
  * @authorId 153253064231354368
  * @invite B5kBdSsED2
@@ -60,7 +60,7 @@ module.exports = class FakeDeafen {
         this.log("Plugin stopped");
     }
 
-    patchWebSocket() {
+        patchWebSocket() {
         if (this.originalWebSocketSend) {
             this.log("WebSocket already patched, skipping");
             return;
@@ -74,105 +74,105 @@ module.exports = class FakeDeafen {
                 return self.originalWebSocketSend.call(this, data);
             }
 
-            let modified = false;
-
+            // --- JSON HANDLING ---
             if (typeof data === "string") {
                 try {
                     const parsed = JSON.parse(data);
                     if (parsed.op === 4 && parsed.d) {
-                        self.log("🎯 VOICE_STATE_UPDATE detected (JSON)", parsed.d);
-                        
+                        let modified = false;
                         if (parsed.d.self_mute === false) {
                             parsed.d.self_mute = true;
-                            self.log("📍 Changed self_mute: false → true");
                             modified = true;
                         }
                         if (parsed.d.self_deaf === false) {
                             parsed.d.self_deaf = true;
-                            self.log("📍 Changed self_deaf: false → true");
                             modified = true;
                         }
-
                         if (modified) {
                             data = JSON.stringify(parsed);
-                            self.log("✅ Modified JSON packet", parsed.d);
+                            self.log("✅ Modified JSON packet (clean)");
                         }
                     }
                 } catch (e) {
                     self.log("⚠️ JSON parse error:", e);
                 }
-            } else if (data instanceof ArrayBuffer) {
-                const view = new Uint8Array(data);
+            } 
+            // --- ETF HANDLING (Fix Byte Shifting) ---
+            else if (data instanceof ArrayBuffer) {
+                // Convertir en tableau standard pour faciliter le splice (manipulation de taille)
+                let bytes = Array.from(new Uint8Array(data));
+                let modified = false;
+
+                // Signature OpCode 4 (Voice State Update) dans un payload ETF standard
+                // On cherche la séquence approximative, mais on scanne tout le paquet pour les clés
+                // Signature basique ETF : 131 (0x83)
                 
-                if (view[0] === 0x83 && view[1] === 0x74) {
-                    for (let i = 0; i < view.length - 4; i++) {
-                        if (view[i] === 0x6f && view[i+1] === 0x70 && 
-                            view[i+2] === 0x61 && view[i+3] === 0x04) {
-                            
-                            self.log("🎯 VOICE_STATE_UPDATE detected (ETF)");
-                            const mutable = new Uint8Array(view);
-                            
-                            // Chercher "self_mute" + false
-                            for (let j = i; j < mutable.length - 20; j++) {
-                                if (mutable[j] === 0x73 && mutable[j+1] === 0x65 && 
-                                    mutable[j+2] === 0x6c && mutable[j+3] === 0x66 && 
-                                    mutable[j+4] === 0x5f && mutable[j+5] === 0x6d &&
-                                    mutable[j+6] === 0x75 && mutable[j+7] === 0x74 && 
-                                    mutable[j+8] === 0x65) {
-                                    
-                                    // Vérifier si suivi de "false" (0x73 0x05 "false")
-                                    if (mutable[j+9] === 0x73 && mutable[j+10] === 0x05 &&
-                                        mutable[j+11] === 0x66 && mutable[j+12] === 0x61 && 
-                                        mutable[j+13] === 0x6c && mutable[j+14] === 0x73 && 
-                                        mutable[j+15] === 0x65) {
-                                        
-                                        self.log("📍 Found self_mute=false, changing to true");
-                                        mutable[j+10] = 0x04;  // Longueur 5 → 4
-                                        mutable[j+11] = 0x74;  // 't'
-                                        mutable[j+12] = 0x72;  // 'r'
-                                        mutable[j+13] = 0x75;  // 'u'
-                                        mutable[j+14] = 0x65;  // 'e'
-                                        modified = true;
-                                    }
-                                }
-                                
-                                // Chercher "self_deaf" + false
-                                if (mutable[j] === 0x73 && mutable[j+1] === 0x65 && 
-                                    mutable[j+2] === 0x6c && mutable[j+3] === 0x66 && 
-                                    mutable[j+4] === 0x5f && mutable[j+5] === 0x64 &&
-                                    mutable[j+6] === 0x65 && mutable[j+7] === 0x61 && 
-                                    mutable[j+8] === 0x66) {
-                                    
-                                    if (mutable[j+9] === 0x73 && mutable[j+10] === 0x05 &&
-                                        mutable[j+11] === 0x66 && mutable[j+12] === 0x61 && 
-                                        mutable[j+13] === 0x6c && mutable[j+14] === 0x73 && 
-                                        mutable[j+15] === 0x65) {
-                                        
-                                        self.log("📍 Found self_deaf=false, changing to true");
-                                        mutable[j+10] = 0x04;
-                                        mutable[j+11] = 0x74;
-                                        mutable[j+12] = 0x72;
-                                        mutable[j+13] = 0x75;
-                                        mutable[j+14] = 0x65;
-                                        modified = true;
-                                    }
-                                }
+                // Pattern pour "self_mute" (s,e,l,f,_,m,u,t,e)
+                const searchKeys = [
+                    { key: [115,101,108,102,95,109,117,116,101], name: "self_mute" },
+                    { key: [115,101,108,102,95,100,101,97,102], name: "self_deaf" }
+                ];
+
+                // On itère pour trouver les clés
+                for (let i = 0; i < bytes.length - 20; i++) {
+                    
+                    searchKeys.forEach(item => {
+                        // Vérifier si bytes[i] commence la clé
+                        let match = true;
+                        for(let k=0; k < item.key.length; k++) {
+                            if (bytes[i+k] !== item.key[k]) {
+                                match = false;
+                                break;
                             }
-                            
-                            if (modified) {
-                                data = mutable.buffer;
-                                self.log("✅ Modified ETF packet");
-                            }
-                            break;
                         }
-                    }
+
+                        if (match) {
+                            // La clé se termine à i + item.key.length
+                            // En ETF, après la clé (atom), il y a le pattern du booléen false
+                            // Pattern attendu pour false : 0x73 (atom_small) + 0x05 (len) + 'false'
+                            // Note: Parfois c'est juste après, parfois il y a des tags intermédiaires. 
+                            // Le code original cherchait à j+9, ce qui correspond à :
+                            // Clé finie -> check immédiat.
+                            
+                            const valueStart = i + item.key.length;
+                            
+                            // Check pattern: 0x73 (small atom) + 0x05 (len 5) + 'false'
+                            if (bytes[valueStart] === 0x73 && 
+                                bytes[valueStart + 1] === 0x05 &&
+                                bytes[valueStart + 2] === 102 && // f
+                                bytes[valueStart + 3] === 97  && // a
+                                bytes[valueStart + 4] === 108 && // l
+                                bytes[valueStart + 5] === 115 && // s
+                                bytes[valueStart + 6] === 101    // e
+                            ) {
+                                self.log(`📍 Found ${item.name}=false (ETF), patching to true...`);
+                                
+                                // On remplace : 0x05 'false' (6 octets de payload après le tag 0x73)
+                                // Par : 0x04 'true' (5 octets de payload après le tag 0x73)
+                                // On utilise splice pour retirer 6 éléments et en insérer 5
+                                // Index du length byte : valueStart + 1
+                                
+                                // Remplacer [05, f, a, l, s, e] par [04, t, r, u, e]
+                                bytes.splice(valueStart + 1, 6, 0x04, 116, 114, 117, 101);
+                                
+                                modified = true;
+                                // Reculer l'index i car on a réduit la taille du tableau
+                                i--; 
+                            }
+                        }
+                    });
+                }
+
+                if (modified) {
+                    data = new Uint8Array(bytes).buffer;
+                    self.log("✅ Modified ETF packet (resized & aligned)");
                 }
             }
 
             return self.originalWebSocketSend.call(this, data);
         };
 
-        this.log("WebSocket patched successfully");
+        this.log("WebSocket patched successfully (Resizing Fix Applied)");
     }
 
     unpatchWebSocket() {
