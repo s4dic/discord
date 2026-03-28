@@ -2,8 +2,8 @@
  * @name UserNotes
  * @author DevilBro & Sleek
  * @authorId 108351165988618240
- * @version 2.3
- * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color
+ * @version 2.4
+ * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color + 📝 badge on noted users
  * @invite B5kBdSsED2
  * @website https://github.com/s4dic/discord
  * @source https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/UserNotes/
@@ -70,14 +70,17 @@ module.exports = (_ => {
             onLoad () {
                 this.notesDir = path.join(BdApi.Plugins.folder, "UserNotesData");
                 this.labels = this.setLabelsByLanguage();
+                this.notedUsers = new Set();
             }
 
             onStart () {
                 if (!fs.existsSync(this.notesDir)) {
                     fs.mkdirSync(this.notesDir, { recursive: true });
                 }
-                this.injectMenuCSS();   // ✅ NEW: force context menu item color
+                this.refreshNotedUsers();
+                this.injectMenuCSS();
                 this.patchContextMenu();
+                this.patchBadges();
             }
 
             onStop () {
@@ -87,13 +90,121 @@ module.exports = (_ => {
                 const menuStyle = document.getElementById("usernotes-menu-css");
                 if (menuStyle) menuStyle.remove();
 
+                const badgeStyle = document.getElementById("usernotes-badge-css");
+                if (badgeStyle) badgeStyle.remove();
+
                 if (this.observer) {
                     this.observer.disconnect();
                     this.observer = null;
                 }
+
+                if (this.badgeObserver) {
+                    this.badgeObserver.disconnect();
+                    this.badgeObserver = null;
+                }
+
+                if (this.badgeInterval) {
+                    clearInterval(this.badgeInterval);
+                    this.badgeInterval = null;
+                }
+
+                // Nettoyage des badges
+                document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
             }
 
-            // safer than BDFDB.LanguageUtils.LanguageStrings.* when Discord changes placeholders
+            // ─── BADGE SYSTEM ───────────────────────────────────────────
+
+            refreshNotedUsers () {
+                this.notedUsers.clear();
+                if (!fs.existsSync(this.notesDir)) return;
+                const files = fs.readdirSync(this.notesDir);
+                for (const file of files) {
+                    if (!file.endsWith(".txt")) continue;
+                    const userId = file.replace(".txt", "");
+                    const content = fs.readFileSync(path.join(this.notesDir, file), "utf8");
+                    if (content && content.trim() !== "") {
+                        this.notedUsers.add(userId);
+                    }
+                }
+                console.log("[UserNotes] Noted users:", [...this.notedUsers]);
+            }
+
+            patchBadges () {
+                // CSS pour le badge
+                if (!document.getElementById("usernotes-badge-css")) {
+                    const style = document.createElement("style");
+                    style.id = "usernotes-badge-css";
+                    style.textContent = `
+                        .usernotes-badge {
+                            font-size: 14px;
+                            margin-right: 4px;
+                            flex-shrink: 0;
+                            display: inline-flex;
+                            align-items: center;
+                            cursor: pointer;
+                            z-index: 9999;
+                            user-select: none;
+                        }
+                        .usernotes-badge:hover {
+                            transform: scale(1.2);
+                            filter: brightness(1.3);
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                // Scan initial + interval
+                this.scanAndInjectBadges();
+                this.badgeInterval = setInterval(() => this.scanAndInjectBadges(), 3000);
+
+                // Observer pour les changements DOM
+                this.badgeObserver = new MutationObserver(() => {
+                    clearTimeout(this._badgeDebounce);
+                    this._badgeDebounce = setTimeout(() => this.scanAndInjectBadges(), 500);
+                });
+                this.badgeObserver.observe(document.body, { childList: true, subtree: true });
+            }
+
+            scanAndInjectBadges () {
+                document.querySelectorAll('div.userAvatar__55bab').forEach(div => {
+                    const parent = div.parentElement;
+                    if (!parent) return;
+
+                    // Déjà traité ?
+                    if (parent.querySelector('.usernotes-badge')) return;
+
+                    const bg = div.style.backgroundImage || "";
+                    const m = bg.match(/avatars\/(\d+)\//);
+                    if (!m) return;
+
+                    const userId = m[1];
+                    if (!this.notedUsers.has(userId)) return;
+
+                    // Récupérer le username depuis le DOM si possible
+                    let userName = "User";
+                    const nameEl = parent.querySelector('[class*="username"]') || parent.querySelector('[class*="name_"]');
+                    if (nameEl) userName = nameEl.textContent || "User";
+
+                    const badge = document.createElement("span");
+                    badge.className = "usernotes-badge";
+                    badge.textContent = "📝";
+                    badge.title = `Open note for ${userName}`;
+                    badge.dataset.userId = userId;
+                    badge.dataset.userName = userName;
+
+                    badge.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        this.openNotesModal({ id: userId, username: userName });
+                    });
+
+                    // Insérer AVANT le div avatar
+                    parent.insertBefore(badge, div);
+                });
+            }
+
+            // ─── CONTEXT MENU ───────────────────────────────────────────
+
             getLangStringSafe(key, fallback) {
                 try {
                     const v = BDFDB?.LanguageUtils?.LanguageStrings?.[key];
@@ -102,27 +213,21 @@ module.exports = (_ => {
                 return fallback;
             }
 
-            // ✅ Hard-force colors for the injected context menu item (theme-proof)
             injectMenuCSS () {
                 if (document.getElementById("usernotes-menu-css")) return;
                 const style = document.createElement("style");
                 style.id = "usernotes-menu-css";
                 style.textContent = `
-                    /* 1) Neutralise tout filtre appliqué AU MENU (souvent la cause du "blanc -> noir") */
                     #user-context, #user-context * {
                         filter: none !important;
                         -webkit-filter: none !important;
                         mix-blend-mode: normal !important;
                     }
-
-                    /* 2) Force la couleur en BLANC pour l'item (et ses enfants) */
                     #user-note-context,
                     #user-note-context * {
                         color: #ffffff !important;
                         -webkit-text-fill-color: #ffffff !important;
                     }
-
-                    /* Hover */
                     #user-note-context:hover {
                         background: var(--menu-item-default-hover-bg) !important;
                     }
@@ -140,11 +245,9 @@ module.exports = (_ => {
                     for (const mutation of mutations) {
                         for (const node of mutation.addedNodes) {
                             if (node.nodeType !== 1) continue;
-
                             const menu = node.id === "user-context"
                                 ? node
                                 : node.querySelector && node.querySelector("#user-context");
-
                             if (menu && !menu.dataset.userNotesPatched) {
                                 menu.dataset.userNotesPatched = "true";
                                 try { this.injectMenuItem(menu); }
@@ -153,7 +256,6 @@ module.exports = (_ => {
                         }
                     }
                 });
-
                 this.observer.observe(document.body, { childList: true, subtree: true });
             }
 
@@ -182,11 +284,8 @@ module.exports = (_ => {
 
                 const groups = menu.querySelectorAll('[role="group"]');
                 if (!groups || !groups.length) return;
-
                 const lastGroup = groups[groups.length - 1];
                 if (!lastGroup || !lastGroup.parentNode) return;
-
-                // avoid duplicates if Discord reuses DOM nodes
                 if (menu.querySelector("#user-note-context")) return;
 
                 const noteItem = this.createMenuItem(userId, userName, hasNote);
@@ -234,12 +333,13 @@ module.exports = (_ => {
                     this.openNotesModal({ id: userId, username: userName });
                 });
 
-                // optional: keep Discord "focused" behavior
                 item.addEventListener("mouseenter", () => item.classList.add("focused_c1e9c4"));
                 item.addEventListener("mouseleave", () => item.classList.remove("focused_c1e9c4"));
 
                 return item;
             }
+
+            // ─── SETTINGS ───────────────────────────────────────────────
 
             getSettingsPanel (collapseStates = {}) {
                 return BDFDB.PluginUtils.createSettingsPanel(this, {
@@ -261,6 +361,8 @@ module.exports = (_ => {
                     }
                 });
             }
+
+            // ─── MODAL ──────────────────────────────────────────────────
 
             openNotesModal (user) {
                 if (!user || !user.id) return;
@@ -292,7 +394,13 @@ module.exports = (_ => {
                     header: "User Note",
                     subHeader: user.username,
                     className: "usernotes-modal-custom",
-                    onClose: () => tryAutoSave(),
+                    onClose: () => {
+                        tryAutoSave();
+                        // Rafraîchir les badges après fermeture
+                        this.refreshNotedUsers();
+                        document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
+                        this.scanAndInjectBadges();
+                    },
                     children: [
                         BDFDB.ReactUtils.createElement(BDFDB.LibraryComponents.TextArea, {
                             value: note,
@@ -315,13 +423,17 @@ module.exports = (_ => {
                         onClick: _ => {
                             preventAutoSave = true;
                             this.saveNote(user.id, note);
+                            // Rafraîchir les badges après sauvegarde
+                            this.refreshNotedUsers();
+                            document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
+                            this.scanAndInjectBadges();
                         }
                     }, {
                         contents: CANCEL_TEXT,
                         color: "TRANSPARENT",
                         close: true,
                         onClick: _ => {
-                            preventAutoSave = true; // discard changes
+                            preventAutoSave = true;
                         }
                     }]
                 });
@@ -339,6 +451,8 @@ module.exports = (_ => {
                 `;
                 document.head.appendChild(style);
             }
+
+            // ─── FILE I/O ───────────────────────────────────────────────
 
             loadNote (userId) {
                 const notePath = path.join(this.notesDir, `${userId}.txt`);
@@ -365,8 +479,12 @@ module.exports = (_ => {
                 files.forEach(file => {
                     if (file.endsWith(".txt")) fs.unlinkSync(path.join(this.notesDir, file));
                 });
+                this.refreshNotedUsers();
+                document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
                 BDFDB.NotificationUtils.toast("All notes removed", {type: "success"});
             }
+
+            // ─── LABELS ─────────────────────────────────────────────────
 
             setLabelsByLanguage () {
                 switch (BDFDB.LanguageUtils.getLanguage().id) {
