@@ -6,6 +6,65 @@ if [ "$(id -u)" -eq 0 ]; then
     exit 1
 fi
 
+# ============================================================================
+# BLOC DE VÉRIFICATION ET INSTALLATION DES DÉPENDANCES
+# ============================================================================
+
+echo "Vérification des dépendances..."
+
+REQUIRED_PACKAGES=("curl" "x11-utils" "libnotify-bin" "polkitd" "pkexec")
+MISSING_PACKAGES=()
+
+# Vérifier chaque paquet requis
+for package in "${REQUIRED_PACKAGES[@]}"; do
+    if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "install ok installed"; then
+        MISSING_PACKAGES+=("$package")
+    fi
+done
+
+# Vérifier betterdiscordctl
+if ! command -v betterdiscordctl &>/dev/null; then
+    echo "Avertissement : betterdiscordctl n'est pas installé ou non disponible dans le PATH."
+    echo "Installation automatique de betterdiscordctl..."
+    
+    # Télécharger et installer betterdiscordctl
+    BETTERDISCORD_TMP="/tmp/betterdiscordctl"
+    if curl -fsSL -o "$BETTERDISCORD_TMP" https://raw.githubusercontent.com/bb010g/betterdiscordctl/master/betterdiscordctl; then
+        chmod +x "$BETTERDISCORD_TMP"
+        if pkexec mv "$BETTERDISCORD_TMP" /usr/local/bin/betterdiscordctl; then
+            echo "✓ betterdiscordctl installé avec succès"
+        else
+            echo "✗ Échec de l'installation de betterdiscordctl (élévation refusée)"
+            rm -f "$BETTERDISCORD_TMP"
+            exit 1
+        fi
+    else
+        echo "✗ Échec du téléchargement de betterdiscordctl"
+        exit 1
+    fi
+fi
+
+# Installer les paquets manquants si nécessaire
+if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
+    echo "Paquets manquants détectés : ${MISSING_PACKAGES[*]}"
+    echo "Installation des dépendances manquantes..."
+    
+    if pkexec apt update && pkexec apt install -y "${MISSING_PACKAGES[@]}"; then
+        echo "✓ Toutes les dépendances ont été installées avec succès"
+    else
+        echo "✗ Échec de l'installation des dépendances"
+        echo "Paquets manquants : ${MISSING_PACKAGES[*]}"
+        exit 1
+    fi
+else
+    echo "✓ Toutes les dépendances sont déjà installées"
+fi
+
+# ============================================================================
+# FIN DU BLOC DE VÉRIFICATION
+# ============================================================================
+
+
 # Vérifie et configure la variable DISPLAY si nécessaire (cas cron, systemd, etc.)
 if [ -z "$DISPLAY" ]; then
     export DISPLAY=:0
