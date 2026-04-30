@@ -2,8 +2,8 @@
  * @name UserNotes
  * @author DevilBro & Sleek
  * @authorId 108351165988618240
- * @version 2.4
- * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color + 📝 badge on noted users
+ * @version 2.5
+ * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color + clickable 📝 badge on noted users
  * @invite B5kBdSsED2
  * @website https://github.com/s4dic/discord
  * @source https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/UserNotes/
@@ -11,7 +11,18 @@
  */
 
 module.exports = (_ => {
-    const changeLog = {};
+    const changeLog = {
+        added: {
+            "Clickable badge": "Le badge 📝 sur les utilisateurs notés est cliquable et ouvre la modal de note."
+        },
+        fixed: {
+            "Badge spam": "Correction de la duplication des badges (jusqu'à plusieurs centaines par user).",
+            "Badge position": "Le badge est désormais inséré à gauche de l'avatar."
+        },
+        improved: {
+            "Performance": "Suppression du scan périodique redondant ; l'observer DOM filtre désormais ses propres mutations."
+        }
+    };
 
     return !window.BDFDB_Global || (!window.BDFDB_Global.loaded && !window.BDFDB_Global.started) ? class {
         constructor (meta) {for (let key in meta) this[key] = meta[key];}
@@ -35,7 +46,6 @@ module.exports = (_ => {
                 BdApi.UI.alert("Error", "Could not download BDFDB Library Plugin. Try again later or download it manually from GitHub: https://mwittrien.github.io/downloader/?library");
             });
         }
-
         load () {
             if (!window.BDFDB_Global || !Array.isArray(window.BDFDB_Global.pluginQueue))
                 window.BDFDB_Global = Object.assign({}, window.BDFDB_Global, {pluginQueue: []});
@@ -103,9 +113,9 @@ module.exports = (_ => {
                     this.badgeObserver = null;
                 }
 
-                if (this.badgeInterval) {
-                    clearInterval(this.badgeInterval);
-                    this.badgeInterval = null;
+                if (this._badgeDebounce) {
+                    clearTimeout(this._badgeDebounce);
+                    this._badgeDebounce = null;
                 }
 
                 // Nettoyage des badges
@@ -153,12 +163,17 @@ module.exports = (_ => {
                     document.head.appendChild(style);
                 }
 
-                // Scan initial + interval
+                // Scan initial
                 this.scanAndInjectBadges();
-                this.badgeInterval = setInterval(() => this.scanAndInjectBadges(), 3000);
 
-                // Observer pour les changements DOM
-                this.badgeObserver = new MutationObserver(() => {
+                // Observer DOM avec filtrage des mutations causées par nos propres badges
+                this.badgeObserver = new MutationObserver((mutations) => {
+                    const relevant = mutations.some(m =>
+                        [...m.addedNodes].some(n =>
+                            n.nodeType === 1 && !n.classList?.contains("usernotes-badge")
+                        )
+                    );
+                    if (!relevant) return;
                     clearTimeout(this._badgeDebounce);
                     this._badgeDebounce = setTimeout(() => this.scanAndInjectBadges(), 500);
                 });
@@ -166,41 +181,90 @@ module.exports = (_ => {
             }
 
             scanAndInjectBadges () {
-                document.querySelectorAll('div.userAvatar__55bab').forEach(div => {
-                    const parent = div.parentElement;
-                    if (!parent) return;
+                if (!this.notedUsers || this.notedUsers.size === 0) return;
 
-                    // Déjà traité ?
-                    if (parent.querySelector('.usernotes-badge')) return;
+                const containerSelectors = [
+                    '[class*="voiceUser_"]',
+                    '[class*="member_"]:not([class*="memberInner_"])',
+                    '[class*="privateChannel"]',
+                    '[class*="peopleListItem_"]',
+                    '[class*="messageListItem_"]',
+                ].join(",");
 
-                    const bg = div.style.backgroundImage || "";
-                    const m = bg.match(/avatars\/(\d+)\//);
-                    if (!m) return;
+                document.querySelectorAll(containerSelectors).forEach(el => {
+                    // Dédup robuste : un seul badge par conteneur, où qu'il soit
+                    if (el.querySelector(".usernotes-badge")) return;
 
-                    const userId = m[1];
-                    if (!this.notedUsers.has(userId)) return;
-
-                    // Récupérer le username depuis le DOM si possible
-                    let userName = "User";
-                    const nameEl = parent.querySelector('[class*="username"]') || parent.querySelector('[class*="name_"]');
-                    if (nameEl) userName = nameEl.textContent || "User";
+                    const uid = this._getUserIdFromFiber(el);
+                    if (!uid || !this.notedUsers.has(uid)) return;
 
                     const badge = document.createElement("span");
                     badge.className = "usernotes-badge";
                     badge.textContent = "📝";
-                    badge.title = `Open note for ${userName}`;
-                    badge.dataset.userId = userId;
-                    badge.dataset.userName = userName;
+                    badge.title = "User Note";
+                    badge.dataset.userId = uid;
+                    badge.style.cssText = [
+                        "display:inline-flex",
+                        "align-items:center",
+                        "justify-content:center",
+                        "margin-right:6px",
+                        "font-size:14px",
+                        "cursor:pointer",
+                        "vertical-align:middle",
+                        "z-index:10",
+                        "position:relative",
+                        "pointer-events:auto",
+                    ].join(";");
 
+                    // Capture phase pour devancer les handlers Discord
                     badge.addEventListener("click", (e) => {
-                        e.stopPropagation();
                         e.preventDefault();
-                        this.openNotesModal({ id: userId, username: userName });
-                    });
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
 
-                    // Insérer AVANT le div avatar
-                    parent.insertBefore(badge, div);
+                        // Tente de récupérer un objet user complet via les stores Discord
+                        let userObj = null;
+                        try {
+                            const UserStore = BdApi.Webpack.getStore?.("UserStore")
+                                           || BDFDB?.LibraryStores?.UserStore;
+                            userObj = UserStore?.getUser?.(uid) || null;
+                        } catch (_) {}
+
+                        this.openNotesModal(userObj || { id: uid, username: "User" });
+                    }, true);
+                    badge.addEventListener("mousedown", e => e.stopPropagation(), true);
+
+                    // Insère AVANT l'avatar (à gauche)
+                    const avatar = el.querySelector('[class*="avatar_"], [class*="userAvatar_"], img[class*="avatar"]');
+                    if (avatar && avatar.parentElement) {
+                        avatar.parentElement.insertBefore(badge, avatar);
+                    } else {
+                        el.insertBefore(badge, el.firstChild);
+                    }
                 });
+            }
+
+            _getUserIdFromFiber (el) {
+                // 1) Tente sur l'élément lui-même et ses ancêtres DOM (jusqu'à 8 niveaux)
+                let cur = el;
+                for (let i = 0; i < 8 && cur; i++, cur = cur.parentElement) {
+                    const key = Object.keys(cur).find(k => k.startsWith("__reactFiber") || k.startsWith("__reactProps"));
+                    if (!key) continue;
+                    let fiber = cur[key];
+                    let depth = 30;
+                    while (fiber && depth-- > 0) {
+                        const p = fiber.memoizedProps || fiber.pendingProps;
+                        if (p) {
+                            if (p.user && p.user.id) return p.user.id;
+                            if (p.userId) return p.userId;
+                            if (p.message?.author?.id) return p.message.author.id;
+                            if (p.author?.id) return p.author.id;
+                            if (p.participant?.user?.id) return p.participant.user.id;
+                        }
+                        fiber = fiber.return;
+                    }
+                }
+                return null;
             }
 
             // ─── CONTEXT MENU ───────────────────────────────────────────
@@ -373,7 +437,6 @@ module.exports = (_ => {
 
                 const screenHeight = window.innerHeight;
                 const modalHeight = Math.floor(screenHeight * 0.7);
-                const textareaRows = Math.max(6, Math.floor((modalHeight - 150) / 20));
 
                 this.injectCustomCSS();
 
@@ -389,6 +452,12 @@ module.exports = (_ => {
                     catch (e) { console.error("[UserNotes] autosave failed:", e); }
                 };
 
+                const refreshBadges = () => {
+                    this.refreshNotedUsers();
+                    document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
+                    this.scanAndInjectBadges();
+                };
+
                 BDFDB.ModalUtils.open(this, {
                     size: "LARGE",
                     header: "User Note",
@@ -396,23 +465,29 @@ module.exports = (_ => {
                     className: "usernotes-modal-custom",
                     onClose: () => {
                         tryAutoSave();
-                        // Rafraîchir les badges après fermeture
-                        this.refreshNotedUsers();
-                        document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
-                        this.scanAndInjectBadges();
+                        // Rafraîchir les badges après fermeture (couvre Save, Cancel et autosave)
+                        refreshBadges();
                     },
                     children: [
-                        BDFDB.ReactUtils.createElement(BDFDB.LibraryComponents.TextArea, {
-                            value: note,
+                        BDFDB.ReactUtils.createElement("textarea", {
+                            defaultValue: note,
                             placeholder: "Write your note here...",
                             autoFocus: true,
-                            rows: textareaRows,
                             maxLength: 50000,
-                            onChange: value => note = value,
+                            onChange: e => { note = e.target.value; },
                             style: {
+                                width: "100%",
                                 minHeight: `${modalHeight - 200}px`,
                                 fontSize: "14px",
-                                lineHeight: "1.5"
+                                lineHeight: "1.5",
+                                padding: "10px",
+                                background: "var(--input-background)",
+                                color: "var(--text-normal)",
+                                border: "1px solid var(--background-tertiary)",
+                                borderRadius: "4px",
+                                resize: "vertical",
+                                fontFamily: "Consolas, Monaco, 'Courier New', monospace",
+                                boxSizing: "border-box"
                             }
                         })
                     ],
@@ -423,10 +498,7 @@ module.exports = (_ => {
                         onClick: _ => {
                             preventAutoSave = true;
                             this.saveNote(user.id, note);
-                            // Rafraîchir les badges après sauvegarde
-                            this.refreshNotedUsers();
-                            document.querySelectorAll('.usernotes-badge').forEach(b => b.remove());
-                            this.scanAndInjectBadges();
+                            // Le refresh des badges est fait dans onClose
                         }
                     }, {
                         contents: CANCEL_TEXT,
@@ -451,6 +523,7 @@ module.exports = (_ => {
                 `;
                 document.head.appendChild(style);
             }
+
 
             // ─── FILE I/O ───────────────────────────────────────────────
 
