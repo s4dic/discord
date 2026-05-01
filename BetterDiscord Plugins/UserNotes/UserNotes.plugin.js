@@ -1,8 +1,8 @@
 /**
  * @name UserNotes
- * @author DevilBro & Sleek
+ * @author Sleek
  * @authorId 108351165988618240
- * @version 2.6
+ * @version 2.6.1
  * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color + clickable 📝 badge on noted users
  * @invite B5kBdSsED2
  * @website https://github.com/s4dic/discord
@@ -233,15 +233,12 @@ module.exports = (_ => {
                     const isMessage = el.matches('[class*="messageListItem_"]');
 
                     if (isMessage) {
-                        // Dans le chat : à droite du pseudo (avant le timestamp)
-                        const username = el.querySelector('[class*="username_"], h3 [class*="username"]');
-                        if (username) {
-                            // insère juste après le span username, dans son parent (le header)
-                            username.insertAdjacentElement("afterend", badge);
-                        } else {
-                            el.insertBefore(badge, el.firstChild);
-                        }
-                    } else {
+                        // Uniquement sur le 1er message d'un groupe (celui qui a avatar + pseudo)
+                        const username = el.querySelector('[class*="username_"]');
+                        if (!username) return; // message groupé sans header → on saute
+                        username.insertAdjacentElement("afterend", badge);
+                    }
+                    else {
                         // Sidebar / membres / DMs : à gauche de l'avatar
                         const avatar = el.querySelector('[class*="avatar_"], [class*="userAvatar_"], img[class*="avatar"]');
                         if (avatar && avatar.parentElement) {
