@@ -192,7 +192,6 @@ module.exports = (_ => {
                 ].join(",");
 
                 document.querySelectorAll(containerSelectors).forEach(el => {
-                    // Dédup robuste : un seul badge par conteneur, où qu'il soit
                     if (el.querySelector(".usernotes-badge")) return;
 
                     const uid = this._getUserIdFromFiber(el);
@@ -207,7 +206,7 @@ module.exports = (_ => {
                         "display:inline-flex",
                         "align-items:center",
                         "justify-content:center",
-                        "margin-right:6px",
+                        "margin:0 4px",
                         "font-size:14px",
                         "cursor:pointer",
                         "vertical-align:middle",
@@ -216,34 +215,43 @@ module.exports = (_ => {
                         "pointer-events:auto",
                     ].join(";");
 
-                    // Capture phase pour devancer les handlers Discord
                     badge.addEventListener("click", (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-
-                        // Tente de récupérer un objet user complet via les stores Discord
                         let userObj = null;
                         try {
                             const UserStore = BdApi.Webpack.getStore?.("UserStore")
                                            || BDFDB?.LibraryStores?.UserStore;
                             userObj = UserStore?.getUser?.(uid) || null;
                         } catch (_) {}
-
                         this.openNotesModal(userObj || { id: uid, username: "User" });
                     }, true);
                     badge.addEventListener("mousedown", e => e.stopPropagation(), true);
 
-                    // Insère AVANT l'avatar (à gauche)
-                    const avatar = el.querySelector('[class*="avatar_"], [class*="userAvatar_"], img[class*="avatar"]');
-                    if (avatar && avatar.parentElement) {
-                        avatar.parentElement.insertBefore(badge, avatar);
+                    // ─── Insertion contextuelle ─────────────────────────────────
+                    const isMessage = el.matches('[class*="messageListItem_"]');
+
+                    if (isMessage) {
+                        // Dans le chat : à droite du pseudo (avant le timestamp)
+                        const username = el.querySelector('[class*="username_"], h3 [class*="username"]');
+                        if (username) {
+                            // insère juste après le span username, dans son parent (le header)
+                            username.insertAdjacentElement("afterend", badge);
+                        } else {
+                            el.insertBefore(badge, el.firstChild);
+                        }
                     } else {
-                        el.insertBefore(badge, el.firstChild);
+                        // Sidebar / membres / DMs : à gauche de l'avatar
+                        const avatar = el.querySelector('[class*="avatar_"], [class*="userAvatar_"], img[class*="avatar"]');
+                        if (avatar && avatar.parentElement) {
+                            avatar.parentElement.insertBefore(badge, avatar);
+                        } else {
+                            el.insertBefore(badge, el.firstChild);
+                        }
                     }
                 });
             }
-
             _getUserIdFromFiber (el) {
                 // 1) Tente sur l'élément lui-même et ses ancêtres DOM (jusqu'à 8 niveaux)
                 let cur = el;
