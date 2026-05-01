@@ -2,7 +2,7 @@
  * @name UserNotes
  * @author DevilBro & Sleek
  * @authorId 108351165988618240
- * @version 2.5
+ * @version 2.6
  * @description Allows you to write User Notes locally (File-based storage with dynamic modal) + autosave on outside click + forces context label color + clickable 📝 badge on noted users
  * @invite B5kBdSsED2
  * @website https://github.com/s4dic/discord
