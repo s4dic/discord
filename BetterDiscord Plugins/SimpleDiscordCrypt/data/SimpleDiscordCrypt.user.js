@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://gitlab.com/n01sed/SimpleDiscordCryptV2
-// @version      1.7.5.1
+// @version      1.7.5.2
 // @description  I hope people won't start calling this SDC ^_^
 // @author       An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -1022,9 +1022,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     },
   };
   const MenuBar = {
-    menuBarCss: `.SDC_TOGGLE{opacity:.6;fill:#fff;height:22.5px;width:22.5px;cursor:pointer;margin:0}.SDC_TOGGLE:hover{opacity:.8}.sdc-tooltip{pointer-events:none}.sdc-menu{z-index:10000}.sdc-chat-button-host{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:var(--space-32,32px);min-width:var(--space-32,32px);height:var(--space-32,32px);min-height:var(--space-32,32px);margin:0;padding:0;flex:0 0 auto}.sdc-chat-button-host>.sdc{display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:0}.sdc-chat-button-host:hover .SDC_TOGGLE{opacity:1}.SDC_KEYSELECT_BTN{flex:0 1 auto}.SDC_KEYSELECT_BTN>p{min-width:0}`,
-    toggleOnButtonHtml: `<div class="sdc" style="position:relative;display:inline-block"><svg class="SDC_TOGGLE" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M18 0c-4.612 0-8.483 3.126-9.639 7.371l3.855 1.052C12.91 5.876 15.233 4 18 4c3.313 0 6 2.687 6 6v10h4V10c0-5.522-4.477-10-10-10z"/><path d="M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z"/></svg><p class="sdc-tooltip">Encrypt Channel</p></div>`,
-    toggleOffButtonHtml: `<div class="sdc" style="position:relative;display:inline-block"><svg class="SDC_TOGGLE" style="opacity:1;fill:#00ff00" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M18 3C12.477 3 8 7.477 8 13v10h4V13c0-3.313 2.686-6 6-6s6 2.687 6 6v10h4V13c0-5.523-4.477-10-10-10z"/><path d="M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z"/></svg><p class="sdc-tooltip">Disable Encryption</p></div>`,
+    // Keep the React lock's layout intentionally identical to InvisibleTyping's
+    // chat-input button. In particular, do not style the Tooltip wrapper: doing
+    // so can contribute visual overflow to Discord's scrollable composer.
+    menuBarCss: `.SDC_TOGGLE{opacity:.6;fill:#fff;height:22.5px;width:22.5px;cursor:pointer;margin:0}.SDC_TOGGLE:hover{opacity:.8}.sdc-menu{z-index:10000}.sdcReactLockButton svg{color:var(--interactive-normal);overflow:visible}.sdcReactLockButton{box-sizing:border-box;padding:0;margin-inline:0;min-height:var(--space-32);min-width:var(--space-32)}.sdcReactLockButton:hover svg{color:var(--interactive-hover)}.SDC_KEYSELECT_BTN{flex:0 1 auto}.SDC_KEYSELECT_BTN>p{min-width:0}`,
+    toggleOnButtonHtml: `<div class="sdc" style="position:relative;display:inline-block"><svg class="SDC_TOGGLE" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M18 0c-4.612 0-8.483 3.126-9.639 7.371l3.855 1.052C12.91 5.876 15.233 4 18 4c3.313 0 6 2.687 6 6v10h4V10c0-5.522-4.477-10-10-10z"/><path d="M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z"/></svg></div>`,
+    toggleOffButtonHtml: `<div class="sdc" style="position:relative;display:inline-block"><svg class="SDC_TOGGLE" style="opacity:1;fill:#00ff00" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M18 3C12.477 3 8 7.477 8 13v10h4V13c0-3.313 2.686-6 6-6s6 2.687 6 6v10h4V13c0-5.523-4.477-10-10-10z"/><path d="M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z"/></svg></div>`,
     keySelectButtonHtml: `<div class="sdc" style="margin:-3px 0 -2px 5px"><button type="button" class="SDC_KEYSELECT_BTN" style="min-width:200px;max-width:300px;height:30px;background:rgba(0,0,0,.1);border:solid 1px rgba(0,0,0,.3);border-radius:3px;padding:0 10px;cursor:pointer;justify-content:center;align-items:center;transition:border-color .15s ease"><p class="SDC_SELECTED" style="text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p></button></div>`,
     toggledOnCss: `${ChatInputSelector}{box-shadow:0 0 0 1px ${BaseColor} !important}`,
     menuHtml: `<button type="button" class="SDC_FOCUS sdc-hidden"></button>
@@ -1091,11 +1094,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       this.toggleOnButton = document.createElement('div');
       this.toggleOnButton.className = 'sdc-chat-button-host';
+      this.toggleOnButton.title = 'Encrypt Channel';
       this.toggleOnButton.innerHTML = this.toggleOnButtonHtml;
       this.toggleOnButton.onclick = toggle;
 
       this.toggleOffButton = document.createElement('div');
       this.toggleOffButton.className = 'sdc-chat-button-host';
+      this.toggleOffButton.title = 'Disable Encryption';
       this.toggleOffButton.innerHTML = this.toggleOffButtonHtml;
       this.toggleOffButton.onclick = toggle;
 
@@ -1143,8 +1148,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
 
       this.OpenContextMenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        const event = e?.nativeEvent || e;
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const clientX = Number.isFinite(event?.clientX) ? event.clientX : 0;
+        const clientY = Number.isFinite(event?.clientY) ? event.clientY : 0;
 
         // Re-evaluate the current channel at the exact moment the menu opens.
         // This avoids stale DM/group state after Discord reuses the chat UI.
@@ -1161,11 +1171,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         const rect = menu.getBoundingClientRect();
         const margin = 8;
         const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
-        const left = Math.max(margin, Math.min(e.clientX, maxLeft));
+        const left = Math.max(margin, Math.min(clientX, maxLeft));
 
-        let top = e.clientY;
+        let top = clientY;
         if (top + rect.height > window.innerHeight - margin)
-          top = e.clientY - rect.height;
+          top = clientY - rect.height;
         top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
 
         menu.style.left = `${left}px`;
@@ -1179,36 +1189,182 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         menu.style.visibility = 'hidden';
       };
 
-      // Put the lock in the same chat-input action area used by InvisibleTyping.
-      // Prefer its rendered button as an exact anchor; fall back to Discord's
-      // current channelTextArea/buttons container when InvisibleTyping is disabled.
-      this.GetChatButtonAnchor = () => {
-        const invisibleTypingButton = document.querySelector('.invisibleTypingButton');
-        if (invisibleTypingButton) {
-          const invisibleTypingWrapper = invisibleTypingButton.parentElement;
-          if (invisibleTypingWrapper?.parentElement) {
-            return {
-              container: invisibleTypingWrapper.parentElement,
-              before: invisibleTypingWrapper,
-            };
+      // Inject the lock through the exact same React chat-button group used by
+      // InvisibleTyping. This is substantially more stable than attaching a DOM
+      // node after Discord has rendered the composer, especially in voice-channel
+      // text chats where Discord frequently replaces the composer subtree.
+      this.reactUpdateListeners = new Set();
+      this.RequestReactUpdate = () => {
+        for (const listener of Array.from(this.reactUpdateListeners)) {
+          try {
+            listener();
+          } catch (error) {
+            this.reactUpdateListeners.delete(listener);
           }
         }
-
-        const textArea = document.querySelector(
-          'div[class^=channelTextArea], div[class*=channelTextArea]'
-        );
-        if (!textArea) return null;
-
-        const buttonGroups = Array.from(
-          textArea.querySelectorAll('div[class*=buttons]')
-        ).filter((element) =>
-          element.querySelector('button, [role=button], svg')
-        );
-        const container = buttonGroups[buttonGroups.length - 1];
-        if (!container) return null;
-
-        return { container, before: container.firstElementChild };
       };
+
+      this.InstallReactChatButton = () => {
+        try {
+          if (typeof BdApi !== 'function' || !BdApi.React) return false;
+
+          const api = new BdApi('SimpleDiscordCryptV2');
+          const React = BdApi.React;
+          const ChatButton = api.Webpack.getBySource(
+            'CHAT_INPUT_BUTTON_NOTIFICATION',
+            'animated.div'
+          )?.A;
+          const ChatButtonsGroup = api.Webpack.getBySource(
+            'isSubmitButtonEnabled',
+            '.A.getActiveOption('
+          )?.A;
+
+          if (!ChatButton || !ChatButtonsGroup || typeof ChatButtonsGroup.type !== 'function') {
+            console.warn('[SDC] React chat-button modules not found; using DOM fallback');
+            return false;
+          }
+
+          const owner = this;
+          const LockIcon = ({ enabled }) =>
+            React.createElement(
+              'svg',
+              {
+                width: '22.5',
+                height: '22.5',
+                viewBox: '0 0 36 36',
+                style: enabled ? { color: '#00ff00' } : null,
+                fill: 'currentColor',
+                'aria-hidden': true,
+              },
+              enabled
+                ? React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement('path', {
+                      d: 'M18 3C12.477 3 8 7.477 8 13v10h4V13c0-3.313 2.686-6 6-6s6 2.687 6 6v10h4V13c0-5.523-4.477-10-10-10z',
+                    }),
+                    React.createElement('path', {
+                      d: 'M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z',
+                    })
+                  )
+                : React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement('path', {
+                      d: 'M18 0c-4.612 0-8.483 3.126-9.639 7.371l3.855 1.052C12.91 5.876 15.233 4 18 4c3.313 0 6 2.687 6 6v10h4V10c0-5.522-4.477-10-10-10z',
+                    }),
+                    React.createElement('path', {
+                      d: 'M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z',
+                    })
+                  )
+            );
+
+          function SdcCryptButton() {
+            const [, forceUpdate] = React.useReducer((value) => value + 1, 0);
+            React.useEffect(() => {
+              owner.reactUpdateListeners.add(forceUpdate);
+              return () => owner.reactUpdateListeners.delete(forceUpdate);
+            }, []);
+
+            let enabled = false;
+            try {
+              enabled = !!getToggleStatus();
+            } catch (error) {
+              console.warn('[SDC] Unable to read encryption toggle state', error);
+            }
+
+            const handleClick = React.useCallback(() => {
+              // Match InvisibleTyping's event structure: let Discord's chat button
+              // receive its normal pointer lifecycle instead of cancelling it.
+              toggle();
+              queueMicrotask(() => owner.RequestReactUpdate());
+            }, []);
+
+            const handleContextMenu = React.useCallback((event) => {
+              owner.OpenContextMenu(event);
+            }, []);
+
+            const renderButton = (tooltipProps = {}) =>
+              React.createElement(
+                'div',
+                {
+                  ...tooltipProps,
+                  onClick: handleClick,
+                  onContextMenu: handleContextMenu,
+                },
+                React.createElement(
+                  ChatButton,
+                  { className: 'sdcReactLockButton' },
+                  React.createElement(LockIcon, { enabled })
+                )
+              );
+
+            return api.Components?.Tooltip
+              ? React.createElement(
+                  api.Components.Tooltip,
+                  { text: enabled ? 'Disable Encryption' : 'Encrypt Channel' },
+                  (props) => renderButton(props)
+                )
+              : renderButton({ title: enabled ? 'Disable Encryption' : 'Encrypt Channel' });
+          }
+
+          api.Patcher.after(ChatButtonsGroup, 'type', (_, methodArgs, res) => {
+            const [args] = methodArgs;
+            if (
+              !args?.disabled &&
+              ['normal', 'sidebar'].includes(args?.type?.analyticsName) &&
+              Array.isArray(res?.props?.children)
+            ) {
+              res.props.children.unshift(
+                React.createElement(SdcCryptButton, { key: 'sdc-crypt-lock' })
+              );
+            }
+          });
+
+          this.bdApi = api;
+          this.reactChatButtonInstalled = true;
+          console.log('[SDC] React chat lock installed');
+          return true;
+        } catch (error) {
+          console.error('[SDC] Failed to install React chat lock; using DOM fallback', error);
+          return false;
+        }
+      };
+
+      // Do NOT fall back to manually inserting the lock into Discord's DOM.
+      // SDC is loaded after the database password prompt, while some Discord
+      // composer modules can still be lazy. A one-shot lookup therefore caused
+      // the voice-channel text composer to use the old unstable DOM path.
+      // Retry until the exact React module used by InvisibleTyping is available.
+      this.reactChatButtonInstalled = false;
+      this.reactInstallStopped = false;
+      this.reactInstallDelay = 50;
+      this.EnsureReactChatButton = () => {
+        if (this.reactInstallStopped || this.reactChatButtonInstalled) return;
+        clearTimeout(this.reactInstallTimeout);
+
+        if (this.InstallReactChatButton()) {
+          this.reactChatButtonInstalled = true;
+          this.reactInstallDelay = 50;
+          // The patch now owns all future renders. A resize event is a harmless
+          // nudge for an already-mounted composer so the new child is rendered
+          // immediately instead of waiting for an unrelated Discord update.
+          requestAnimationFrame(() => {
+            try {
+              window.dispatchEvent(new Event('resize'));
+            } catch (_) {}
+          });
+          return;
+        }
+
+        const delay = this.reactInstallDelay;
+        this.reactInstallDelay = Math.min(1000, Math.round(delay * 1.7));
+        this.reactInstallTimeout = setTimeout(
+          () => this.EnsureReactChatButton(),
+          delay
+        );
+      };
+      this.EnsureReactChatButton();
 
       // Find the header that belongs to the SAME active chat as the composer.
       // Do not query generic title/span selectors globally: Discord reuses them
@@ -1268,10 +1424,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
 
       this.Update = function (isRetry) {
+        this.EnsureReactChatButton();
         const headerKeyAnchor = this.GetHeaderKeyAnchor();
-        const chatButtonAnchor = this.GetChatButtonAnchor();
 
-        if (headerKeyAnchor == null && chatButtonAnchor == null) {
+        if (headerKeyAnchor == null && !this.reactChatButtonInstalled) {
           if (!isRetry) this.retries = 0;
           if (this.retries < 10) {
             this.retries++;
@@ -1287,11 +1443,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (this.mutationObserver != null) this.mutationObserver.disconnect();
         else
           this.mutationObserver = new MutationObserver((changes) => {
-            const watched = [
-              this.keySelectButton,
-              this.toggleOnButton,
-              this.toggleOffButton,
-            ];
+            const watched = [this.keySelectButton];
             for (const change of changes) {
               for (const removed of change.removedNodes) {
                 if (
@@ -1333,34 +1485,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           this.keySelectButton.remove();
         }
 
-        const placeToggle = (button) => {
-          if (chatButtonAnchor) {
-            if (
-              button.parentElement !== chatButtonAnchor.container ||
-              button.nextElementSibling !== chatButtonAnchor.before
-            ) {
-              chatButtonAnchor.container.insertBefore(
-                button,
-                chatButtonAnchor.before || null
-              );
-            }
-            return;
-          }
-
-          // Fallback: if the composer button group is temporarily unavailable,
-          // keep the lock in the active chat header only. Never use a globally
-          // matched title/sidebar element.
-          if (headerKeyAnchor) headerKeyAnchor.container.appendChild(button);
-        };
+        // React is the only owner of the composer lock in v5. Remove any old
+        // v3/v4 fallback nodes that may still be present after a hot reload.
+        if (toggleOnEnabled) this.toggleOnButton.remove();
+        if (toggleOffEnabled) this.toggleOffButton.remove();
 
         if (toggledOn) {
           if (!styleEnabled) document.head.appendChild(this.toggledOnStyle);
-          if (toggleOnEnabled) this.toggleOnButton.remove();
-          placeToggle(this.toggleOffButton);
-        } else {
-          if (styleEnabled) document.head.removeChild(this.toggledOnStyle);
-          if (toggleOffEnabled) this.toggleOffButton.remove();
-          placeToggle(this.toggleOnButton);
+        } else if (styleEnabled) {
+          document.head.removeChild(this.toggledOnStyle);
+        }
+
+        if (this.reactChatButtonInstalled) {
+          this.RequestReactUpdate();
         }
 
         this.UpdateContextMenuGroups();
@@ -1378,6 +1515,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (this.mutationObserver) this.mutationObserver.disconnect();
       clearTimeout(this.retryTimeout);
       clearTimeout(this.mutationUpdateTimeout);
+      clearTimeout(this.reactInstallTimeout);
+      this.reactInstallStopped = true;
+      try {
+        this.bdApi?.Patcher?.unpatchAll();
+      } catch (error) {
+        console.warn('[SDC] Unable to unpatch React chat lock cleanly', error);
+      }
+      this.reactUpdateListeners?.clear?.();
+      this.reactChatButtonInstalled = false;
       if (this.toggledOnStyle) this.toggledOnStyle.remove();
       if (this.menuBarStyle) this.menuBarStyle.remove();
       if (this.keySelectButton) this.keySelectButton.remove();
@@ -4264,31 +4410,34 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           )
             return 2;
 
-          if (
-            /friend/i.test(DataBase.autoKeyExchange) &&
-            typeof Discord.isFriend === 'function' &&
-            !Discord.isFriend(userId)
-          ) {
-            if (this.ongoingKeyExchanges[userId]) return 0;
-            this.ongoingKeyExchanges[userId] = true;
-            if (user.username == null) user = Discord.getUser(userId);
-            let popupOverride = {};
-            let popup = PopupManager.NewPromise(
-              `Would you like to initiate key exchange with ${user.username}#${user.discriminator}`,
-              false,
-              popupOverride
-            );
-            const autoCancel = () => {
-              delete this.ongoingKeyExchanges[userId];
-              popupOverride.cancel();
-            };
-            this.AddMessageDeleteListener(autoOnMessage, autoCancel);
-            this.AddKeyShareListener(autoOnKey, autoCancel);
-            let force = await popup;
-            this.RemoveMessageDeleteListener(autoOnMessage, autoCancel);
-            this.RemoveKeyShareListener(autoOnKey, autoCancel);
-            if (!force) return 0;
-          }
+          // Never initiate a first/automatic exchange silently. Friendship is not
+          // sufficient consent for cryptographic key establishment: when this path
+          // was triggered by an incoming encrypted message, require an explicit OK.
+          if (this.ongoingKeyExchanges[userId]) return 0;
+          this.ongoingKeyExchanges[userId] = true;
+          if (user.username == null) user = Discord.getUser(userId);
+          const displayName =
+            user?.global_name || user?.username || userId;
+          const discriminator =
+            user?.discriminator && user.discriminator !== '0'
+              ? `#${user.discriminator}`
+              : '';
+          let popupOverride = {};
+          let popup = PopupManager.NewPromise(
+            `Would you like to initiate key exchange with ${displayName}${discriminator}?`,
+            false,
+            popupOverride
+          );
+          const autoCancel = () => {
+            delete this.ongoingKeyExchanges[userId];
+            popupOverride.cancel();
+          };
+          this.AddMessageDeleteListener(autoOnMessage, autoCancel);
+          this.AddKeyShareListener(autoOnKey, autoCancel);
+          let force = await popup;
+          this.RemoveMessageDeleteListener(autoOnMessage, autoCancel);
+          this.RemoveKeyShareListener(autoOnKey, autoCancel);
+          if (!force) return 0;
         }
         delete this.ongoingKeyExchanges[userId]; //this way once canceled you either have to add them as friend or restart the plugin
 
@@ -6084,8 +6233,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const isIncomingKeyExchange =
         messageType === 'DH KEY' ||
         messageType === 'DH RESPONSE' ||
-        messageType === 'PERSONAL KEY' ||
-        messageType === 'KEY SHARE';
+        messageType === 'PERSONAL KEY';
 
       if (isIncomingKeyExchange && !keyExchangeWhitelist[userId]) {
         const username =
@@ -6319,12 +6467,43 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               Utils.PayloadDecode(requestedKeyPayload)
             );
 
-            Utils.ShareKey(
+            const requestedKey = DataBase.keys[keyHash];
+            const requesterName =
+              message.author.global_name || message.author.username || userId;
+            const requesterDiscriminator =
+              message.author.discriminator && message.author.discriminator !== '0'
+                ? `#${message.author.discriminator}`
+                : '';
+            const requestedDescriptor = requestedKey
+              ? Utils.FormatDescriptor(requestedKey.d)
+              : keyHash.slice(0, 12) + '…';
+
+            const allowShare = await PopupManager.NewPromise(
+              `Allow ${requesterName}${requesterDiscriminator} to receive key "${requestedDescriptor}"?`,
+              true
+            );
+
+            if (!allowShare) {
+              console.log('[SDC] Incoming key request denied', {
+                userId,
+                keyHash: keyHash.slice(0, 8),
+              });
+              Utils.SendSystemMessage(
+                message.channel_id,
+                `*type*: \`KEY SHARE\`\n*status*: \`DENIED\``
+              );
+              message.content = `💻 Key request from ${requesterName}${requesterDiscriminator} declined.`;
+              return true;
+            }
+
+            // The explicit confirmation above is the authorization. Pass null so
+            // ShareKey does not open a second sender-side confirmation dialog.
+            await Utils.ShareKey(
               keyHash,
               message.channel_id,
-              nonForced,
+              null,
               message.author
-            ); //no need to wait
+            );
           } catch (e) {
             break;
           }
@@ -6351,6 +6530,37 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (keyTypeName == null) break;
           let keyDescriptor = getSystemMessageProperty('keyDescriptor', sysmsg);
           if (keyDescriptor == null) break;
+
+          const senderName =
+            message.author.global_name || message.author.username || userId;
+          const senderDiscriminator =
+            message.author.discriminator && message.author.discriminator !== '0'
+              ? `#${message.author.discriminator}`
+              : '';
+          message.content = `💻 ${senderName}${senderDiscriminator} wants to share key "${keyDescriptor}" — waiting for your confirmation…`;
+
+          const acceptSharedKey = await PopupManager.NewPromise(
+            `Accept shared key "${keyDescriptor}" from ${senderName}${senderDiscriminator}?`,
+            true
+          );
+          if (!acceptSharedKey) {
+            console.log('[SDC] Incoming shared key denied', {
+              userId,
+              keyTypeName,
+              keyDescriptor,
+            });
+            message.content = `💻 Shared key from ${senderName}${senderDiscriminator} declined.`;
+            delete channelConfig.w;
+            Utils.dbChanged = true;
+            delete keyExchangeWhitelist[userId];
+            return true;
+          }
+
+          console.log('[SDC] Incoming shared key explicitly accepted', {
+            userId,
+            keyTypeName,
+            keyDescriptor,
+          });
           try {
             let keyHash = Utils.BytesToBase64(
               Utils.PayloadDecode(keyHashPayload)
