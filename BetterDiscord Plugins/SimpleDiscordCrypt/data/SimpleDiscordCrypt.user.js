@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://gitlab.com/n01sed/SimpleDiscordCryptV2
-// @version      1.7.5.0
+// @version      1.7.5.1
 // @description  I hope people won't start calling this SDC ^_^
 // @author       An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -1022,7 +1022,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     },
   };
   const MenuBar = {
-    menuBarCss: `.SDC_TOGGLE{opacity:.6;fill:#fff;height:24px;cursor:pointer;margin-left:-5px}.SDC_TOGGLE:hover{opacity:.8}.sdc-tooltip{pointer-events:none}.sdc-menu{z-index:10000}`,
+    menuBarCss: `.SDC_TOGGLE{opacity:.6;fill:#fff;height:22.5px;width:22.5px;cursor:pointer;margin:0}.SDC_TOGGLE:hover{opacity:.8}.sdc-tooltip{pointer-events:none}.sdc-menu{z-index:10000}.sdc-chat-button-host{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:var(--space-32,32px);min-width:var(--space-32,32px);height:var(--space-32,32px);min-height:var(--space-32,32px);margin:0;padding:0;flex:0 0 auto}.sdc-chat-button-host>.sdc{display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:0}.sdc-chat-button-host:hover .SDC_TOGGLE{opacity:1}.SDC_KEYSELECT_BTN{flex:0 1 auto}.SDC_KEYSELECT_BTN>p{min-width:0}`,
     toggleOnButtonHtml: `<div class="sdc" style="position:relative;display:inline-block"><svg class="SDC_TOGGLE" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M18 0c-4.612 0-8.483 3.126-9.639 7.371l3.855 1.052C12.91 5.876 15.233 4 18 4c3.313 0 6 2.687 6 6v10h4V10c0-5.522-4.477-10-10-10z"/><path d="M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z"/></svg><p class="sdc-tooltip">Encrypt Channel</p></div>`,
     toggleOffButtonHtml: `<div class="sdc" style="position:relative;display:inline-block"><svg class="SDC_TOGGLE" style="opacity:1;fill:#00ff00" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M18 3C12.477 3 8 7.477 8 13v10h4V13c0-3.313 2.686-6 6-6s6 2.687 6 6v10h4V13c0-5.523-4.477-10-10-10z"/><path d="M31 32c0 2.209-1.791 4-4 4H9c-2.209 0-4-1.791-4-4V20c0-2.209 1.791-4 4-4h18c2.209 0 4 1.791 4 4v12z"/></svg><p class="sdc-tooltip">Disable Encryption</p></div>`,
     keySelectButtonHtml: `<div class="sdc" style="margin:-3px 0 -2px 5px"><button type="button" class="SDC_KEYSELECT_BTN" style="min-width:200px;max-width:300px;height:30px;background:rgba(0,0,0,.1);border:solid 1px rgba(0,0,0,.3);border-radius:3px;padding:0 10px;cursor:pointer;justify-content:center;align-items:center;transition:border-color .15s ease"><p class="SDC_SELECTED" style="text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p></button></div>`,
@@ -1090,10 +1090,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         this.menuWrapper.getElementsByClassName('SDC_GROUPMENU')[0];
 
       this.toggleOnButton = document.createElement('div');
+      this.toggleOnButton.className = 'sdc-chat-button-host';
       this.toggleOnButton.innerHTML = this.toggleOnButtonHtml;
       this.toggleOnButton.onclick = toggle;
 
       this.toggleOffButton = document.createElement('div');
+      this.toggleOffButton.className = 'sdc-chat-button-host';
       this.toggleOffButton.innerHTML = this.toggleOffButtonHtml;
       this.toggleOffButton.onclick = toggle;
 
@@ -1128,64 +1130,152 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         KeySelectWindow.Show(getKeys(), selectKey);
       };
 
-      this.toggleOnButton.oncontextmenu = this.toggleOffButton.oncontextmenu = (
-        e
-      ) => {
+      this.UpdateContextMenuGroups = () => {
+        let isDm = false;
+        try {
+          isDm = !!getIsDmChannel();
+        } catch (error) {
+          console.warn('[SDC] Unable to determine channel type for context menu', error);
+        }
+
+        menuDmGroup.style.display = isDm ? null : 'none';
+        menuNondmGroup.style.display = isDm ? 'none' : null;
+      };
+
+      this.OpenContextMenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        menu.style.left = e.clientX + 'px';
-        menu.style.top = e.clientY + 'px';
-        menu.style.visibility = 'visible';
+
+        // Re-evaluate the current channel at the exact moment the menu opens.
+        // This avoids stale DM/group state after Discord reuses the chat UI.
+        this.UpdateContextMenuGroups();
+
+        // The lock now lives near the bottom of the window. The legacy code
+        // always opened the menu downward, which pushed most entries outside
+        // the viewport. Render it invisibly first, measure it, then clamp it.
         menu.style.display = 'block';
-        menuFocus.focus();
+        menu.style.visibility = 'hidden';
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+
+        const rect = menu.getBoundingClientRect();
+        const margin = 8;
+        const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+        const left = Math.max(margin, Math.min(e.clientX, maxLeft));
+
+        let top = e.clientY;
+        if (top + rect.height > window.innerHeight - margin)
+          top = e.clientY - rect.height;
+        top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+        menu.style.visibility = 'visible';
+        menuFocus.focus({ preventScroll: true });
       };
+      this.toggleOnButton.oncontextmenu = this.OpenContextMenu;
+      this.toggleOffButton.oncontextmenu = this.OpenContextMenu;
       menuFocus.onblur = () => {
         menu.style.visibility = 'hidden';
       };
 
-      this.Update = function (isRetry) {
-        // Essayer plusieurs sélecteurs pour trouver titleElement
-        let titleElement = null;
-
-        // Méthode 1 : Sélecteur original
-        titleElement = document.querySelector(HeaderBarChannelNameSelector);
-
-        // Méthode 2 : Essayer les nouveaux sélecteurs
-        if (!titleElement) {
-          for (const selector of HeaderBarChannelNameSelectors) {
-            titleElement = document.querySelector(selector);
-            if (titleElement) {
-              break;
-            }
+      // Put the lock in the same chat-input action area used by InvisibleTyping.
+      // Prefer its rendered button as an exact anchor; fall back to Discord's
+      // current channelTextArea/buttons container when InvisibleTyping is disabled.
+      this.GetChatButtonAnchor = () => {
+        const invisibleTypingButton = document.querySelector('.invisibleTypingButton');
+        if (invisibleTypingButton) {
+          const invisibleTypingWrapper = invisibleTypingButton.parentElement;
+          if (invisibleTypingWrapper?.parentElement) {
+            return {
+              container: invisibleTypingWrapper.parentElement,
+              before: invisibleTypingWrapper,
+            };
           }
         }
 
-        // Méthode 3 : Chercher dans les HeaderBar possibles
-        if (!titleElement) {
+        const textArea = document.querySelector(
+          'div[class^=channelTextArea], div[class*=channelTextArea]'
+        );
+        if (!textArea) return null;
+
+        const buttonGroups = Array.from(
+          textArea.querySelectorAll('div[class*=buttons]')
+        ).filter((element) =>
+          element.querySelector('button, [role=button], svg')
+        );
+        const container = buttonGroups[buttonGroups.length - 1];
+        if (!container) return null;
+
+        return { container, before: container.firstElementChild };
+      };
+
+      // Find the header that belongs to the SAME active chat as the composer.
+      // Do not query generic title/span selectors globally: Discord reuses them
+      // in the guild/sidebar/voice UI and that made the key selector wander.
+      this.GetHeaderKeyAnchor = () => {
+        const textArea = document.querySelector(
+          'div[class^=channelTextArea], div[class*=channelTextArea]'
+        );
+        if (!textArea) return null;
+
+        let scope = textArea;
+        let header = null;
+        const textAreaRect = textArea.getBoundingClientRect();
+
+        // Walk upward until we reach the chat shell which contains both the
+        // composer and its own top header. This deliberately excludes headers
+        // from the server/channel sidebar and unrelated popouts.
+        for (let i = 0; scope && i < 14; i++, scope = scope.parentElement) {
           for (const headerSelector of HeaderBarSelectors) {
-            const header = document.querySelector(headerSelector);
-            if (header) {
-              // Chercher un titre dedans
-              for (const nameSelector of HeaderBarChannelNameSelectors) {
-                titleElement = header.querySelector(nameSelector);
-                if (titleElement) {
-                  break;
-                }
-              }
-              if (titleElement) break;
-            }
+            const candidate = scope.querySelector?.(headerSelector);
+            if (!candidate || candidate.contains(textArea)) continue;
+
+            const rect = candidate.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) continue;
+
+            // The active chat header must sit above and horizontally overlap
+            // the active composer. This rejects sidebar/voice/popout headers
+            // even if Discord gives them the same minified class fragments.
+            const overlap = Math.max(
+              0,
+              Math.min(rect.right, textAreaRect.right) -
+                Math.max(rect.left, textAreaRect.left)
+            );
+            const requiredOverlap = Math.min(200, textAreaRect.width * 0.3);
+            if (overlap < requiredOverlap || rect.top >= textAreaRect.top) continue;
+
+            header = candidate;
+            break;
           }
+          if (header) break;
         }
 
-        // Correction d'alignement : remonter d'un niveau si on cible le texte directement
-        if (titleElement && ['H1', 'H2', 'H3', 'SPAN'].includes(titleElement.tagName)) {
-          titleElement = titleElement.parentElement;
-        }
+        if (!header) return null;
 
-        if (titleElement == null) {
+        // Discord normally keeps the channel title in a `children` container.
+        // Appending the selector to that exact header container is more stable
+        // than inserting it after whichever generic `title` element happens to
+        // match first.
+        const children =
+          header.querySelector(':scope > div[class*=children]') ||
+          header.querySelector('div[class*=children]');
+
+        return {
+          header,
+          container: children || header,
+        };
+      };
+
+      this.Update = function (isRetry) {
+        const headerKeyAnchor = this.GetHeaderKeyAnchor();
+        const chatButtonAnchor = this.GetChatButtonAnchor();
+
+        if (headerKeyAnchor == null && chatButtonAnchor == null) {
           if (!isRetry) this.retries = 0;
           if (this.retries < 10) {
             this.retries++;
+            clearTimeout(this.retryTimeout);
             this.retryTimeout = setTimeout(() => {
               this.Update(true);
             }, this.retries * 400);
@@ -1197,15 +1287,26 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (this.mutationObserver != null) this.mutationObserver.disconnect();
         else
           this.mutationObserver = new MutationObserver((changes) => {
-            for (let change of changes)
-              for (let removed of change.removedNodes)
+            const watched = [
+              this.keySelectButton,
+              this.toggleOnButton,
+              this.toggleOffButton,
+            ];
+            for (const change of changes) {
+              for (const removed of change.removedNodes) {
                 if (
-                  removed === this.keySelectButton ||
-                  removed.contains(this.keySelectButton)
+                  watched.some(
+                    (element) =>
+                      removed === element ||
+                      (typeof removed.contains === 'function' && removed.contains(element))
+                  )
                 ) {
-                  this.Update();
+                  clearTimeout(this.mutationUpdateTimeout);
+                  this.mutationUpdateTimeout = setTimeout(() => this.Update(), 0);
                   return;
                 }
+              }
+            }
           });
 
         let styleEnabled = document.head.contains(this.toggledOnStyle);
@@ -1220,44 +1321,63 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           ? BaseColor
           : null;
 
-        if (!keySelectEnabled)
-          titleElement.insertAdjacentElement('afterend', this.keySelectButton);
+        if (headerKeyAnchor) {
+          const keyContainer = headerKeyAnchor.container;
+          if (this.keySelectButton.parentElement !== keyContainer) {
+            keyContainer.appendChild(this.keySelectButton);
+          }
+        } else if (keySelectEnabled) {
+          // If Discord is between layouts during a rerender, never leave the key
+          // selector attached to an old/sidebar node. It will be restored on the
+          // next mutation/update when the active chat header exists again.
+          this.keySelectButton.remove();
+        }
+
+        const placeToggle = (button) => {
+          if (chatButtonAnchor) {
+            if (
+              button.parentElement !== chatButtonAnchor.container ||
+              button.nextElementSibling !== chatButtonAnchor.before
+            ) {
+              chatButtonAnchor.container.insertBefore(
+                button,
+                chatButtonAnchor.before || null
+              );
+            }
+            return;
+          }
+
+          // Fallback: if the composer button group is temporarily unavailable,
+          // keep the lock in the active chat header only. Never use a globally
+          // matched title/sidebar element.
+          if (headerKeyAnchor) headerKeyAnchor.container.appendChild(button);
+        };
 
         if (toggledOn) {
           if (!styleEnabled) document.head.appendChild(this.toggledOnStyle);
           if (toggleOnEnabled) this.toggleOnButton.remove();
-          if (!toggleOffEnabled)
-            titleElement.insertAdjacentElement(
-              'afterend',
-              this.toggleOffButton
-            );
+          placeToggle(this.toggleOffButton);
         } else {
           if (styleEnabled) document.head.removeChild(this.toggledOnStyle);
           if (toggleOffEnabled) this.toggleOffButton.remove();
-          if (!toggleOnEnabled)
-            titleElement.insertAdjacentElement('afterend', this.toggleOnButton);
+          placeToggle(this.toggleOnButton);
         }
 
-        if (getIsDmChannel()) {
-          menuDmGroup.style.display = null;
-          menuNondmGroup.style.display = 'none';
-        } else {
-          menuDmGroup.style.display = 'none';
-          menuNondmGroup.style.display = null;
-        }
+        this.UpdateContextMenuGroups();
 
-        let randomChangesNode =
-          document.getElementsByClassName('base-3dtUhz')[0];
-        if (randomChangesNode != null)
-          this.mutationObserver.observe(randomChangesNode, {
-            childList: true,
-            subtree: true,
-          });
+        // Observe Discord UI replacement globally. The callback only reacts when
+        // one of our own nodes is removed, so ordinary message mutations are cheap.
+        this.mutationObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
+        });
       };
       this.Update();
     },
     Remove: function () {
       if (this.mutationObserver) this.mutationObserver.disconnect();
+      clearTimeout(this.retryTimeout);
+      clearTimeout(this.mutationUpdateTimeout);
       if (this.toggledOnStyle) this.toggledOnStyle.remove();
       if (this.menuBarStyle) this.menuBarStyle.remove();
       if (this.keySelectButton) this.keySelectButton.remove();
@@ -1278,9 +1398,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         document.body.appendChild(this.domElement);
     },
     New: function (message, okCallback, cancelCallback, ontop) {
+      // Discord can replace large parts of its DOM while changing channels.
+      // Make sure the popup host still exists before adding a confirmation.
+      if (!this.domElement) this.Inject();
+      else this.Update();
+
       let popup = document.createElement('div');
-      popup.innerHTML = `<div class="sdc sdc-window" style="width:280px;position:fixed;right:50px;bottom:60px">
-    <div style="margin:20px;word-break:break-all;word-break:break-word">
+      popup.className = 'SDC_POPUP_HOST';
+      popup.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
+      popup.innerHTML = `<div class="sdc sdc-window" role="dialog" aria-modal="true" style="width:320px;max-width:calc(100vw - 32px);position:fixed;right:24px;bottom:80px;z-index:2147483647;pointer-events:auto;box-shadow:0 12px 36px rgba(0,0,0,.55)">
+    <div style="margin:20px;word-break:break-word;line-height:1.35">
         ${HtmlEscape(message)}
     </div>
     <div class="sdc-footer" style="padding:10px">
@@ -4712,7 +4839,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       Discord[mirroredName] = originalFunction;
       Discord[functionName] = function () {
-        return originalFunction.apply(targetExport, arguments);
+        // Preserve the real receiver when a hooked/native method is called through
+        // targetExport. Native DOM methods (notably HTMLIFrameElement#setAttribute)
+        // throw "Illegal invocation" if they are called with the prototype itself
+        // instead of the actual DOM element. Direct Discord.* calls still use the
+        // discovered export as their receiver.
+        const receiver = this && this !== Discord ? this : targetExport;
+        return Reflect.apply(originalFunction, receiver, arguments);
       };
       return true;
     };
@@ -5944,31 +6077,65 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     let nonForced = true;
     if (!oldMessage) {
-      message.content = blockedSystemMessage;
-      if (
-        /friend/i.test(DataBase.autoKeyExchange) &&
-        typeof Discord.isFriend === 'function' &&
-        !Discord.isFriend(userId)
-      ) {
-        if (
-          messageType === 'DH KEY' ||
-          messageType === 'DH RESPONSE' ||
-          messageType === 'PERSONAL KEY' ||
-          messageType === 'KEY SHARE'
-        ) {
-          if (!keyExchangeWhitelist[userId]) {
-            //let user = Discord.getUser(userId);
-            if (
-              !(await PopupManager.NewPromise(
-                `Would you like to accept key exchange from ${message.author.username}#${message.author.discriminator}`,
-                true
-              ))
-            )
-              return false;
-            keyExchangeWhitelist[userId] = true;
-          }
+      // Require an explicit decision for a new incoming cryptographic exchange.
+      // Do not leave the message as SYSTEM MESSAGE BLOCKED while the promise is
+      // waiting: processUpdateSystemMessage() is intentionally asynchronous, so
+      // that temporary value is what Discord renders until the user answers.
+      const isIncomingKeyExchange =
+        messageType === 'DH KEY' ||
+        messageType === 'DH RESPONSE' ||
+        messageType === 'PERSONAL KEY' ||
+        messageType === 'KEY SHARE';
+
+      if (isIncomingKeyExchange && !keyExchangeWhitelist[userId]) {
+        const username =
+          message.author.global_name || message.author.username || userId;
+        const discriminator =
+          message.author.discriminator && message.author.discriminator !== '0'
+            ? `#${message.author.discriminator}`
+            : '';
+
+        message.content = `💻 Key exchange request from ${username}${discriminator} — waiting for your confirmation…`;
+        message.embeds = [];
+
+        let accepted = false;
+        try {
+          accepted = await PopupManager.NewPromise(
+            `Would you like to accept key exchange from ${username}${discriminator}?`,
+            true
+          );
+        } catch (error) {
+          console.error('[SDC] Unable to display key exchange confirmation', error);
+          message.content = '💻 Unable to display the key exchange confirmation.';
+          return true;
         }
-      } else nonForced = false;
+
+        if (!accepted) {
+          console.log('[SDC] Incoming key exchange denied', {
+            userId,
+            messageType,
+          });
+          message.content = `💻 Key exchange from ${username}${discriminator} declined.`;
+          return true;
+        }
+
+        keyExchangeWhitelist[userId] = true;
+        console.log('[SDC] Incoming key exchange accepted', {
+          userId,
+          messageType,
+        });
+      }
+
+      // Preserve the original key-request sharing policy. This flag is used by
+      // KEY REQUEST/ShareKey and is independent from accepting the DH exchange.
+      if (
+        !(
+          /friend/i.test(DataBase.autoKeyExchange) &&
+          typeof Discord.isFriend === 'function' &&
+          !Discord.isFriend(userId)
+        )
+      )
+        nonForced = false;
     }
 
     switch (messageType) {
