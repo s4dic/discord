@@ -1,25 +1,12 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
-// @namespace    https://gitlab.com/n01sed/SimpleDiscordCryptV2
-// @version      1.7.5.3
-// @description  I hope people won't start calling this SDC ^_^
-// @author       New author : Sleek
+// @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
+// @version      1.7.5.4
+// @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
+// @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
-// @downloadURL  https://gitlab.com/n01sed/SimpleDiscordCryptV2/raw/master/SimpleDiscordCrypt.user.js
-// @updateURL    https://gitlab.com/n01sed/SimpleDiscordCryptV2/raw/master/SimpleDiscordCrypt.meta.js
-// @icon         https://gitlab.com/n01sed/SimpleDiscordCryptV2/raw/master/logo.png
-// @match        https://*.discord.com/channels/*
-// @match        https://*.discord.com/activity
-// @match        https://*.discord.com/login*
-// @match        https://*.discord.com/app
-// @match        https://*.discord.com/library
-// @match        https://*.discord.com/store
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        unsafeWindow
-// @grant        GM_xmlhttpRequest
-// @connect      cdn.discordapp.com
-// @connect      gitlab.com
+// @downloadURL  https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
+// @updateURL    https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // ==/UserScript==
 
 // Credits for inspiration to the original DiscordCrypt
@@ -31,10 +18,11 @@
   // SECTION 1: CONSTANTS & CONFIGURATION
   // ============================================================================
 
+  // v23: remote guild blacklist disabled; attachment download menu generalized.
   const CONFIG = {
     // URLs & Resources
     urls: {
-      blacklist: 'https://gitlab.com/An0/SimpleDiscordCrypt/raw/master/blacklist.txt',
+      blacklist: null, // v23: upstream remote guild blacklist disabled
       gitlab: 'http://gitlab.com/An0/SimpleDiscordCrypt',
       iconLarge: 'https://i.imgur.com/pFuRfDE.png',
       iconSmall: 'https://i.imgur.com/zWXtTpX.png'
@@ -1993,9 +1981,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     constructor() {
       this.utf8encoder = new TextEncoder();
       this.utf8decoder = new TextDecoder();
+      this.v2Enabled = true;
+      this.selfTestResult = null;
     }
 
     // Hashing
+    async sha256(buffer) {
+      return await crypto.subtle.digest('SHA-256', buffer);
+    }
+
     async sha512(buffer) {
       return await crypto.subtle.digest('SHA-512', buffer);
     }
@@ -2017,55 +2011,229 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
 
     // AES Encryption/Decryption
-    async aesImportKey(buffer) {
-      return await crypto.subtle.importKey('raw', buffer, 'AES-CBC', false, [
-        'encrypt',
-        'decrypt',
-      ]);
+    // v22 writes authenticated AES-256-GCM envelopes while retaining transparent
+    // AES-CBC decryption for all pre-v22 content.
+    getAesPurposeId(purpose) {
+      const purposes = {
+        generic: 0,
+        message: 1,
+        file: 2,
+        filename: 3,
+        'db-key': 4,
+        'db-dh': 5,
+        'db-identity': 6,
+        'db-check': 7,
+        'key-share': 8,
+        'personal-key': 9,
+      };
+      return purposes[purpose] == null ? purposes.generic : purposes[purpose];
     }
 
-    async aesEncrypt(key, buffer) {
-      let initializationVector = this.getRandomBytes(16);
-      let encryptedBuffer = await crypto.subtle.encrypt(
+    getAesPurposeName(id) {
+      const names = [
+        'generic',
+        'message',
+        'file',
+        'filename',
+        'db-key',
+        'db-dh',
+        'db-identity',
+        'db-check',
+        'key-share',
+        'personal-key',
+      ];
+      return names[id] || 'generic';
+    }
+
+    getGcmMagic() {
+      // 64-bit marker: an accidental collision with a legacy CBC IV is
+      // effectively negligible, while keeping v1 auto-detection simple.
+      return Uint8Array.from([0x53, 0x44, 0x43, 0x32, 0x47, 0x43, 0x4d, 0x21]); // SDC2GCM!
+    }
+
+    isAesV2Envelope(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const magic = this.getGcmMagic();
+      if (bytes.byteLength < magic.length + 2 + 12 + 16) return false;
+      for (let i = 0; i < magic.length; i++) {
+        if (bytes[i] !== magic[i]) return false;
+      }
+      return bytes[9] === 1;
+    }
+
+    async aesImportKey(buffer) {
+      const raw = new Uint8Array(buffer).slice();
+      if (raw.byteLength !== 32)
+        throw new Error(`SDC AES key must be 32 bytes, got ${raw.byteLength}`);
+
+      const [cbc, gcm] = await Promise.all([
+        crypto.subtle.importKey('raw', raw, 'AES-CBC', false, [
+          'encrypt',
+          'decrypt',
+        ]),
+        crypto.subtle.importKey('raw', raw, 'AES-GCM', false, [
+          'encrypt',
+          'decrypt',
+        ]),
+      ]);
+
+      return Object.freeze({ __sdcAesKey: 2, cbc, gcm });
+    }
+
+    getAesSubkey(key, mode) {
+      if (key?.__sdcAesKey === 2) return key[mode];
+      if (key?.algorithm?.name === (mode === 'gcm' ? 'AES-GCM' : 'AES-CBC'))
+        return key;
+      throw new Error(`SDC AES ${mode.toUpperCase()} subkey unavailable`);
+    }
+
+    async aesEncryptLegacy(key, buffer) {
+      const initializationVector = this.getRandomBytes(16);
+      const encryptedBuffer = await crypto.subtle.encrypt(
         { name: 'AES-CBC', iv: initializationVector },
-        key,
+        this.getAesSubkey(key, 'cbc'),
         buffer
       );
       return this.concatBuffers([initializationVector, encryptedBuffer]);
     }
 
-    async aesDecrypt(key, buffer) {
-      let initializationVector = buffer.slice(0, 16);
-      let encryptedBuffer = buffer.slice(16);
+    async aesDecryptLegacy(key, buffer) {
+      if (buffer.byteLength < 32)
+        throw new Error('Invalid legacy AES-CBC envelope');
+      const initializationVector = buffer.slice(0, 16);
+      const encryptedBuffer = buffer.slice(16);
       return await crypto.subtle.decrypt(
         { name: 'AES-CBC', iv: initializationVector },
-        key,
+        this.getAesSubkey(key, 'cbc'),
         encryptedBuffer
       );
     }
 
-    async aesEncryptString(key, string) {
-      let bytes = this.stringToUtf8Bytes(string);
-      return await this.aesEncrypt(key, bytes);
+    async aesEncrypt(key, buffer, purpose = 'generic') {
+      if (this.v2Enabled === false)
+        return await this.aesEncryptLegacy(key, buffer);
+
+      const magic = this.getGcmMagic();
+      const header = new Uint8Array(magic.length + 2);
+      header.set(magic, 0);
+      header[8] = this.getAesPurposeId(purpose);
+      header[9] = 1; // envelope version
+
+      const nonce = this.getRandomBytes(12);
+      const ciphertext = await crypto.subtle.encrypt(
+        {
+          name: 'AES-GCM',
+          iv: nonce,
+          additionalData: header,
+          tagLength: 128,
+        },
+        this.getAesSubkey(key, 'gcm'),
+        buffer
+      );
+      return this.concatBuffers([header, nonce, ciphertext]);
     }
 
-    async aesDecryptString(key, buffer) {
-      let bytes = await this.aesDecrypt(key, buffer);
+    async aesDecrypt(key, buffer, expectedPurpose = null) {
+      if (!this.isAesV2Envelope(buffer))
+        return await this.aesDecryptLegacy(key, buffer);
+
+      const bytes = new Uint8Array(buffer);
+      const headerLength = this.getGcmMagic().length + 2;
+      const header = bytes.slice(0, headerLength);
+      const purpose = this.getAesPurposeName(header[8]);
+      if (
+        expectedPurpose != null &&
+        expectedPurpose !== 'generic' &&
+        purpose !== expectedPurpose
+      ) {
+        throw new Error(
+          `SDC AES-GCM purpose mismatch: expected ${expectedPurpose}, got ${purpose}`
+        );
+      }
+
+      const nonce = bytes.slice(headerLength, headerLength + 12);
+      const ciphertext = bytes.slice(headerLength + 12);
+      return await crypto.subtle.decrypt(
+        {
+          name: 'AES-GCM',
+          iv: nonce,
+          additionalData: header,
+          tagLength: 128,
+        },
+        this.getAesSubkey(key, 'gcm'),
+        ciphertext
+      );
+    }
+
+    async aesEncryptString(key, string, purpose = 'generic') {
+      const bytes = this.stringToUtf8Bytes(string);
+      return await this.aesEncrypt(key, bytes, purpose);
+    }
+
+    async aesDecryptString(key, buffer, expectedPurpose = null) {
+      const bytes = await this.aesDecrypt(key, buffer, expectedPurpose);
       return this.utf8BytesToString(bytes);
     }
 
     async aesEncryptCompressString(key, string) {
-      let buffer = await this.tryCompress(
+      const buffer = await this.tryCompress(
         this.stringToUtf8Bytes(string).buffer
       );
-      return await this.aesEncrypt(key, buffer);
+      return await this.aesEncrypt(key, buffer, 'message');
+    }
+
+    async aesEncryptCompressStringLegacy(key, string) {
+      const buffer = await this.tryCompress(
+        this.stringToUtf8Bytes(string).buffer
+      );
+      return await this.aesEncryptLegacy(key, buffer);
     }
 
     async aesDecryptDecompressString(key, string) {
-      let buffer = await this.tryDecompress(
-        await this.aesDecrypt(key, string)
+      const buffer = await this.tryDecompress(
+        await this.aesDecrypt(key, string, 'message')
       );
       return this.utf8BytesToString(buffer);
+    }
+
+    async pbkdf2Sha256(password, salt, iterations, length = 32) {
+      const material = await crypto.subtle.importKey(
+        'raw',
+        this.stringToUtf8Bytes(password),
+        'PBKDF2',
+        false,
+        ['deriveBits']
+      );
+      return await crypto.subtle.deriveBits(
+        {
+          name: 'PBKDF2',
+          hash: 'SHA-256',
+          salt,
+          iterations,
+        },
+        material,
+        length * 8
+      );
+    }
+
+    async hkdfSha256(ikm, salt, info, length = 32) {
+      const material = await crypto.subtle.importKey(
+        'raw',
+        ikm,
+        'HKDF',
+        false,
+        ['deriveBits']
+      );
+      return await crypto.subtle.deriveBits(
+        {
+          name: 'HKDF',
+          hash: 'SHA-256',
+          salt,
+          info,
+        },
+        material,
+        length * 8
+      );
     }
 
     // Diffie-Hellman Key Exchange
@@ -2122,10 +2290,73 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
 
     async dhGetSecret(privateKey, publicKey) {
+      // Legacy v1 compatibility: pre-v22 derived only the first 256 bits.
       return await crypto.subtle.deriveBits(
         { name: 'ECDH', namedCurve: 'P-521', public: publicKey },
         privateKey,
         256
+      );
+    }
+
+    async dhGetSecretFull(privateKey, publicKey) {
+      // P-521 field elements occupy 66 bytes (528 bits in WebCrypto output).
+      return await crypto.subtle.deriveBits(
+        { name: 'ECDH', namedCurve: 'P-521', public: publicKey },
+        privateKey,
+        528
+      );
+    }
+
+    async identityGenerateKeys() {
+      return await crypto.subtle.generateKey(
+        { name: 'ECDSA', namedCurve: 'P-521' },
+        true,
+        ['sign', 'verify']
+      );
+    }
+
+    async identityImportPublicKey(buffer) {
+      return await crypto.subtle.importKey(
+        'spki',
+        buffer,
+        { name: 'ECDSA', namedCurve: 'P-521' },
+        false,
+        ['verify']
+      );
+    }
+
+    async identityImportPrivateKey(buffer) {
+      return await crypto.subtle.importKey(
+        'pkcs8',
+        buffer,
+        { name: 'ECDSA', namedCurve: 'P-521' },
+        false,
+        ['sign']
+      );
+    }
+
+    async identityExportPublicKey(key) {
+      return await crypto.subtle.exportKey('spki', key);
+    }
+
+    async identityExportPrivateKey(key) {
+      return await crypto.subtle.exportKey('pkcs8', key);
+    }
+
+    async identitySign(privateKey, data) {
+      return await crypto.subtle.sign(
+        { name: 'ECDSA', hash: 'SHA-512' },
+        privateKey,
+        data
+      );
+    }
+
+    async identityVerify(publicKey, signature, data) {
+      return await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-512' },
+        publicKey,
+        signature,
+        data
       );
     }
 
@@ -2298,6 +2529,269 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   // Create singleton instance
   const cryptoService = new CryptoService();
 
+  const SDC_DB_CRYPTO_VERSION = 2;
+  const SDC_DB_KDF_ITERATIONS = 600000;
+  const SDC_DB_CHECK_TEXT = 'SimpleDiscordCrypt DB v2 authenticated check';
+
+  async function deriveDbKeyV2(password, saltBase64, iterations) {
+    const salt = cryptoService.base64ToBytes(saltBase64);
+    const keyBytes = await cryptoService.pbkdf2Sha256(
+      password,
+      salt,
+      iterations || SDC_DB_KDF_ITERATIONS,
+      32
+    );
+    return await cryptoService.aesImportKey(keyBytes);
+  }
+
+  async function makeDbCheckV2(dbKey) {
+    return cryptoService.bytesToBase64(
+      await cryptoService.aesEncrypt(
+        dbKey,
+        cryptoService.stringToUtf8Bytes(SDC_DB_CHECK_TEXT),
+        'db-check'
+      )
+    );
+  }
+
+  async function verifyDbKeyV2(dbKey, encodedCheck) {
+    try {
+      const clear = await cryptoService.aesDecrypt(
+        dbKey,
+        cryptoService.base64ToBytes(encodedCheck),
+        'db-check'
+      );
+      return cryptoService.utf8BytesToString(clear) === SDC_DB_CHECK_TEXT;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function migrateLegacyDatabaseCryptoV2(password, legacyDbKey) {
+    // Keep one untouched encrypted v21 snapshot before changing the on-disk
+    // format. It contains only the already-encrypted legacy database and is
+    // available for an explicit rollback if the user is testing v22.
+    try {
+      const existingBackup = await Utils.StorageLoad(
+        'SimpleDiscordCrypt-pre-v22'
+      );
+      if (existingBackup == null) {
+        await Utils.StorageSave(
+          'SimpleDiscordCrypt-pre-v22',
+          JSON.parse(JSON.stringify(DataBase))
+        );
+        console.log('[SDC][CRYPTO] database:pre-v22-backup-created');
+      }
+    } catch (error) {
+      console.warn('[SDC][CRYPTO] unable to create pre-v22 backup', error);
+    }
+
+    const plaintextKeys = {};
+    for (const [hash, keyObj] of Object.entries(DataBase.keys || {})) {
+      const encrypted = cryptoService.base64ToBytes(keyObj.k);
+      plaintextKeys[hash] = await cryptoService.aesDecrypt(
+        legacyDbKey,
+        encrypted
+      );
+    }
+
+    const dhPlain = await cryptoService.aesDecrypt(
+      legacyDbKey,
+      cryptoService.base64ToBytes(DataBase.dhPrivateKey)
+    );
+
+    let identityPlain = null;
+    if (DataBase.identityPrivateKey) {
+      identityPlain = await cryptoService.aesDecrypt(
+        legacyDbKey,
+        cryptoService.base64ToBytes(DataBase.identityPrivateKey)
+      );
+    }
+
+    const salt = cryptoService.getRandomBytes(16);
+    const saltBase64 = cryptoService.bytesToBase64(salt);
+    const newDbKey = await deriveDbKeyV2(
+      password,
+      saltBase64,
+      SDC_DB_KDF_ITERATIONS
+    );
+
+    const newKeyValues = {};
+    for (const [hash, clear] of Object.entries(plaintextKeys)) {
+      newKeyValues[hash] = cryptoService.bytesToBase64(
+        await cryptoService.aesEncrypt(newDbKey, clear, 'db-key')
+      );
+    }
+    const newDhPrivate = cryptoService.bytesToBase64(
+      await cryptoService.aesEncrypt(newDbKey, dhPlain, 'db-dh')
+    );
+    const newIdentityPrivate = identityPlain
+      ? cryptoService.bytesToBase64(
+          await cryptoService.aesEncrypt(
+            newDbKey,
+            identityPlain,
+            'db-identity'
+          )
+        )
+      : null;
+    const dbCheck = await makeDbCheckV2(newDbKey);
+
+    // Commit only after every decrypt/encrypt operation has succeeded.
+    for (const [hash, value] of Object.entries(newKeyValues))
+      DataBase.keys[hash].k = value;
+    DataBase.dhPrivateKey = newDhPrivate;
+    if (newIdentityPrivate)
+      DataBase.identityPrivateKey = newIdentityPrivate;
+
+    DataBase.dbCryptoVersion = SDC_DB_CRYPTO_VERSION;
+    DataBase.dbKdf = 'PBKDF2-HMAC-SHA-256';
+    DataBase.dbKdfSalt = saltBase64;
+    DataBase.dbKdfIterations = SDC_DB_KDF_ITERATIONS;
+    DataBase.dbCheck = dbCheck;
+    delete DataBase.dbPasswordSalt;
+    delete DataBase.dbKeySalt;
+    delete DataBase.dbPasswordHash;
+
+    Cache.dbKey = newDbKey;
+    await Utils.StorageSave('SimpleDiscordCrypt', DataBase);
+    console.log('[SDC][CRYPTO] database:migrated-v2', {
+      kdf: DataBase.dbKdf,
+      iterations: DataBase.dbKdfIterations,
+      keys: Object.keys(DataBase.keys || {}).length,
+    });
+  }
+
+  async function ensureIdentityKeys() {
+    if (DataBase.identityPublicKey && DataBase.identityPrivateKey) return;
+
+    const pair = await cryptoService.identityGenerateKeys();
+    const publicBytes = await cryptoService.identityExportPublicKey(
+      pair.publicKey
+    );
+    let privateBytes = await cryptoService.identityExportPrivateKey(
+      pair.privateKey
+    );
+
+    if (DataBase.isEncrypted) {
+      privateBytes = await cryptoService.aesEncrypt(
+        Cache.dbKey,
+        privateBytes,
+        'db-identity'
+      );
+    }
+
+    DataBase.identityPublicKey = cryptoService.bytesToBase64(publicBytes);
+    DataBase.identityPrivateKey = cryptoService.bytesToBase64(privateBytes);
+    DataBase.identityKeyCreated = Date.now();
+    Utils.dbChanged = true;
+    try { Utils.FastSaveDb(); } catch (_) {}
+
+    const fp = cryptoService.bytesToBase64url(
+      (await cryptoService.sha256(publicBytes)).slice(0, 16)
+    );
+    console.log('[SDC][CRYPTO] identity:created', { fingerprint: fp });
+  }
+
+  async function readIdentityPrivateKey() {
+    await ensureIdentityKeys();
+    let bytes = cryptoService.base64ToBytes(DataBase.identityPrivateKey);
+    if (DataBase.isEncrypted) {
+      bytes = await cryptoService.aesDecrypt(
+        Cache.dbKey,
+        bytes,
+        'db-identity'
+      );
+    }
+    return await cryptoService.identityImportPrivateKey(bytes);
+  }
+
+  async function runCryptoV2SelfTest() {
+    if (cryptoService.selfTestResult != null)
+      return cryptoService.selfTestResult;
+
+    const started = performance.now();
+    try {
+      const raw = cryptoService.getRandomBytes(32);
+      const key = await cryptoService.aesImportKey(raw);
+      const sample = cryptoService.stringToUtf8Bytes('SDC crypto v2 self-test');
+
+      const gcm = await cryptoService.aesEncrypt(key, sample, 'message');
+      const clear = await cryptoService.aesDecrypt(key, gcm, 'message');
+      if (cryptoService.utf8BytesToString(clear) !== 'SDC crypto v2 self-test')
+        throw new Error('AES-GCM roundtrip mismatch');
+
+      const tampered = new Uint8Array(gcm).slice();
+      tampered[tampered.length - 1] ^= 1;
+      let tamperRejected = false;
+      try {
+        await cryptoService.aesDecrypt(key, tampered, 'message');
+      } catch (_) {
+        tamperRejected = true;
+      }
+      if (!tamperRejected) throw new Error('AES-GCM tamper test failed');
+
+      const legacy = await cryptoService.aesEncryptLegacy(key, sample);
+      const legacyClear = await cryptoService.aesDecrypt(key, legacy);
+      if (
+        cryptoService.utf8BytesToString(legacyClear) !==
+        'SDC crypto v2 self-test'
+      )
+        throw new Error('AES-CBC compatibility roundtrip mismatch');
+
+      const salt = cryptoService.getRandomBytes(16);
+      const pb = await cryptoService.pbkdf2Sha256('self-test', salt, 1000, 32);
+      if (pb.byteLength !== 32) throw new Error('PBKDF2 length mismatch');
+
+      const hk = await cryptoService.hkdfSha256(
+        raw,
+        salt,
+        cryptoService.stringToUtf8Bytes('SDC self-test'),
+        32
+      );
+      if (hk.byteLength !== 32) throw new Error('HKDF length mismatch');
+
+      const a = await cryptoService.dhGenerateKeys();
+      const b = await cryptoService.dhGenerateKeys();
+      const [sa, sb] = await Promise.all([
+        cryptoService.dhGetSecretFull(a.privateKey, b.publicKey),
+        cryptoService.dhGetSecretFull(b.privateKey, a.publicKey),
+      ]);
+      if (
+        cryptoService.bytesToBase64(sa) !==
+        cryptoService.bytesToBase64(sb)
+      )
+        throw new Error('ephemeral ECDH mismatch');
+
+      const id = await cryptoService.identityGenerateKeys();
+      const sig = await cryptoService.identitySign(id.privateKey, sample);
+      if (!(await cryptoService.identityVerify(id.publicKey, sig, sample)))
+        throw new Error('ECDSA verification failed');
+
+      cryptoService.v2Enabled = true;
+      cryptoService.selfTestResult = {
+        ok: true,
+        elapsedMs: Math.round(performance.now() - started),
+        aes: 'AES-256-GCM-128',
+        legacyRead: 'AES-256-CBC',
+        kdf: 'PBKDF2-HMAC-SHA-256',
+        exchangeKdf: 'HKDF-SHA-256',
+        identity: 'ECDSA-P-521/SHA-512',
+        exchange: 'ephemeral ECDH-P-521',
+      };
+    } catch (error) {
+      cryptoService.v2Enabled = false;
+      cryptoService.selfTestResult = {
+        ok: false,
+        elapsedMs: Math.round(performance.now() - started),
+        error: error?.message || String(error),
+      };
+      console.error('[SDC][CRYPTO] self-test failed; new encryption falls back to legacy CBC', error);
+    }
+
+    console.log('[SDC][CRYPTO] self-test', cryptoService.selfTestResult);
+    return cryptoService.selfTestResult;
+  }
+
   // DatabaseManager - Centralized database operations
   class DatabaseManager {
     constructor() {
@@ -2336,7 +2830,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let keyBytes = cryptoService.base64ToBytes(keyBase64);
 
       if (DataBase.isEncrypted)
-        keyBytes = await cryptoService.aesDecrypt(Cache.dbKey, keyBytes);
+        keyBytes = await cryptoService.aesDecrypt(Cache.dbKey, keyBytes, 'db-key');
 
       let key = await cryptoService.aesImportKey(keyBytes);
       this.trimKeyCache();
@@ -2354,7 +2848,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let keyBytes = cryptoService.base64ToBytes(keyBase64);
 
       if (DataBase.isEncrypted)
-        keyBytes = await cryptoService.aesDecrypt(Cache.dbKey, keyBytes);
+        keyBytes = await cryptoService.aesDecrypt(Cache.dbKey, keyBytes, 'db-key');
 
       return keyBytes;
     }
@@ -2373,7 +2867,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
 
       if (DataBase.isEncrypted)
-        keyBytes = await cryptoService.aesEncrypt(Cache.dbKey, keyBytes);
+        keyBytes = await cryptoService.aesEncrypt(Cache.dbKey, keyBytes, 'db-key');
 
       keyObj.k = cryptoService.bytesToBase64(keyBytes);
       DataBase.keys[keyHashBase64] = keyObj;
@@ -3939,6 +4433,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return result;
       },
 
+      Sha256: async (buffer) => await cryptoService.sha256(buffer),
       Sha512: async (buffer) => await cryptoService.sha512(buffer),
       Sha512_128: async (buffer) => await cryptoService.sha512_128(buffer),
       Sha512_128str: async (string) => await cryptoService.sha512_128str(string),
@@ -3946,11 +4441,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       Sha512_256str: async (string) => await cryptoService.sha512_256str(string),
 
       AesImportKey: async (buffer) => await cryptoService.aesImportKey(buffer),
-      AesEncrypt: async (key, buffer) => await cryptoService.aesEncrypt(key, buffer),
-      AesDecrypt: async (key, buffer) => await cryptoService.aesDecrypt(key, buffer),
-      AesEncryptString: async (key, string) => await cryptoService.aesEncryptString(key, string),
-      AesDecryptString: async (key, buffer) => await cryptoService.aesDecryptString(key, buffer),
+      AesEncrypt: async (key, buffer, purpose) => await cryptoService.aesEncrypt(key, buffer, purpose),
+      AesEncryptLegacy: async (key, buffer) => await cryptoService.aesEncryptLegacy(key, buffer),
+      AesDecrypt: async (key, buffer, purpose) => await cryptoService.aesDecrypt(key, buffer, purpose),
+      AesEncryptString: async (key, string, purpose) => await cryptoService.aesEncryptString(key, string, purpose),
+      AesDecryptString: async (key, buffer, purpose) => await cryptoService.aesDecryptString(key, buffer, purpose),
       AesEncryptCompressString: async (key, string) => await cryptoService.aesEncryptCompressString(key, string),
+      AesEncryptCompressStringLegacy: async (key, string) => await cryptoService.aesEncryptCompressStringLegacy(key, string),
       AesDecryptDecompressString: async (key, string) => await cryptoService.aesDecryptDecompressString(key, string),
 
       DhGenerateKeys: async () => await cryptoService.dhGenerateKeys(),
@@ -3961,6 +4458,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       DhExportPrivateKey: async (key) => await cryptoService.dhExportPrivateKey(key),
       DhExportPrivateKeyFallback: async (key) => await cryptoService.dhExportPrivateKeyFallback(key),
       DhGetSecret: async (privateKey, publicKey) => await cryptoService.dhGetSecret(privateKey, publicKey),
+      DhGetSecretFull: async (privateKey, publicKey) => await cryptoService.dhGetSecretFull(privateKey, publicKey),
+      HkdfSha256: async (ikm, salt, info, length) => await cryptoService.hkdfSha256(ikm, salt, info, length),
+      Pbkdf2Sha256: async (password, salt, iterations, length) => await cryptoService.pbkdf2Sha256(password, salt, iterations, length),
+      IdentityGenerateKeys: async () => await cryptoService.identityGenerateKeys(),
+      IdentityImportPublicKey: async (buffer) => await cryptoService.identityImportPublicKey(buffer),
+      IdentityImportPrivateKey: async (buffer) => await cryptoService.identityImportPrivateKey(buffer),
+      IdentityExportPublicKey: async (key) => await cryptoService.identityExportPublicKey(key),
+      IdentityExportPrivateKey: async (key) => await cryptoService.identityExportPrivateKey(key),
+      IdentitySign: async (key, data) => await cryptoService.identitySign(key, data),
+      IdentityVerify: async (key, signature, data) => await cryptoService.identityVerify(key, signature, data),
+      CryptoV2SelfTest: async () => await runCryptoV2SelfTest(),
 
       StringToUtf8Bytes: (string) => cryptoService.stringToUtf8Bytes(string),
       StringToAsciiBytes: (string) => cryptoService.stringToAsciiBytes(string),
@@ -3998,30 +4506,83 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       LoadDb: function (callback, failCallback, reload) {
         (async () => {
+          const selfTest = await this.CryptoV2SelfTest();
           if (!reload) DataBase = await this.StorageLoad('SimpleDiscordCrypt');
           if (DataBase != null) {
             Cache = { keys: {} };
+
+            const finishLoad = async () => {
+              if (selfTest.ok) await ensureIdentityKeys();
+              if (callback) callback();
+            };
 
             if (DataBase.isEncrypted) {
               const newdbCallback = () => {
                 this.NewDb(callback);
               };
               const passwordCallback = async (password) => {
-                if (
-                  this.BytesToBase64(
-                    await this.Sha512_128str(password + DataBase.dbPasswordSalt)
-                  ) === DataBase.dbPasswordHash
-                ) {
-                  Cache.dbKey = await this.AesImportKey(
-                    await this.Sha512_256str(password + DataBase.dbKeySalt)
+                try {
+                  if (DataBase.dbCryptoVersion === SDC_DB_CRYPTO_VERSION) {
+                    if (!selfTest.ok)
+                      throw new Error(
+                        'Crypto v2 is unavailable; this database requires AES-GCM/PBKDF2 support.'
+                      );
+
+                    const dbKey = await deriveDbKeyV2(
+                      password,
+                      DataBase.dbKdfSalt,
+                      DataBase.dbKdfIterations
+                    );
+                    if (!(await verifyDbKeyV2(dbKey, DataBase.dbCheck))) {
+                      UnlockWindow.Show(passwordCallback, newdbCallback);
+                      return;
+                    }
+                    Cache.dbKey = dbKey;
+                    await finishLoad();
+                    return;
+                  }
+
+                  // Legacy password verification remains read-only and is used
+                  // once to atomically migrate the database to PBKDF2 + GCM.
+                  const legacyHash = this.BytesToBase64(
+                    await this.Sha512_128str(
+                      password + DataBase.dbPasswordSalt
+                    )
                   );
-                  if (callback) callback();
-                } else UnlockWindow.Show(passwordCallback, newdbCallback);
+                  if (legacyHash !== DataBase.dbPasswordHash) {
+                    UnlockWindow.Show(passwordCallback, newdbCallback);
+                    return;
+                  }
+
+                  const legacyDbKey = await this.AesImportKey(
+                    await this.Sha512_256str(
+                      password + DataBase.dbKeySalt
+                    )
+                  );
+
+                  if (!selfTest.ok) {
+                    Cache.dbKey = legacyDbKey;
+                    console.warn('[SDC][CRYPTO] Legacy database unlocked without v2 migration because self-test failed');
+                  } else {
+                    await migrateLegacyDatabaseCryptoV2(
+                      password,
+                      legacyDbKey
+                    );
+                  }
+                  await finishLoad();
+                } catch (error) {
+                  console.error('[SDC][CRYPTO] database unlock/migration failed', error);
+                  UnlockWindow.Show(passwordCallback, newdbCallback);
+                }
               };
 
               UnlockWindow.Show(passwordCallback, newdbCallback, failCallback);
             } else {
-              if (callback) callback();
+              if (selfTest.ok && DataBase.dbCryptoVersion == null) {
+                DataBase.dbCryptoVersion = SDC_DB_CRYPTO_VERSION;
+                this.dbChanged = true;
+              }
+              await finishLoad();
             }
           } else {
             this.NewDb(callback, failCallback);
@@ -4071,21 +4632,23 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               autoKeyExchange: 'DM+friends',
             };
             Cache = { keys: {} };
+            DataBase.dbCryptoVersion = SDC_DB_CRYPTO_VERSION;
             if (DataBase.isEncrypted) {
-              let salts = this.GetRandomUints(2);
-              DataBase.dbPasswordSalt = salts[0];
-              DataBase.dbKeySalt = salts[1];
-
-              DataBase.dbPasswordHash = await this.BytesToBase64(
-                await this.Sha512_128str(password + DataBase.dbPasswordSalt)
+              const salt = this.GetRandomBytes(16);
+              DataBase.dbKdf = 'PBKDF2-HMAC-SHA-256';
+              DataBase.dbKdfSalt = this.BytesToBase64(salt);
+              DataBase.dbKdfIterations = SDC_DB_KDF_ITERATIONS;
+              Cache.dbKey = await deriveDbKeyV2(
+                password,
+                DataBase.dbKdfSalt,
+                DataBase.dbKdfIterations
               );
-              Cache.dbKey = await this.AesImportKey(
-                await this.Sha512_256str(password + DataBase.dbKeySalt)
-              );
+              DataBase.dbCheck = await makeDbCheckV2(Cache.dbKey);
             }
 
             await this.NewPersonalKey();
             await this.NewDhKeys();
+            await ensureIdentityKeys();
             this.FastSaveDb();
             if (callback) callback();
           },
@@ -4105,86 +4668,114 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         );
       },
       NewDbPassword: function (callback) {
-        //TODO: notifications
         NewPasswordWindow.Show(async (password) => {
-          let newDataBase = Object.assign({}, DataBase);
-          let newDbKey = null;
-          let oldDbKey = Cache.dbKey;
-          newDataBase.isEncrypted = password !== '';
-          if (newDataBase.isEncrypted) {
-            let salts = this.GetRandomUints(2);
-            newDataBase.dbPasswordSalt = salts[0];
-            newDataBase.dbKeySalt = salts[1];
+          try {
+            const newDataBase = Object.assign({}, DataBase);
+            const oldDbKey = Cache.dbKey;
 
-            newDataBase.dbPasswordHash = await this.BytesToBase64(
-              await this.Sha512_128str(password + newDataBase.dbPasswordSalt)
-            );
-            newDbKey = await this.AesImportKey(
-              await this.Sha512_256str(password + newDataBase.dbKeySalt)
-            );
-
-            let keys = {};
-            let dhKeyBytes;
-            if (DataBase.isEncrypted) {
-              //re-encrypt keys
-              for (let [keyHash, oldKey] of Object.entries(DataBase.keys)) {
-                let newKey = Object.assign({}, oldKey);
-                let keyBytes = await this.AesDecrypt(
+            const clearKeys = {};
+            for (const [keyHash, oldKey] of Object.entries(DataBase.keys || {})) {
+              let keyBytes = this.Base64ToBytes(oldKey.k);
+              if (DataBase.isEncrypted) {
+                keyBytes = await this.AesDecrypt(
                   oldDbKey,
-                  this.Base64ToBytes(oldKey.k /*key*/)
+                  keyBytes,
+                  'db-key'
                 );
-                newKey.k = this.BytesToBase64(
-                  await this.AesEncrypt(newDbKey, keyBytes)
-                );
-                keys[keyHash] = newKey;
               }
+              clearKeys[keyHash] = keyBytes;
+            }
+
+            let dhKeyBytes = this.Base64ToBytes(DataBase.dhPrivateKey);
+            if (DataBase.isEncrypted) {
               dhKeyBytes = await this.AesDecrypt(
                 oldDbKey,
-                this.Base64ToBytes(DataBase.dhPrivateKey)
+                dhKeyBytes,
+                'db-dh'
               );
-            } else {
-              //encrypt keys
-              for (let [keyHash, oldKey] of Object.entries(DataBase.keys)) {
-                let newKey = Object.assign({}, oldKey);
-                let keyBytes = this.Base64ToBytes(oldKey.k /*key*/);
-                newKey.k = this.BytesToBase64(
-                  await this.AesEncrypt(newDbKey, keyBytes)
-                );
-                keys[keyHash] = newKey;
-              }
-              dhKeyBytes = this.Base64ToBytes(DataBase.dhPrivateKey);
             }
-            newDataBase.dhPrivateKey = this.BytesToBase64(
-              await this.AesEncrypt(newDbKey, dhKeyBytes)
-            );
-            newDataBase.keys = keys;
-          } else if (DataBase.isEncrypted) {
-            //decrypt keys
+
+            let identityKeyBytes = DataBase.identityPrivateKey
+              ? this.Base64ToBytes(DataBase.identityPrivateKey)
+              : null;
+            if (identityKeyBytes && DataBase.isEncrypted) {
+              identityKeyBytes = await this.AesDecrypt(
+                oldDbKey,
+                identityKeyBytes,
+                'db-identity'
+              );
+            }
+
+            const enableProtection = password !== '';
+            newDataBase.isEncrypted = enableProtection;
+            newDataBase.dbCryptoVersion = SDC_DB_CRYPTO_VERSION;
+
+            let newDbKey = null;
+            if (enableProtection) {
+              const salt = this.GetRandomBytes(16);
+              newDataBase.dbKdf = 'PBKDF2-HMAC-SHA-256';
+              newDataBase.dbKdfSalt = this.BytesToBase64(salt);
+              newDataBase.dbKdfIterations = SDC_DB_KDF_ITERATIONS;
+              newDbKey = await deriveDbKeyV2(
+                password,
+                newDataBase.dbKdfSalt,
+                newDataBase.dbKdfIterations
+              );
+              newDataBase.dbCheck = await makeDbCheckV2(newDbKey);
+            } else {
+              delete newDataBase.dbKdf;
+              delete newDataBase.dbKdfSalt;
+              delete newDataBase.dbKdfIterations;
+              delete newDataBase.dbCheck;
+            }
             delete newDataBase.dbPasswordSalt;
             delete newDataBase.dbKeySalt;
             delete newDataBase.dbPasswordHash;
-            let keys = {};
-            for (let [keyHash, oldKey] of Object.entries(DataBase.keys)) {
-              let newKey = Object.assign({}, oldKey);
-              let keyBytes = await this.AesDecrypt(
-                oldDbKey,
-                this.Base64ToBytes(oldKey.k /*key*/)
-              );
+
+            const keys = {};
+            for (const [keyHash, oldKey] of Object.entries(DataBase.keys || {})) {
+              const newKey = Object.assign({}, oldKey);
+              let keyBytes = clearKeys[keyHash];
+              if (enableProtection) {
+                keyBytes = await this.AesEncrypt(
+                  newDbKey,
+                  keyBytes,
+                  'db-key'
+                );
+              }
               newKey.k = this.BytesToBase64(keyBytes);
               keys[keyHash] = newKey;
             }
-            let dhKeyBytes = await this.AesDecrypt(
-              oldDbKey,
-              this.Base64ToBytes(DataBase.dhPrivateKey)
-            );
-            newDataBase.dhPrivateKey = this.BytesToBase64(dhKeyBytes);
             newDataBase.keys = keys;
-          }
 
-          DataBase = newDataBase;
-          Cache.dbKey = newDbKey;
-          this.FastSaveDb();
-          if (callback) callback();
+            if (enableProtection) {
+              dhKeyBytes = await this.AesEncrypt(
+                newDbKey,
+                dhKeyBytes,
+                'db-dh'
+              );
+              if (identityKeyBytes) {
+                identityKeyBytes = await this.AesEncrypt(
+                  newDbKey,
+                  identityKeyBytes,
+                  'db-identity'
+                );
+              }
+            }
+            newDataBase.dhPrivateKey = this.BytesToBase64(dhKeyBytes);
+            if (identityKeyBytes)
+              newDataBase.identityPrivateKey = this.BytesToBase64(
+                identityKeyBytes
+              );
+
+            DataBase = newDataBase;
+            Cache.dbKey = newDbKey;
+            this.FastSaveDb();
+            if (callback) callback();
+          } catch (error) {
+            console.error('[SDC][CRYPTO] password change failed; database left untouched', error);
+            Utils.Error('Unable to change database password safely.');
+          }
         });
       },
       NewDhKeys: async function () {
@@ -4205,7 +4796,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (DataBase.isEncrypted)
           dhPrivateKeyBytes = await this.AesEncrypt(
             Cache.dbKey,
-            dhPrivateKeyBytes
+            dhPrivateKeyBytes,
+            'db-dh'
           );
 
         if (dhPrivateKeyFallback) DataBase.dhPrivateKeyFallback = true;
@@ -4219,7 +4811,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (DataBase.isEncrypted)
           dhPrivateKeyBytes = await this.AesDecrypt(
             Cache.dbKey,
-            dhPrivateKeyBytes
+            dhPrivateKeyBytes,
+            'db-dh'
           );
 
         if (DataBase.dhPrivateKeyFallback) {
@@ -4231,7 +4824,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             if (DataBase.isEncrypted)
               dhPrivateKeyBytes = await this.AesEncrypt(
                 Cache.dbKey,
-                dhPrivateKeyBytes
+                dhPrivateKeyBytes,
+                'db-dh'
               );
 
             delete DataBase.dhPrivateKeyFallback;
@@ -4379,9 +4973,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         let personalKey = await this.GetKeyBytesByHash(
           DataBase.personalKeyHash
         );
-        let personalKeyPayload = this.PayloadEncode(
-          await this.AesEncrypt(key, personalKey)
-        );
+        let encryptedPersonalKey;
+        if (channelConfig.cryptoProtocol === 1)
+          encryptedPersonalKey = await this.AesEncryptLegacy(key, personalKey);
+        else
+          encryptedPersonalKey = await this.AesEncrypt(
+            key,
+            personalKey,
+            'personal-key'
+          );
+        let personalKeyPayload = this.PayloadEncode(encryptedPersonalKey);
 
         this.SendSystemMessage(
           channelId,
@@ -4581,9 +5182,47 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           this.Base64ToBytes(DataBase.dhPublicKey)
         );
 
-        const sysMsg = `*type*: \`DH KEY\`\n*dhKey*: \`${dhPublicKeyPayload}\``;
+        let sysMsg;
+        if (cryptoService.v2Enabled) {
+          await ensureIdentityKeys();
+          const ephemeral = await this.DhGenerateKeys();
+          const ephemeralPublicBytes = await this.DhExportPublicKey(
+            ephemeral.publicKey
+          );
+          const identityPublicBytes = this.Base64ToBytes(
+            DataBase.identityPublicKey
+          );
+          const transcript = kexTranscriptInit(
+            currentUserId,
+            userId,
+            channelId,
+            ephemeralPublicBytes
+          );
+          const signatureBytes = await signKexTranscript(transcript);
 
-        console.log('[SDC] InitKeyExchange: Sending DH KEY', { channelId });
+          pendingV2KeyExchanges[userId] = {
+            channelId,
+            privateKey: ephemeral.privateKey,
+            publicKeyBytes: ephemeralPublicBytes,
+            createdAt: Date.now(),
+          };
+
+          sysMsg =
+            `*type*: \`DH KEY\`\n` +
+            `*protocol*: \`2\`\n` +
+            `*dhKey*: \`${dhPublicKeyPayload}\`\n` +
+            `*ephKey*: \`${this.PayloadEncode(ephemeralPublicBytes)}\`\n` +
+            `*identityKey*: \`${this.PayloadEncode(identityPublicBytes)}\`\n` +
+            `*signature*: \`${this.PayloadEncode(signatureBytes)}\``;
+
+          console.log('[SDC] InitKeyExchange: Sending signed ephemeral DH KEY v2', {
+            channelId,
+            userId,
+          });
+        } else {
+          sysMsg = `*type*: \`DH KEY\`\n*dhKey*: \`${dhPublicKeyPayload}\``;
+          console.warn('[SDC][CRYPTO] v2 unavailable; sending legacy DH KEY');
+        }
         this.SendSystemMessage(channelId, sysMsg);
         channelConfig =
           channelConfig || this.GetOrCreateChannelConfig(channelId);
@@ -4758,7 +5397,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         let sharedKeyBase64 = keyObj.k;
         let sharedKeyBytes = this.Base64ToBytes(sharedKeyBase64);
         if (DataBase.isEncrypted)
-          sharedKeyBytes = await this.AesDecrypt(Cache.dbKey, sharedKeyBytes);
+          sharedKeyBytes = await this.AesDecrypt(Cache.dbKey, sharedKeyBytes, 'db-key');
 
         if (channelConfig == null)
           channelConfig = this.GetOrCreateChannelConfig(channelId);
@@ -4787,9 +5426,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           this.Base64ToBytes(channelConfig.k)
         );
 
-        let sharedKeyPayload = this.PayloadEncode(
-          await Utils.AesEncrypt(key, sharedKeyBytes)
-        );
+        let encryptedSharedKey;
+        if (channelConfig.cryptoProtocol === 1)
+          encryptedSharedKey = await Utils.AesEncryptLegacy(
+            key,
+            sharedKeyBytes
+          );
+        else
+          encryptedSharedKey = await Utils.AesEncrypt(
+            key,
+            sharedKeyBytes,
+            'key-share'
+          );
+        let sharedKeyPayload = this.PayloadEncode(encryptedSharedKey);
 
         if (keyHash === DataBase.personalKeyHash) {
           let keyDescriptor = `<@${Discord.getCurrentUser().id
@@ -4842,23 +5491,47 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (DataBase.isEncrypted)
             dhPrivateKeyBytes = await this.AesDecrypt(
               Cache.dbKey,
-              dhPrivateKeyBytes
+              dhPrivateKeyBytes,
+              'db-dh'
             );
           let seed = this.Base64ToBytes(keyRotator.seed);
           let newName =
             /^(.*?)(?: +\d+)?$/.exec(oldKey.d /*descriptor*/)[1] +
             ' ' +
             rotationCtr;
-          let seedEdit = new DataView(seed.buffer);
-          seedEdit.setUint32(
-            0,
-            seedEdit.getUint32(0, true) ^ rotationCtr,
-            true
-          );
-          let newKeyHash = await this.SaveKey(
-            await this.Sha512_256(
+
+          let nextKeyBytes;
+          if (keyRotator.v >= 2) {
+            // v22 rotations derive from the current group key using HKDF. This
+            // avoids the previous ad-hoc SHA-512(seed || local-DH-private-key)
+            // construction and is deterministic for every holder of the group
+            // key + rotator metadata.
+            const currentKeyBytes = await this.GetKeyBytesByHash(keyHash);
+            const salt = await this.Sha256(seed);
+            const info = this.StringToUtf8Bytes(
+              `SDC-KEY-ROTATION-V2|${rotationCtr}|${keyRotator.start}|${keyRotator.interval}`
+            );
+            nextKeyBytes = await this.HkdfSha256(
+              currentKeyBytes,
+              salt,
+              info,
+              32
+            );
+          } else {
+            // Existing schedules remain fully compatible with v21 and older.
+            let seedEdit = new DataView(seed.buffer);
+            seedEdit.setUint32(
+              0,
+              seedEdit.getUint32(0, true) ^ rotationCtr,
+              true
+            );
+            nextKeyBytes = await this.Sha512_256(
               this.ConcatBuffers([seed, dhPrivateKeyBytes])
-            ),
+            );
+          }
+
+          let newKeyHash = await this.SaveKey(
+            nextKeyBytes,
             1 /*group*/,
             newName,
             oldKey.h /*hidden*/
@@ -4952,7 +5625,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
         let fileBuffer = await Utils.AesDecrypt(
           await Utils.GetKeyByHash(keyHash),
-          encryptedFileBuffer
+          encryptedFileBuffer,
+          'file'
         );
 
         Utils.DownloadBlob(filename, new File([fileBuffer], filename));
@@ -4974,6 +5648,34 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         throw error;
       }
     };
+    Discord.window.SdcCryptoStatus = async () => {
+      const identityPublic = DataBase?.identityPublicKey
+        ? Utils.Base64ToBytes(DataBase.identityPublicKey)
+        : null;
+      return {
+        selfTest: await runCryptoV2SelfTest(),
+        databaseCryptoVersion: DataBase?.dbCryptoVersion || 1,
+        databaseKdf: DataBase?.dbKdf || (DataBase?.isEncrypted ? 'legacy-SHA-512' : 'none'),
+        databaseKdfIterations: DataBase?.dbKdfIterations || null,
+        writeCipher: cryptoService.v2Enabled ? 'AES-256-GCM-128' : 'AES-256-CBC (fallback)',
+        legacyReadCipher: 'AES-256-CBC',
+        identityFingerprint: identityPublic
+          ? await identityFingerprint(identityPublic)
+          : null,
+        peerIdentities: Object.keys(DataBase?.peerIdentityKeys || {}).length,
+      };
+    };
+
+    Discord.window.SdcRestorePreV22Database = async () => {
+      const backup = await Utils.StorageLoad('SimpleDiscordCrypt-pre-v22');
+      if (backup == null) return { restored: false, reason: 'no-backup' };
+      await Utils.StorageSave('SimpleDiscordCrypt', backup);
+      return {
+        restored: true,
+        message: 'Pre-v22 database restored. Fully restart Discord before loading SDC again.',
+      };
+    };
+
     Discord.window.SdcClearKeys = (filterFunc) => {
       const typeLookup = [null, 'GROUP', 'CONVERSATION', 'PERSONAL'];
       for (let [hash, keyObj] of Object.entries(DataBase.keys)) {
@@ -5053,7 +5755,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             return;
           }
           if (DataBase.keyRotators == null) DataBase.keyRotators = {};
-          DataBase.keyRotators[keyHash] = { interval, start, seed: keyHash };
+          DataBase.keyRotators[keyHash] = { interval, start, seed: keyHash, v: 2 };
         } else {
           interval = day * days;
           if (keyRotator.start < Date.now())
@@ -5867,6 +6569,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return mediaTypes[match[1].toLowerCase()] === 'img';
   }
 
+  function getEncryptedAttachmentDownloadsForMessage(messageId) {
+    if (!messageId) return [];
+
+    const result = [];
+    for (const meta of EncryptedAttachmentDownloads.values()) {
+      if (String(meta.messageId || '') === String(messageId)) {
+        result.push(meta);
+      }
+    }
+
+    // Keep registration/attachment order stable.
+    return result;
+  }
+
   function getEncryptedImageDownloadsForMessage(messageId) {
     if (!messageId) return [];
 
@@ -5889,10 +6605,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (!/^\d{17,20}$/.test(id)) return null;
 
     for (const meta of EncryptedAttachmentDownloads.values()) {
-      if (
-        String(meta.messageId || '') === id &&
-        isEncryptedImageAttachmentMeta(meta)
-      ) {
+      if (String(meta.messageId || '') === id) {
         return id;
       }
     }
@@ -6053,10 +6766,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         const meta = findEncryptedAttachmentDownloadForHref(
           anchor.getAttribute('href') || anchor.href || ''
         );
-        if (
-          meta?.messageId &&
-          isEncryptedImageAttachmentMeta(meta)
-        ) {
+        if (meta?.messageId) {
           return String(meta.messageId);
         }
       }
@@ -6065,10 +6775,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return null;
   }
 
+  function getEncryptedAttachmentKind(meta) {
+    if (!meta?.filename) return 'file';
+
+    const match = extensionRegex.exec(meta.filename);
+    if (match == null) return 'file';
+
+    const mediaType = mediaTypes[match[1].toLowerCase()];
+    if (mediaType === 'img') return 'image';
+    if (mediaType === 'video') return 'video';
+    return 'file';
+  }
+
   async function downloadEncryptedImageFromContextMenu(meta) {
     if (!meta) return;
 
-    gifResolverLog('attachment', 'image-context-menu:download-start', {
+    gifResolverLog('attachment', 'attachment-context-menu:download-start', {
       id: meta.id,
       filename: meta.filename,
       messageId: meta.messageId,
@@ -6088,7 +6810,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         );
       } catch (_) {}
 
-      gifResolverLog('attachment', 'image-context-menu:download-success', {
+      gifResolverLog('attachment', 'attachment-context-menu:download-success', {
         id: meta.id,
         filename: meta.filename,
         messageId: meta.messageId,
@@ -6101,7 +6823,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         );
       } catch (_) {}
 
-      gifResolverWarn('attachment', 'image-context-menu:download-failed', {
+      gifResolverWarn('attachment', 'attachment-context-menu:download-failed', {
         id: meta.id,
         filename: meta.filename,
         messageId: meta.messageId,
@@ -6124,14 +6846,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       menuItem = {
         type: 'item',
         id: 'sdc-download-encrypted-image',
-        label: 'Télécharger l’image déchiffrée',
+        label:
+          getEncryptedAttachmentKind(meta) === 'image'
+            ? 'Télécharger l’image déchiffrée'
+            : getEncryptedAttachmentKind(meta) === 'video'
+              ? 'Télécharger la vidéo déchiffrée'
+              : 'Télécharger le fichier déchiffré',
         action: () => downloadEncryptedImageFromContextMenu(meta),
       };
     } else {
       menuItem = {
         type: 'submenu',
         id: 'sdc-download-encrypted-images',
-        label: 'Télécharger les images déchiffrées',
+        label: 'Télécharger les pièces jointes déchiffrées',
         items: metas.map((meta, index) => ({
           type: 'item',
           id: `sdc-download-encrypted-image-${index}`,
@@ -6317,10 +7044,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     item.setAttribute('role', 'menuitem');
     item.setAttribute('tabindex', '-1');
 
-    const label =
-      total === 1
-        ? 'Télécharger l’image déchiffrée'
-        : `Télécharger ${meta.filename}`;
+    let label;
+    if (total === 1) {
+      const kind = getEncryptedAttachmentKind(meta);
+      label =
+        kind === 'image'
+          ? 'Télécharger l’image déchiffrée'
+          : kind === 'video'
+            ? 'Télécharger la vidéo déchiffrée'
+            : 'Télécharger le fichier déchiffré';
+    } else {
+      label = `Télécharger ${meta.filename}`;
+    }
 
     replaceClonedDiscordMenuItemLabel(item, label);
     replaceClonedDiscordMenuItemIcon(item);
@@ -6366,7 +7101,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return true;
     }
 
-    const metas = getEncryptedImageDownloadsForMessage(
+    const metas = getEncryptedAttachmentDownloadsForMessage(
       pending.messageId
     );
     if (!metas.length) return false;
@@ -6432,7 +7167,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     gifResolverLog(
       'attachment',
-      'image-overflow-menu:injected',
+      'attachment-overflow-menu:injected',
       {
         messageId: pending.messageId,
         count: metas.length,
@@ -6450,7 +7185,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (Date.now() > pending.expiresAt) {
       gifResolverLog(
         'attachment',
-        'image-overflow-menu:expired',
+        'attachment-overflow-menu:expired',
         { messageId: pending.messageId }
       );
       encryptedImageOverflowPending = null;
@@ -6514,7 +7249,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (!messageId) return;
 
     const metas =
-      getEncryptedImageDownloadsForMessage(messageId);
+      getEncryptedAttachmentDownloadsForMessage(messageId);
     if (!metas.length) return;
 
     const ariaLabel = String(
@@ -6553,7 +7288,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     gifResolverLog(
       'attachment',
-      'image-overflow-menu:armed',
+      'attachment-overflow-menu:armed',
       {
         messageId,
         ariaLabel: ariaLabel || null,
@@ -6616,7 +7351,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       gifResolverLog(
         'attachment',
-        'image-overflow-menu:installed',
+        'attachment-overflow-menu:installed',
         {
           mode: 'three-dot-popover-dom',
         }
@@ -6626,7 +7361,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     } catch (error) {
       gifResolverWarn(
         'attachment',
-        'image-overflow-menu:install-failed',
+        'attachment-overflow-menu:install-failed',
         {
           message: error?.message || String(error),
           stack: error?.stack,
@@ -6954,7 +7689,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     let encryptedFilename = Utils.Base64urlToBytes(attachment.filename);
     let filename;
     try {
-      filename = await Utils.AesDecryptString(key, encryptedFilename);
+      filename = await Utils.AesDecryptString(key, encryptedFilename, 'filename');
     } catch (e) {
       filename = 'file';
     }
@@ -7273,7 +8008,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   // --------------------------------------------------------------------------
-  // Rich GIF link support (v21)
+  // Rich GIF link support (v23)
   // --------------------------------------------------------------------------
   // Discord never sees the clear-text URL of an encrypted message, so its own
   // unfurler cannot resolve page-style GIF links. Keep that work isolated to a
@@ -9661,6 +10396,113 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const invalidSystemMessage = CONFIG.messages.invalidSystem;
   const blockedSystemMessage = CONFIG.messages.blocked;
   var keyExchangeWhitelist = {};
+  const pendingV2KeyExchanges = {};
+
+  function kexTranscriptInit(initiatorId, responderId, channelId, ephBytes) {
+    return Utils.StringToUtf8Bytes(
+      [
+        'SDC-KEX-V2',
+        'INIT',
+        String(initiatorId),
+        String(responderId),
+        String(channelId),
+        Utils.BytesToBase64(ephBytes),
+      ].join('|')
+    );
+  }
+
+  function kexTranscriptResponse(
+    initiatorId,
+    responderId,
+    channelId,
+    initEphBytes,
+    responseEphBytes
+  ) {
+    return Utils.StringToUtf8Bytes(
+      [
+        'SDC-KEX-V2',
+        'RESP',
+        String(initiatorId),
+        String(responderId),
+        String(channelId),
+        Utils.BytesToBase64(initEphBytes),
+        Utils.BytesToBase64(responseEphBytes),
+      ].join('|')
+    );
+  }
+
+  async function identityFingerprint(publicBytes) {
+    return Utils.BytesToBase64url(
+      (await Utils.Sha256(publicBytes)).slice(0, 16)
+    );
+  }
+
+  async function verifyAndPinPeerIdentity(
+    userId,
+    publicBytes,
+    signatureBytes,
+    transcript
+  ) {
+    const publicKey = await Utils.IdentityImportPublicKey(publicBytes);
+    if (!(await Utils.IdentityVerify(publicKey, signatureBytes, transcript)))
+      throw new Error('Peer identity signature verification failed');
+
+    const encoded = Utils.BytesToBase64(publicBytes);
+    const fingerprint = await identityFingerprint(publicBytes);
+    if (!DataBase.peerIdentityKeys) DataBase.peerIdentityKeys = {};
+    const known = DataBase.peerIdentityKeys[userId];
+
+    if (known && known.publicKey !== encoded) {
+      const oldFingerprint = known.fingerprint || 'unknown';
+      const accepted = await PopupManager.NewPromise(
+        `SECURITY WARNING: the cryptographic identity for this user changed.\n\nOld: ${oldFingerprint}\nNew: ${fingerprint}\n\nAccept the new identity key?`,
+        true
+      );
+      if (!accepted)
+        throw new Error('Peer identity key changed and replacement was rejected');
+    }
+
+    DataBase.peerIdentityKeys[userId] = {
+      publicKey: encoded,
+      fingerprint,
+      firstSeen: known?.firstSeen || Date.now(),
+      lastSeen: Date.now(),
+    };
+    Utils.dbChanged = true;
+    return { publicKey, fingerprint };
+  }
+
+  async function signKexTranscript(transcript) {
+    const privateKey = await readIdentityPrivateKey();
+    return await Utils.IdentitySign(privateKey, transcript);
+  }
+
+  async function deriveConversationKeyV2(
+    privateKey,
+    remotePublicKey,
+    initiatorId,
+    responderId,
+    channelId,
+    initEphBytes,
+    responseEphBytes
+  ) {
+    const sharedSecret = await Utils.DhGetSecretFull(
+      privateKey,
+      remotePublicKey
+    );
+    const salt = await Utils.Sha256(
+      Utils.ConcatBuffers([initEphBytes, responseEphBytes])
+    );
+    const info = Utils.StringToUtf8Bytes(
+      `SDC-KEX-V2|${initiatorId}|${responderId}|${channelId}`
+    );
+    return await Utils.HkdfSha256(
+      sharedSecret,
+      salt,
+      info,
+      32
+    );
+  }
 
   // Peers explicitly refused by the local user. This is persisted inside the SDC
   // database so a message refresh/restart cannot reopen the same confirmation.
@@ -9825,51 +10667,159 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           message.content = '💻 H-hi I would like to know you better';
           if (oldMessage) return false;
 
+          const protocol = getSystemMessageProperty('protocol', sysmsg);
+          if (protocol === '2') {
+            try {
+              const ephPayload = getSystemMessageProperty('ephKey', sysmsg);
+              const identityPayload = getSystemMessageProperty(
+                'identityKey',
+                sysmsg
+              );
+              const signaturePayload = getSystemMessageProperty(
+                'signature',
+                sysmsg
+              );
+              if (!ephPayload || !identityPayload || !signaturePayload) break;
+
+              const initiatorId = message.author.id;
+              const responderId = Discord.getCurrentUser().id;
+              const initEphBytes = Utils.PayloadDecode(ephPayload);
+              const identityBytes = Utils.PayloadDecode(identityPayload);
+              const signatureBytes = Utils.PayloadDecode(signaturePayload);
+              const initTranscript = kexTranscriptInit(
+                initiatorId,
+                responderId,
+                message.channel_id,
+                initEphBytes
+              );
+              const peerIdentity = await verifyAndPinPeerIdentity(
+                userId,
+                identityBytes,
+                signatureBytes,
+                initTranscript
+              );
+
+              const initEphPublic = await Utils.DhImportPublicKey(
+                initEphBytes
+              );
+              const responseEphemeral = await Utils.DhGenerateKeys();
+              const responseEphBytes = await Utils.DhExportPublicKey(
+                responseEphemeral.publicKey
+              );
+              const conversationKeyBytes = await deriveConversationKeyV2(
+                responseEphemeral.privateKey,
+                initEphPublic,
+                initiatorId,
+                responderId,
+                message.channel_id,
+                initEphBytes,
+                responseEphBytes
+              );
+
+              const keyHash = await Utils.SaveKey(
+                conversationKeyBytes,
+                2,
+                `DM key with <@${message.author.id}>`
+              );
+              Utils.KeyShareEvent(keyHash);
+              channelConfig.k = keyHash;
+              channelConfig.cryptoProtocol = 2;
+              if (message.channel_id === Cache.channelId) {
+                Cache.channelConfig = channelConfig;
+                MenuBar.Update();
+              }
+
+              await ensureIdentityKeys();
+              const identityPublicBytes = Utils.Base64ToBytes(
+                DataBase.identityPublicKey
+              );
+              const responseTranscript = kexTranscriptResponse(
+                initiatorId,
+                responderId,
+                message.channel_id,
+                initEphBytes,
+                responseEphBytes
+              );
+              const responseSignature = await signKexTranscript(
+                responseTranscript
+              );
+              const conversationKey = await Utils.AesImportKey(
+                conversationKeyBytes
+              );
+              const encryptedPersonalKey = await Utils.AesEncrypt(
+                conversationKey,
+                await Utils.GetKeyBytesByHash(DataBase.personalKeyHash),
+                'personal-key'
+              );
+
+              const legacyDhPublicPayload = Utils.PayloadEncode(
+                Utils.Base64ToBytes(DataBase.dhPublicKey)
+              );
+              Utils.SendSystemMessage(
+                message.channel_id,
+                `*type*: \`DH RESPONSE\`\n` +
+                  `*protocol*: \`2\`\n` +
+                  `*dhKey*: \`${legacyDhPublicPayload}\`\n` +
+                  `*ephKey*: \`${Utils.PayloadEncode(responseEphBytes)}\`\n` +
+                  `*identityKey*: \`${Utils.PayloadEncode(identityPublicBytes)}\`\n` +
+                  `*signature*: \`${Utils.PayloadEncode(responseSignature)}\`\n` +
+                  `*personalKey*: \`${Utils.PayloadEncode(encryptedPersonalKey)}\``
+              );
+
+              channelConfig.w = 1;
+              Utils.dbChanged = true;
+              console.log('[SDC][CRYPTO] kex:v2-response-sent', {
+                userId,
+                keyHash: keyHash?.slice(0, 8),
+                peerFingerprint: peerIdentity.fingerprint,
+              });
+              decryptWaitingMessages(keyHash);
+              return true;
+            } catch (error) {
+              console.error('[SDC][CRYPTO] kex:v2 DH KEY failed', error);
+              break;
+            }
+          }
+
+          // Legacy v1 exchange remains readable for old peers.
           let dhKeyPayload = getSystemMessageProperty('dhKey', sysmsg);
           if (dhKeyPayload == null) break;
           try {
             let dhRemoteKeyBytes = Utils.PayloadDecode(dhKeyPayload);
             let dhRemoteKey = await Utils.DhImportPublicKey(dhRemoteKeyBytes);
-
             let dhPrivateKey = await Utils.ReadDhKey();
-
             let sharedSecret = await Utils.DhGetSecret(
               dhPrivateKey,
               dhRemoteKey
             );
             let keyHash = await Utils.SaveKey(
               sharedSecret,
-              2 /*conversation*/,
+              2,
               `DM key with <@${message.author.id}>`
             );
             Utils.KeyShareEvent(keyHash);
-            channelConfig.k /*keyHash*/ = keyHash;
+            channelConfig.k = keyHash;
+            channelConfig.cryptoProtocol = 1;
             if (message.channel_id === Cache.channelId) {
-              Cache.channelConfig = channelConfig; //in case it's a new config
+              Cache.channelConfig = channelConfig;
               MenuBar.Update();
             }
 
             let dhPublicKeyPayload = Utils.PayloadEncode(
               Utils.Base64ToBytes(DataBase.dhPublicKey)
             );
-
             let key = await Utils.AesImportKey(sharedSecret);
-
-            let encryptedPersonalKey = await Utils.AesEncrypt(
+            let encryptedPersonalKey = await Utils.AesEncryptLegacy(
               key,
               await Utils.GetKeyBytesByHash(DataBase.personalKeyHash)
             );
             let personalKeyPayload = Utils.PayloadEncode(encryptedPersonalKey);
-
-            console.log('[SDC] DH KEY: Sending DH RESPONSE with personal key', { keyHash: keyHash?.substring(0, 8) });
             Utils.SendSystemMessage(
               message.channel_id,
               `*type*: \`DH RESPONSE\`\n*dhKey*: \`${dhPublicKeyPayload}\`\n*personalKey*: \`${personalKeyPayload}\``
             );
-
-            channelConfig.w = 1; //waitingForSystemMessage (PERSONAL KEY from initiator)
+            channelConfig.w = 1;
             Utils.dbChanged = true;
-            console.log('[SDC] DH KEY: DH RESPONSE sent, w=1, waiting for PERSONAL KEY');
             decryptWaitingMessages(keyHash);
           } catch (e) {
             break;
@@ -9881,6 +10831,125 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           message.content = '💻 I like you :3, you can have my number';
           if (oldMessage) return false;
 
+          const protocol = getSystemMessageProperty('protocol', sysmsg);
+          if (protocol === '2') {
+            try {
+              const pending = pendingV2KeyExchanges[userId];
+              if (
+                !pending ||
+                pending.channelId !== message.channel_id ||
+                Date.now() - pending.createdAt > 10 * 60 * 1000
+              ) {
+                throw new Error('No valid pending ephemeral exchange state');
+              }
+
+              const responseEphPayload = getSystemMessageProperty(
+                'ephKey',
+                sysmsg
+              );
+              const identityPayload = getSystemMessageProperty(
+                'identityKey',
+                sysmsg
+              );
+              const signaturePayload = getSystemMessageProperty(
+                'signature',
+                sysmsg
+              );
+              const remotePersonalKeyPayload = getSystemMessageProperty(
+                'personalKey',
+                sysmsg
+              );
+              if (
+                !responseEphPayload ||
+                !identityPayload ||
+                !signaturePayload ||
+                !remotePersonalKeyPayload
+              )
+                break;
+
+              const initiatorId = Discord.getCurrentUser().id;
+              const responderId = message.author.id;
+              const responseEphBytes = Utils.PayloadDecode(
+                responseEphPayload
+              );
+              const identityBytes = Utils.PayloadDecode(identityPayload);
+              const signatureBytes = Utils.PayloadDecode(signaturePayload);
+              const responseTranscript = kexTranscriptResponse(
+                initiatorId,
+                responderId,
+                message.channel_id,
+                pending.publicKeyBytes,
+                responseEphBytes
+              );
+              const peerIdentity = await verifyAndPinPeerIdentity(
+                userId,
+                identityBytes,
+                signatureBytes,
+                responseTranscript
+              );
+
+              const responseEphPublic = await Utils.DhImportPublicKey(
+                responseEphBytes
+              );
+              const conversationKeyBytes = await deriveConversationKeyV2(
+                pending.privateKey,
+                responseEphPublic,
+                initiatorId,
+                responderId,
+                message.channel_id,
+                pending.publicKeyBytes,
+                responseEphBytes
+              );
+              delete pendingV2KeyExchanges[userId];
+
+              const keyHash = await Utils.SaveKey(
+                conversationKeyBytes,
+                2,
+                `DM key with <@${message.author.id}>`
+              );
+              Utils.KeyShareEvent(keyHash);
+              channelConfig.k = keyHash;
+              channelConfig.cryptoProtocol = 2;
+              Utils.dbChanged = true;
+              if (message.channel_id === Cache.channelId) {
+                Cache.channelConfig = channelConfig;
+                MenuBar.Update();
+              }
+
+              const key = await Utils.AesImportKey(conversationKeyBytes);
+              const remotePersonalKey = await Utils.AesDecrypt(
+                key,
+                Utils.PayloadDecode(remotePersonalKeyPayload),
+                'personal-key'
+              );
+              if (remotePersonalKey.byteLength !== 32) break;
+              const remotePersonalKeyHash = await Utils.SaveKey(
+                remotePersonalKey,
+                3,
+                `<@${message.author.id}>'s personal key`
+              );
+              Utils.KeyShareEvent(remotePersonalKeyHash);
+
+              await Utils.SendPersonalKey(message.channel_id);
+              delete keyExchangeWhitelist[userId];
+              Utils.KeyExchangeEvent(userId);
+              decryptWaitingMessages(keyHash);
+              decryptWaitingMessages(remotePersonalKeyHash);
+              console.log('[SDC][CRYPTO] kex:v2-complete', {
+                userId,
+                keyHash: keyHash?.slice(0, 8),
+                peerFingerprint: peerIdentity.fingerprint,
+              });
+              return true;
+            } catch (error) {
+              delete pendingV2KeyExchanges[userId];
+              console.error('[SDC][CRYPTO] kex:v2 DH RESPONSE failed', error);
+              break;
+            }
+          }
+
+          // Legacy response from a pre-v22 peer.
+          delete pendingV2KeyExchanges[userId];
           let dhKeyPayload = getSystemMessageProperty('dhKey', sysmsg);
           if (dhKeyPayload == null) break;
           let remotePersonalKeyPayload = getSystemMessageProperty(
@@ -9891,20 +10960,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           try {
             let dhRemoteKeyBytes = Utils.PayloadDecode(dhKeyPayload);
             let dhRemoteKey = await Utils.DhImportPublicKey(dhRemoteKeyBytes);
-
             let dhPrivateKey = await Utils.ReadDhKey();
-
             let sharedSecret = await Utils.DhGetSecret(
               dhPrivateKey,
               dhRemoteKey
             );
             let keyHash = await Utils.SaveKey(
               sharedSecret,
-              2 /*conversation*/,
+              2,
               `DM key with <@${message.author.id}>`
             );
             Utils.KeyShareEvent(keyHash);
-            channelConfig.k /*keyHash*/ = keyHash;
+            channelConfig.k = keyHash;
+            channelConfig.cryptoProtocol = 1;
             Utils.dbChanged = true;
             if (message.channel_id === Cache.channelId) {
               Cache.channelConfig = channelConfig;
@@ -9912,26 +10980,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             }
 
             let key = await Utils.AesImportKey(sharedSecret);
-
             let remotePersonalKey = await Utils.AesDecrypt(
               key,
-              Utils.PayloadDecode(remotePersonalKeyPayload)
+              Utils.PayloadDecode(remotePersonalKeyPayload),
+              'personal-key'
             );
             if (remotePersonalKey.byteLength !== 32) break;
             let remotePersonalKeyHash = await Utils.SaveKey(
               remotePersonalKey,
-              3 /*personal*/,
+              3,
               `<@${message.author.id}>'s personal key`
             );
             Utils.KeyShareEvent(remotePersonalKeyHash);
-
             await Utils.SendPersonalKey(message.channel_id);
-
-            // [BUG FIX #2] Clear keyExchangeWhitelist after sending PERSONAL KEY
             delete keyExchangeWhitelist[userId];
-
             Utils.KeyExchangeEvent(userId);
-
             decryptWaitingMessages(keyHash);
             decryptWaitingMessages(remotePersonalKeyHash);
           } catch (e) {
@@ -10131,7 +11194,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
             let sharedKey = await Utils.AesDecrypt(
               key,
-              Utils.PayloadDecode(sharedKeyPayload)
+              Utils.PayloadDecode(sharedKeyPayload),
+              'key-share'
             );
             if (sharedKey.byteLength !== 32) break;
             const keyTypeNames = { GROUP: 1, CONVERSATION: 2, PERSONAL: 3 }; //let's get personal :3
@@ -10313,7 +11377,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     let keyHashBytes = Utils.Base64ToBytes(channelConfig.k);
     let messageBytes;
     if (content !== '') {
-      let encryptedMessage = await Utils.AesEncryptCompressString(key, content);
+      let encryptedMessage =
+        channelConfig.cryptoProtocol === 1
+          ? await Utils.AesEncryptCompressStringLegacy(key, content)
+          : await Utils.AesEncryptCompressString(key, content);
       messageBytes = Utils.ConcatBuffers([keyHashBytes, encryptedMessage]);
     } else messageBytes = keyHashBytes;
 
@@ -10377,7 +11444,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   const filenameLimit = CONFIG.limits.maxFilenameLength;
   const filenameRegex = CONFIG.patterns.filename;
-  async function encryptFilename(key, filename) {
+  async function encryptFilename(key, filename, legacyCrypto = false) {
     let filenameParts = filenameRegex.exec(filename);
     let filenameMax = filenameLimit - filenameParts[2].length;
     filename = filenameParts[1].substr(0, filenameMax) + filenameParts[2];
@@ -10388,7 +11455,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       filenameBytes = Utils.StringToUtf8Bytes('file' + filenameParts[2]);
     do {
       encryptedFilename = Utils.BytesToBase64url(
-        await Utils.AesEncrypt(key, filenameBytes)
+        legacyCrypto
+          ? await Utils.AesEncryptLegacy(key, filenameBytes)
+          : await Utils.AesEncrypt(key, filenameBytes, 'filename')
       );
     } while (
       encryptedFilename.startsWith('_') ||
@@ -10432,9 +11501,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
 
     try {
-      let encryptedFilename = await encryptFilename(key, filename);
+      const legacyCrypto =
+        Utils.GetChannelConfig(channelId)?.cryptoProtocol === 1;
+      let encryptedFilename = await encryptFilename(
+        key,
+        filename,
+        legacyCrypto
+      );
       let fileBuffer = await Utils.ReadFile(file);
-      let encryptedBuffer = await Utils.AesEncrypt(key, fileBuffer);
+      let encryptedBuffer = legacyCrypto
+        ? await Utils.AesEncryptLegacy(key, fileBuffer)
+        : await Utils.AesEncrypt(key, fileBuffer, 'file');
       params.file = new File([encryptedBuffer], encryptedFilename);
       params.filename = encryptedFilename;
     } catch (e) {
@@ -10450,6 +11527,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (key == null) return;
 
     let encryptedUploads = [];
+    const legacyCrypto =
+      Utils.GetChannelConfig(channelId)?.cryptoProtocol === 1;
 
     try {
       for (let editableFile of uploads) {
@@ -10464,9 +11543,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
 
         // Chiffrer le nom du fichier
-        let encryptedFilename = await encryptFilename(key, filename);
+        let encryptedFilename = await encryptFilename(
+          key,
+          filename,
+          legacyCrypto
+        );
         let fileBuffer = await Utils.ReadFile(file);
-        let encryptedBuffer = await Utils.AesEncrypt(key, fileBuffer);
+        let encryptedBuffer = legacyCrypto
+          ? await Utils.AesEncryptLegacy(key, fileBuffer)
+          : await Utils.AesEncrypt(key, fileBuffer, 'file');
         let encryptedFile = new File([encryptedBuffer], encryptedFilename);
 
         // Mettre à jour l'objet editableFile
@@ -10491,10 +11576,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return Discord.original_instantBatchUpload.apply(this, arguments);
 
     try {
+      const legacyCrypto =
+        Utils.GetChannelConfig(channelId)?.cryptoProtocol === 1;
       for (let file of fileList) {
-        let encryptedFilename = await encryptFilename(key, file.name);
+        let encryptedFilename = await encryptFilename(
+          key,
+          file.name,
+          legacyCrypto
+        );
         let fileBuffer = await Utils.ReadFile(file);
-        let encryptedBuffer = await Utils.AesEncrypt(key, fileBuffer);
+        let encryptedBuffer = legacyCrypto
+          ? await Utils.AesEncryptLegacy(key, fileBuffer)
+          : await Utils.AesEncrypt(key, fileBuffer, 'file');
         let encryptedFile = new File([encryptedBuffer], encryptedFilename);
 
         Discord.upload({
@@ -10518,9 +11611,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     try {
       let filename = this.filename;
       let file = this.item.file;
-      let encryptedFilename = await encryptFilename(key, filename);
+      const legacyCrypto =
+        Utils.GetChannelConfig(this.channelId)?.cryptoProtocol === 1;
+      let encryptedFilename = await encryptFilename(
+        key,
+        filename,
+        legacyCrypto
+      );
       let fileBuffer = await Utils.ReadFile(file);
-      let encryptedBuffer = await Utils.AesEncrypt(key, fileBuffer);
+      let encryptedBuffer = legacyCrypto
+        ? await Utils.AesEncryptLegacy(key, fileBuffer)
+        : await Utils.AesEncrypt(key, fileBuffer, 'file');
       let encryptedFile = new File([encryptedBuffer], encryptedFilename);
 
       this.ENCRYPTED_FILE = encryptedFile;
@@ -10608,6 +11709,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
 
     const key = await Utils.GetKeyByHash(channelConfig.k);
+    const legacyCrypto = channelConfig.cryptoProtocol === 1;
 
     if (event.files && key) {
       const encryptedFiles = [];
@@ -10618,9 +11720,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           const file = fileItem.file || fileItem;
           const filename = file.name;
 
-          const encryptedFilename = await encryptFilename(key, filename);
+          const encryptedFilename = await encryptFilename(
+            key,
+            filename,
+            legacyCrypto
+          );
           const fileBuffer = await Utils.ReadFile(file);
-          const encryptedBuffer = await Utils.AesEncrypt(key, fileBuffer);
+          const encryptedBuffer = legacyCrypto
+            ? await Utils.AesEncryptLegacy(key, fileBuffer)
+            : await Utils.AesEncrypt(key, fileBuffer, 'file');
           const encryptedFile = new File([encryptedBuffer], encryptedFilename);
 
           // Stocker dans la Map avec le nom original comme clé
@@ -10673,22 +11781,26 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function LoadBlacklist() {
-    let blacklistString = Utils.Utf8BytesToString(
-      await Utils.DownloadFile(BlacklistUrl)
-    );
-    let blacklistRegex = /^\s*(\d{1,20})(E?)/gm;
+    // v23: the original plugin downloaded a remotely controlled list of guild
+    // IDs from the upstream GitLab repository. We deliberately disable that
+    // dependency: no remote request is performed and no guild is restricted.
     Blacklist = {};
-    let record;
-    while ((record = blacklistRegex.exec(blacklistString)) != null) {
-      Blacklist[record[1]] = record[2] === 'E' ? 2 : 1;
-    }
+    Cache.channelBlacklist = null;
 
+    gifResolverLog('security', 'remote-guild-blacklist:disabled', {
+      source: null,
+      behavior: 'all guilds unrestricted',
+    });
+
+    // Preserve the cache refresh behavior that followed the old blacklist
+    // download, because other startup code relies on Cache being current.
     for (let i = 1; ; i++) {
       if ((await Utils.RefreshCache()) || i === 10) break;
       await Utils.Sleep(i * 200);
     }
 
-    if (Cache.channelBlacklist === 1) MenuBar.Update();
+    Cache.channelBlacklist = null;
+    MenuBar.Update();
   }
 
   function HandleDispatch(event) {
@@ -11214,9 +12326,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // Messages already present in the viewport predate the observer.
     scanEncryptedAttachmentDownloadLinks();
 
-    // Images already decrypt/render inside Discord; v19 exposes their download
-    // through Discord's own message context menu rather than overlaying another
-    // button on top of the image.
+    // v23: every encrypted attachment is also downloadable from Discord's
+    // three-dot message menu. Non-image files keep their existing ↓ button.
     installEncryptedImageContextMenu();
 
     dbSaveInterval = setInterval(() => {
