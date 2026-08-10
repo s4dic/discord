@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://gitlab.com/n01sed/SimpleDiscordCryptV2
-// @version      1.7.5.2
+// @version      1.7.5.3
 // @description  I hope people won't start calling this SDC ^_^
-// @author       An0
+// @author       New author : Sleek
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
 // @downloadURL  https://gitlab.com/n01sed/SimpleDiscordCryptV2/raw/master/SimpleDiscordCrypt.user.js
 // @updateURL    https://gitlab.com/n01sed/SimpleDiscordCryptV2/raw/master/SimpleDiscordCrypt.meta.js
@@ -110,7 +110,7 @@
 
     // Regex Patterns
     patterns: {
-      message: /^([⠀-⣿]{16,}) `(?:SimpleDiscordCrypt|🔒)`$/,
+      message: /^([⠀-⣿]{16,}) `(?:SimpleDiscordCrypt|🔒)`(?:\r?\nhttps:\/\/(?:www\.)?klipy\.com\/gifs\/[^\s<>'"]+)*$/i,
       systemMessage: /^```(?:\w*\n)?-----SYSTEM MESSAGE-----\n?```\s*(.*?)\s*```(?:\w*\n)?(?:🔒|SimpleDiscordCrypt)\n?```$/s,
       description: /^[⠀-⣿]{16,}$/,
       prefix: /^(?::?ENC(?:(?:_\w*)?:|\b)|<:ENC:\d{1,20}>)\s*/,
@@ -553,6 +553,76 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 }
 .sdc-zoom::-webkit-scrollbar-thumb {
     background: #72dac7;
+}
+
+
+/* encrypted attachment download button */
+.sdc-attachment-download-card {
+    position: relative !important;
+}
+.sdc-attachment-download-btn {
+    all: unset;
+    box-sizing: border-box;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 4;
+    color: var(--interactive-normal, #b5bac1);
+    background: transparent;
+    transition:
+        background-color .12s ease,
+        color .12s ease,
+        opacity .12s ease;
+}
+.sdc-attachment-download-btn:hover {
+    color: var(--interactive-hover, #dbdee1);
+    background: var(--background-modifier-hover, rgba(79,84,92,.24));
+}
+.sdc-attachment-download-btn:active {
+    background: var(--background-modifier-active, rgba(79,84,92,.32));
+}
+.sdc-attachment-download-btn:disabled {
+    cursor: default;
+    opacity: .75;
+}
+.sdc-attachment-download-btn svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.sdc-attachment-download-spinner {
+    width: 16px;
+    height: 16px;
+    box-sizing: border-box;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: sdc-attachment-download-spin .7s linear infinite;
+}
+.sdc-attachment-download-success {
+    color: var(--status-positive, #23a55a);
+    font-size: 18px;
+    font-weight: 700;
+}
+.sdc-attachment-download-error {
+    color: var(--status-danger, #f23f43);
+    font-size: 18px;
+    font-weight: 700;
+}
+@keyframes sdc-attachment-download-spin {
+    to { transform: rotate(360deg); }
 }
 
 /*for light theme*/
@@ -3819,7 +3889,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+
+        // Chromium can start the actual download asynchronously. Revoking the
+        // object URL immediately can therefore produce an empty/unreadable file
+        // on some Discord/Electron builds.
+        setTimeout(() => {
+          try { URL.revokeObjectURL(url); } catch (_) {}
+        }, 30000);
       },
 
       TryCompress: (buffer) => cryptoService.tryCompress(buffer),
@@ -4399,6 +4475,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         let currentUserId = Discord.getCurrentUser().id;
         if (userId === currentUserId) return 0;
 
+        // A manual exchange (the context-menu action in a DM) is the only action
+        // that clears a previous refusal for this peer. Automatic exchanges caused
+        // by unknown encrypted messages stay suppressed until the user does this.
+        if (!autoOnMessage) {
+          ClearDeniedKeyPeer(userId);
+        } else if (IsDeniedKeyPeer(userId)) {
+          console.log('[SDC] Automatic key exchange suppressed for previously denied peer', { userId });
+          return 0;
+        }
+
         let channelId = Discord.getDMFromUserId(userId);
         let channelConfig;
         if (autoOnMessage) {
@@ -4437,7 +4523,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           let force = await popup;
           this.RemoveMessageDeleteListener(autoOnMessage, autoCancel);
           this.RemoveKeyShareListener(autoOnKey, autoCancel);
-          if (!force) return 0;
+          if (!force) {
+            DenyKeyPeer(userId, 'automatic-exchange');
+            return 0;
+          }
         }
         delete this.ongoingKeyExchanges[userId]; //this way once canceled you either have to add them as friend or restart the plugin
 
@@ -4507,6 +4596,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       RequestKey: async function (keyHash, user, autoOnMessage) {
         let userId = user.id;
         if (DataBase.keys[keyHash] != null) return false;
+
+        if (autoOnMessage && IsDeniedKeyPeer(userId)) {
+          console.log('[SDC] Automatic key request suppressed for previously denied peer', {
+            userId,
+            keyHash: keyHash?.slice(0, 8),
+          });
+          return false;
+        }
 
         let channelId = Discord.getDMFromUserId(userId);
         if (channelId == null) return false;
@@ -4821,12 +4918,61 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       document.body.removeChild(a);
     };
     Discord.window.SdcDecryptDl = async (filename, keyHash, url) => {
-      let encryptedFileBuffer = await Utils.DownloadFile(url);
-      let fileBuffer = await Utils.AesDecrypt(
-        await Utils.GetKeyByHash(keyHash),
-        encryptedFileBuffer
-      );
-      Utils.DownloadBlob(filename, new File([fileBuffer], filename));
+      try {
+        let encryptedFileBuffer;
+
+        // BdApi.Net.fetch handles redirects and current Discord CDN URLs more
+        // reliably than the old javascript: link + raw https.get path.
+        if (BdApi?.Net?.fetch) {
+          try {
+            const response = await BdApi.Net.fetch(url, {
+              method: 'GET',
+              redirect: 'follow',
+              timeout: 120000,
+              headers: { Accept: '*/*' },
+            });
+
+            if (!response.ok) {
+              throw new Error(`Attachment HTTP ${response.status}`);
+            }
+
+            encryptedFileBuffer = await response.arrayBuffer();
+          } catch (fetchError) {
+            gifResolverWarn('attachment', 'download:bdapi-fallback', {
+              filename,
+              url,
+              message: fetchError?.message || String(fetchError),
+            });
+          }
+        }
+
+        if (!encryptedFileBuffer) {
+          encryptedFileBuffer = await Utils.DownloadFile(url);
+        }
+
+        let fileBuffer = await Utils.AesDecrypt(
+          await Utils.GetKeyByHash(keyHash),
+          encryptedFileBuffer
+        );
+
+        Utils.DownloadBlob(filename, new File([fileBuffer], filename));
+
+        gifResolverLog('attachment', 'download:success', {
+          filename,
+          encryptedBytes: encryptedFileBuffer.byteLength,
+          decryptedBytes: fileBuffer.byteLength,
+        });
+
+        return true;
+      } catch (error) {
+        gifResolverWarn('attachment', 'download:failed', {
+          filename,
+          url,
+          name: error?.name,
+          message: error?.message || String(error),
+        });
+        throw error;
+      }
     };
     Discord.window.SdcClearKeys = (filterFunc) => {
       const typeLookup = [null, 'GROUP', 'CONVERSATION', 'PERSONAL'];
@@ -5070,6 +5216,42 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             funcName = 'sendMessage';
             break;
           }
+        }
+
+        // editMessage is a separate Discord action. Older SDC versions hooked it,
+        // but the modern compatibility path only hooked sendMessage/enqueue. As a
+        // result Discord sent the editor marker (:ENC: / <:ENC:...>) as plaintext.
+        let editFunc = null;
+        let editTarget = null;
+        for (const exp of mqExports) {
+          if (typeof exp.editMessage === 'function') {
+            editFunc = exp.editMessage;
+            editTarget = exp;
+            break;
+          }
+        }
+
+        if (editFunc && editTarget) {
+          Discord.original_editMessage = editFunc;
+          Discord.editMessageTarget = editTarget;
+
+          let detourEditFunction = editFunc;
+          Object.defineProperty(Discord, 'detour_editMessage', {
+            get: () => detourEditFunction,
+            set: (value) => (detourEditFunction = value),
+          });
+
+          Discord.editMessage = function () {
+            return Reflect.apply(detourEditFunction, editTarget, arguments);
+          };
+
+          editTarget.editMessage = function () {
+            return Reflect.apply(detourEditFunction, this, arguments);
+          };
+
+          console.log('[SDC] ✓ MessageQueue.editMessage hooked');
+        } else {
+          console.warn('[SDC] MessageQueue.editMessage not found; encrypted message editing will be unavailable');
         }
 
         if (enqueueFunc && enqueueTarget) {
@@ -5555,6 +5737,1213 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const extensionRegex = CONFIG.patterns.extension;
   var downloadLocked = false;
   var downloadLocks = [];
+
+  const EncryptedAttachmentDownloads = new Map();
+  const EncryptedAttachmentDownloadPaths = new Map();
+  let EncryptedAttachmentDownloadCounter = 0;
+  const MAX_ENCRYPTED_ATTACHMENT_DOWNLOADS = 500;
+
+  let encryptedImageContextMenuUnpatch = null;
+  let encryptedImageOverflowMenuObserver = null;
+  let encryptedImageOverflowPointerHandler = null;
+  let encryptedImageOverflowPending = null;
+  let encryptedImageOverflowSuppressUntil = 0;
+
+  function getEncryptedAttachmentPathKey(value) {
+    try {
+      const parsed = new URL(String(value || ''), location.href);
+      if (!/^https?:$/i.test(parsed.protocol)) return null;
+      return `${parsed.hostname.toLowerCase()}${parsed.pathname}`;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function registerEncryptedAttachmentDownload(
+    filename,
+    keyHash,
+    encryptedUrl,
+    messageId,
+    channelId
+  ) {
+    const pathKey = getEncryptedAttachmentPathKey(encryptedUrl);
+
+    if (pathKey != null) {
+      const previousId = EncryptedAttachmentDownloadPaths.get(pathKey);
+      const previous = previousId
+        ? EncryptedAttachmentDownloads.get(previousId)
+        : null;
+
+      if (previous) {
+        previous.filename = filename;
+        previous.keyHash = keyHash;
+        previous.encryptedUrl = encryptedUrl;
+        previous.messageId = messageId || previous.messageId || null;
+        previous.channelId = channelId || previous.channelId || null;
+        previous.lastSeen = Date.now();
+        scheduleEncryptedAttachmentDownloadScan();
+        return previous.id;
+      }
+    }
+
+    const id =
+      `${Date.now().toString(36)}-${(++EncryptedAttachmentDownloadCounter).toString(36)}`;
+
+    const meta = {
+      id,
+      filename,
+      keyHash,
+      encryptedUrl,
+      pathKey,
+      messageId: messageId || null,
+      channelId: channelId || null,
+      lastSeen: Date.now(),
+    };
+
+    EncryptedAttachmentDownloads.set(id, meta);
+    if (pathKey != null) EncryptedAttachmentDownloadPaths.set(pathKey, id);
+
+    while (
+      EncryptedAttachmentDownloads.size >
+      MAX_ENCRYPTED_ATTACHMENT_DOWNLOADS
+    ) {
+      const oldestId = EncryptedAttachmentDownloads.keys().next().value;
+      const oldest = EncryptedAttachmentDownloads.get(oldestId);
+      EncryptedAttachmentDownloads.delete(oldestId);
+      if (
+        oldest?.pathKey &&
+        EncryptedAttachmentDownloadPaths.get(oldest.pathKey) === oldestId
+      ) {
+        EncryptedAttachmentDownloadPaths.delete(oldest.pathKey);
+      }
+    }
+
+    gifResolverLog('attachment', 'download:registered', {
+      id,
+      filename,
+      messageId: messageId || null,
+      channelId: channelId || null,
+      pathKey,
+    });
+
+    scheduleEncryptedAttachmentDownloadScan();
+    return id;
+  }
+
+  function findEncryptedAttachmentDownloadForHref(href) {
+    const pathKey = getEncryptedAttachmentPathKey(href);
+    if (pathKey == null) return null;
+
+    let id = EncryptedAttachmentDownloadPaths.get(pathKey);
+    if (id != null) {
+      const direct = EncryptedAttachmentDownloads.get(id);
+      if (direct) return direct;
+    }
+
+    // Discord can move cdn.discordapp.com files through another CDN host while
+    // retaining the /attachments/<channel>/<attachment>/... path.
+    let parsedPath;
+    try {
+      parsedPath = new URL(String(href), location.href).pathname;
+    } catch (_) {
+      return null;
+    }
+
+    for (const meta of EncryptedAttachmentDownloads.values()) {
+      try {
+        if (new URL(meta.encryptedUrl).pathname === parsedPath) {
+          return meta;
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  function isEncryptedImageAttachmentMeta(meta) {
+    if (!meta?.filename) return false;
+    const match = extensionRegex.exec(meta.filename);
+    if (match == null) return false;
+    return mediaTypes[match[1].toLowerCase()] === 'img';
+  }
+
+  function getEncryptedImageDownloadsForMessage(messageId) {
+    if (!messageId) return [];
+
+    const result = [];
+    for (const meta of EncryptedAttachmentDownloads.values()) {
+      if (
+        String(meta.messageId || '') === String(messageId) &&
+        isEncryptedImageAttachmentMeta(meta)
+      ) {
+        result.push(meta);
+      }
+    }
+
+    // Keep registration/attachment order stable.
+    return result;
+  }
+
+  function getRegisteredEncryptedImageMessageId(candidate) {
+    const id = String(candidate || '');
+    if (!/^\d{17,20}$/.test(id)) return null;
+
+    for (const meta of EncryptedAttachmentDownloads.values()) {
+      if (
+        String(meta.messageId || '') === id &&
+        isEncryptedImageAttachmentMeta(meta)
+      ) {
+        return id;
+      }
+    }
+
+    return null;
+  }
+
+  function findRegisteredEncryptedImageMessageIdInValue(value, depth = 0, seen = null) {
+    if (value == null || depth > 4) return null;
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      return getRegisteredEncryptedImageMessageId(value);
+    }
+
+    if (typeof value !== 'object') return null;
+
+    if (!seen) seen = new Set();
+    if (seen.has(value)) return null;
+    seen.add(value);
+
+    const directId = getRegisteredEncryptedImageMessageId(value.id);
+    if (directId) {
+      // Prefer objects that actually resemble Discord message data, but the
+      // registry match itself is already unique enough to be safe.
+      if (
+        'attachments' in value ||
+        'content' in value ||
+        'channel_id' in value ||
+        'channelId' in value ||
+        'author' in value
+      ) {
+        return directId;
+      }
+    }
+
+    const directCandidates = [
+      value.message,
+      value.targetMessage,
+      value.contextMessage,
+      value.referencedMessage,
+      value.item,
+      value.record,
+      value.data,
+    ];
+
+    for (const candidate of directCandidates) {
+      const found = findRegisteredEncryptedImageMessageIdInValue(
+        candidate,
+        depth + 1,
+        seen
+      );
+      if (found) return found;
+    }
+
+    // Scan a small number of prop values. Avoid React children/owners/functions
+    // to keep this bounded and prevent expensive walks on large render trees.
+    let scanned = 0;
+    for (const [key, child] of Object.entries(value)) {
+      if (scanned >= 30) break;
+      if (
+        key === 'children' ||
+        key === '_owner' ||
+        key === 'return' ||
+        key === 'child' ||
+        key === 'sibling' ||
+        typeof child === 'function'
+      ) {
+        continue;
+      }
+
+      scanned++;
+      const found = findRegisteredEncryptedImageMessageIdInValue(
+        child,
+        depth + 1,
+        seen
+      );
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  function getMessageIdFromContextMenuReactTarget(target) {
+    if (!target || !(target instanceof Element)) return null;
+
+    let fiber = null;
+    try {
+      fiber = BdApi?.ReactUtils?.getInternalInstance?.(target);
+    } catch (_) {}
+
+    let current = fiber;
+    const seenFibers = new Set();
+
+    for (let depth = 0; current && depth < 45; depth++) {
+      if (seenFibers.has(current)) break;
+      seenFibers.add(current);
+
+      const sources = [
+        current.memoizedProps,
+        current.pendingProps,
+        current.stateNode?.props,
+      ];
+
+      for (const source of sources) {
+        const found =
+          findRegisteredEncryptedImageMessageIdInValue(source);
+        if (found) return found;
+      }
+
+      current = current.return;
+    }
+
+    return null;
+  }
+
+  function getMessageIdFromContextMenuTarget(target) {
+    if (!target || !(target instanceof Element)) return null;
+
+    // 1) React Fiber is the most reliable source on current Discord builds.
+    const reactMessageId =
+      getMessageIdFromContextMenuReactTarget(target);
+    if (reactMessageId) return reactMessageId;
+
+    // 2) Fall back to DOM attributes. Discord changes class names frequently,
+    // so inspect common message/list attributes without depending on CSS names.
+    let node = target;
+    for (
+      let depth = 0;
+      node && depth < 20;
+      depth++, node = node.parentElement
+    ) {
+      const values = [
+        node.id,
+        node.getAttribute?.('data-list-item-id'),
+        node.getAttribute?.('aria-labelledby'),
+        node.getAttribute?.('data-message-id'),
+      ].filter(Boolean);
+
+      for (const value of values) {
+        const snowflakes = String(value).match(/\d{17,20}/g) || [];
+        for (const candidate of snowflakes.reverse()) {
+          const found =
+            getRegisteredEncryptedImageMessageId(candidate);
+          if (found) return found;
+        }
+      }
+    }
+
+    // 3) Attachment-link fallback for non-image attachment layouts.
+    node = target;
+    for (
+      let depth = 0;
+      node && depth < 16;
+      depth++, node = node.parentElement
+    ) {
+      const anchors = node.querySelectorAll?.('a[href]') || [];
+      for (const anchor of anchors) {
+        const meta = findEncryptedAttachmentDownloadForHref(
+          anchor.getAttribute('href') || anchor.href || ''
+        );
+        if (
+          meta?.messageId &&
+          isEncryptedImageAttachmentMeta(meta)
+        ) {
+          return String(meta.messageId);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async function downloadEncryptedImageFromContextMenu(meta) {
+    if (!meta) return;
+
+    gifResolverLog('attachment', 'image-context-menu:download-start', {
+      id: meta.id,
+      filename: meta.filename,
+      messageId: meta.messageId,
+    });
+
+    try {
+      await Discord.window.SdcDecryptDl(
+        meta.filename,
+        meta.keyHash,
+        meta.encryptedUrl
+      );
+
+      try {
+        BdApi?.UI?.showToast?.(
+          `${meta.filename} téléchargé et déchiffré`,
+          { type: 'success' }
+        );
+      } catch (_) {}
+
+      gifResolverLog('attachment', 'image-context-menu:download-success', {
+        id: meta.id,
+        filename: meta.filename,
+        messageId: meta.messageId,
+      });
+    } catch (error) {
+      try {
+        BdApi?.UI?.showToast?.(
+          `Échec du téléchargement de ${meta.filename}`,
+          { type: 'error' }
+        );
+      } catch (_) {}
+
+      gifResolverWarn('attachment', 'image-context-menu:download-failed', {
+        id: meta.id,
+        filename: meta.filename,
+        messageId: meta.messageId,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  function appendEncryptedImageContextMenuGroup(menuTree, metas) {
+    if (!menuTree?.props || !Array.isArray(metas) || metas.length === 0)
+      return false;
+
+    const ContextMenu = BdApi?.ContextMenu;
+    if (!ContextMenu?.buildMenuChildren) return false;
+
+    let menuItem;
+
+    if (metas.length === 1) {
+      const meta = metas[0];
+      menuItem = {
+        type: 'item',
+        id: 'sdc-download-encrypted-image',
+        label: 'Télécharger l’image déchiffrée',
+        action: () => downloadEncryptedImageFromContextMenu(meta),
+      };
+    } else {
+      menuItem = {
+        type: 'submenu',
+        id: 'sdc-download-encrypted-images',
+        label: 'Télécharger les images déchiffrées',
+        items: metas.map((meta, index) => ({
+          type: 'item',
+          id: `sdc-download-encrypted-image-${index}`,
+          label: meta.filename || `Image ${index + 1}`,
+          action: () => downloadEncryptedImageFromContextMenu(meta),
+        })),
+      };
+    }
+
+    const built = ContextMenu.buildMenuChildren([
+      {
+        type: 'group',
+        items: [menuItem],
+      },
+    ]);
+
+    if (!built?.length) return false;
+
+    const children = menuTree.props.children;
+
+    if (Array.isArray(children)) {
+      // Put SDC's download action just before the final destructive/utility
+      // group when possible. This keeps it visually close to Discord's own
+      // message actions without modifying their components.
+      const insertAt = Math.max(0, children.length - 1);
+      children.splice(insertAt, 0, ...built);
+    } else if (children != null) {
+      menuTree.props.children = [children, ...built];
+    } else {
+      menuTree.props.children = built;
+    }
+
+    return true;
+  }
+
+  function isLikelyDiscordMessageActionsMenu(menu) {
+    if (!menu || !(menu instanceof Element)) return false;
+    if (menu.getAttribute('role') !== 'menu') return false;
+
+    const text = String(menu.innerText || '').toLowerCase();
+
+    // Current Discord UI strings + a few French equivalents. We only need
+    // enough signal to distinguish the message actions popover from reactions,
+    // profile menus, channel menus, etc.
+    const signals = [
+      'copy message link',
+      'delete message',
+      'mark unread',
+      'speak message',
+      'copy text',
+      'reply',
+      'forward',
+      'copier le lien du message',
+      'supprimer le message',
+      'marquer comme non lu',
+      'copier le texte',
+      'répondre',
+      'transférer',
+    ];
+
+    let score = 0;
+    for (const signal of signals) {
+      if (text.includes(signal)) score++;
+      if (score >= 2) return true;
+    }
+
+    // Structural fallback: a real message actions menu generally contains
+    // several menuitems. Do not accept it unless we also see at least one
+    // message-ish action term.
+    const items = menu.querySelectorAll('[role="menuitem"]');
+    return (
+      items.length >= 5 &&
+      /\b(reply|forward|message|unread|répondre|transférer)\b/i.test(text)
+    );
+  }
+
+  function getVisibleDiscordMessageActionsMenus() {
+    const menus = Array.from(document.querySelectorAll('[role="menu"]'));
+
+    return menus.filter((menu) => {
+      const rect = menu.getBoundingClientRect?.();
+      if (
+        !rect ||
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        rect.bottom < 0 ||
+        rect.right < 0 ||
+        rect.top > window.innerHeight ||
+        rect.left > window.innerWidth
+      ) {
+        return false;
+      }
+
+      return isLikelyDiscordMessageActionsMenu(menu);
+    });
+  }
+
+  function replaceClonedDiscordMenuItemLabel(item, label) {
+    const walker = document.createTreeWalker(
+      item,
+      NodeFilter.SHOW_TEXT
+    );
+
+    let node;
+    let best = null;
+
+    while ((node = walker.nextNode())) {
+      const value = String(node.nodeValue || '').trim();
+      if (!value) continue;
+
+      if (best == null || value.length > best.value.length) {
+        best = { node, value };
+      }
+    }
+
+    if (best) {
+      best.node.nodeValue = label;
+      return true;
+    }
+
+    return false;
+  }
+
+  function replaceClonedDiscordMenuItemIcon(item) {
+    const svg = item.querySelector?.('svg');
+    if (!svg) return;
+
+    try {
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.innerHTML =
+        '<path fill="currentColor" d="M11 3a1 1 0 0 1 2 0v10.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 1 1 1.414-1.414L11 13.586V3Zm-6 16a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1Z"></path>';
+    } catch (_) {}
+  }
+
+  function stripDuplicateDomIds(root) {
+    if (!root || !(root instanceof Element)) return;
+    root.removeAttribute('id');
+    for (const child of root.querySelectorAll('[id]')) {
+      child.removeAttribute('id');
+    }
+  }
+
+  function closeEncryptedImageOverflowMenu(menu) {
+    try {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          code: 'Escape',
+          keyCode: 27,
+          which: 27,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    } catch (_) {}
+
+    // Fallback for builds where Escape is handled on window.
+    try {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          code: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    } catch (_) {}
+  }
+
+  function buildEncryptedImageOverflowMenuItem(
+    template,
+    meta,
+    index,
+    total,
+    menu
+  ) {
+    const item = template.cloneNode(true);
+    stripDuplicateDomIds(item);
+
+    item.dataset.sdcEncryptedImageDownloadMenuItem = meta.id;
+    item.removeAttribute('aria-disabled');
+    item.setAttribute('role', 'menuitem');
+    item.setAttribute('tabindex', '-1');
+
+    const label =
+      total === 1
+        ? 'Télécharger l’image déchiffrée'
+        : `Télécharger ${meta.filename}`;
+
+    replaceClonedDiscordMenuItemLabel(item, label);
+    replaceClonedDiscordMenuItemIcon(item);
+
+    item.addEventListener(
+      'click',
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        encryptedImageOverflowSuppressUntil = Date.now() + 500;
+        closeEncryptedImageOverflowMenu(menu);
+
+        void downloadEncryptedImageFromContextMenu(meta);
+      },
+      true
+    );
+
+    item.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        encryptedImageOverflowSuppressUntil = Date.now() + 500;
+        closeEncryptedImageOverflowMenu(menu);
+
+        void downloadEncryptedImageFromContextMenu(meta);
+      },
+      true
+    );
+
+    return item;
+  }
+
+  function injectEncryptedImageOverflowMenu(menu, pending) {
+    if (!menu || !pending) return false;
+
+    if (menu.dataset.sdcEncryptedImageDownloadMenu === '1') {
+      return true;
+    }
+
+    const metas = getEncryptedImageDownloadsForMessage(
+      pending.messageId
+    );
+    if (!metas.length) return false;
+
+    const items = Array.from(
+      menu.querySelectorAll('[role="menuitem"]')
+    );
+    if (!items.length) return false;
+
+    const normalizedText = (item) =>
+      String(item.innerText || '').trim().toLowerCase();
+
+    // Prefer cloning a neutral, ordinary message action to inherit Discord's
+    // exact classes/layout. Avoid Delete Message because it carries danger
+    // styling.
+    const template =
+      items.find((item) =>
+        /copy message link|speak message|mark unread|copy text|copier le lien du message|marquer comme non lu|copier le texte/i.test(
+          normalizedText(item)
+        )
+      ) ||
+      items.find(
+        (item) =>
+          !/delete message|supprimer le message/i.test(
+            normalizedText(item)
+          )
+      );
+
+    if (!template) return false;
+
+    const deleteItem = items.find((item) =>
+      /delete message|supprimer le message/i.test(
+        normalizedText(item)
+      )
+    );
+
+    let parent = null;
+    let reference = null;
+
+    if (deleteItem?.parentElement) {
+      parent = deleteItem.parentElement;
+      reference = deleteItem;
+    } else if (template.parentElement) {
+      parent = template.parentElement;
+      reference = template.nextSibling;
+    }
+
+    if (!parent) return false;
+
+    menu.dataset.sdcEncryptedImageDownloadMenu = '1';
+
+    metas.forEach((meta, index) => {
+      const item = buildEncryptedImageOverflowMenuItem(
+        template,
+        meta,
+        index,
+        metas.length,
+        menu
+      );
+
+      parent.insertBefore(item, reference);
+    });
+
+    gifResolverLog(
+      'attachment',
+      'image-overflow-menu:injected',
+      {
+        messageId: pending.messageId,
+        count: metas.length,
+        filenames: metas.map((meta) => meta.filename),
+      }
+    );
+
+    return true;
+  }
+
+  function scanEncryptedImageOverflowMenu() {
+    const pending = encryptedImageOverflowPending;
+    if (!pending) return;
+
+    if (Date.now() > pending.expiresAt) {
+      gifResolverLog(
+        'attachment',
+        'image-overflow-menu:expired',
+        { messageId: pending.messageId }
+      );
+      encryptedImageOverflowPending = null;
+      return;
+    }
+
+    const menus = getVisibleDiscordMessageActionsMenus();
+    if (!menus.length) return;
+
+    // The menu opened most recently is normally the last portal menu in DOM.
+    // If several are visible, prefer the one nearest to the click position.
+    let menu = menus[menus.length - 1];
+
+    if (
+      Number.isFinite(pending.clientX) &&
+      Number.isFinite(pending.clientY) &&
+      menus.length > 1
+    ) {
+      let bestDistance = Infinity;
+
+      for (const candidate of menus) {
+        const rect = candidate.getBoundingClientRect();
+        const x = Math.max(
+          rect.left,
+          Math.min(pending.clientX, rect.right)
+        );
+        const y = Math.max(
+          rect.top,
+          Math.min(pending.clientY, rect.bottom)
+        );
+        const dx = x - pending.clientX;
+        const dy = y - pending.clientY;
+        const distance = dx * dx + dy * dy;
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          menu = candidate;
+        }
+      }
+    }
+
+    if (injectEncryptedImageOverflowMenu(menu, pending)) {
+      encryptedImageOverflowPending = null;
+    }
+  }
+
+  function armEncryptedImageOverflowMenu(event) {
+    if (Date.now() < encryptedImageOverflowSuppressUntil) return;
+
+    const target =
+      event?.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const button = target.closest(
+      'button,[role="button"]'
+    );
+    if (!button) return;
+
+    const messageId =
+      getMessageIdFromContextMenuTarget(button);
+    if (!messageId) return;
+
+    const metas =
+      getEncryptedImageDownloadsForMessage(messageId);
+    if (!metas.length) return;
+
+    const ariaLabel = String(
+      button.getAttribute('aria-label') ||
+        button.getAttribute('data-tooltip-text') ||
+        button.getAttribute('data-text-variant') ||
+        ''
+    ).trim();
+
+    const hasPopup =
+      button.getAttribute('aria-haspopup') === 'menu';
+
+    const likelyMoreButton =
+      hasPopup ||
+      /more|plus|options|actions|autres|menu/i.test(
+        ariaLabel
+      );
+
+    // Discord's three-dot action normally advertises a menu or "More". Do not
+    // arm for ordinary Reply/Reaction buttons unless the build omits all menu
+    // semantics and the icon button has no text at all.
+    const text = String(button.innerText || '').trim();
+    if (
+      !likelyMoreButton &&
+      (ariaLabel || text)
+    ) {
+      return;
+    }
+
+    encryptedImageOverflowPending = {
+      messageId,
+      clientX: Number(event.clientX),
+      clientY: Number(event.clientY),
+      expiresAt: Date.now() + 1800,
+    };
+
+    gifResolverLog(
+      'attachment',
+      'image-overflow-menu:armed',
+      {
+        messageId,
+        ariaLabel: ariaLabel || null,
+        hasPopup,
+        filenames: metas.map((meta) => meta.filename),
+      }
+    );
+
+    // Depending on React scheduling, the portal can be mounted synchronously,
+    // on the next microtask, or on a later frame.
+    queueMicrotask(scanEncryptedImageOverflowMenu);
+    setTimeout(scanEncryptedImageOverflowMenu, 0);
+    setTimeout(scanEncryptedImageOverflowMenu, 40);
+    setTimeout(scanEncryptedImageOverflowMenu, 120);
+    setTimeout(scanEncryptedImageOverflowMenu, 300);
+  }
+
+  function installEncryptedImageContextMenu() {
+    if (
+      encryptedImageOverflowMenuObserver != null ||
+      encryptedImageOverflowPointerHandler != null
+    ) {
+      return true;
+    }
+
+    try {
+      // The three-dot message menu is a click popover, not a
+      // CONTEXT_MENU_OPEN menu. Observe the actual DOM portal instead.
+      encryptedImageOverflowPointerHandler =
+        armEncryptedImageOverflowMenu;
+
+      document.addEventListener(
+        'pointerdown',
+        encryptedImageOverflowPointerHandler,
+        true
+      );
+
+      encryptedImageOverflowMenuObserver =
+        new MutationObserver((mutations) => {
+          if (!encryptedImageOverflowPending) return;
+
+          for (const mutation of mutations) {
+            if (
+              mutation.type === 'childList' &&
+              mutation.addedNodes.length
+            ) {
+              scanEncryptedImageOverflowMenu();
+              break;
+            }
+          }
+        });
+
+      encryptedImageOverflowMenuObserver.observe(
+        document.body || document.documentElement,
+        {
+          childList: true,
+          subtree: true,
+        }
+      );
+
+      gifResolverLog(
+        'attachment',
+        'image-overflow-menu:installed',
+        {
+          mode: 'three-dot-popover-dom',
+        }
+      );
+
+      return true;
+    } catch (error) {
+      gifResolverWarn(
+        'attachment',
+        'image-overflow-menu:install-failed',
+        {
+          message: error?.message || String(error),
+          stack: error?.stack,
+        }
+      );
+
+      return false;
+    }
+  }
+
+  function uninstallEncryptedImageContextMenu() {
+    if (encryptedImageOverflowPointerHandler != null) {
+      try {
+        document.removeEventListener(
+          'pointerdown',
+          encryptedImageOverflowPointerHandler,
+          true
+        );
+      } catch (_) {}
+    }
+
+    encryptedImageOverflowPointerHandler = null;
+
+    if (encryptedImageOverflowMenuObserver != null) {
+      try {
+        encryptedImageOverflowMenuObserver.disconnect();
+      } catch (_) {}
+    }
+
+    encryptedImageOverflowMenuObserver = null;
+    encryptedImageOverflowPending = null;
+
+    // Clean up the old v19/v20 ContextMenu patch if this userscript was
+    // hot-reloaded over a previous version in the same Discord process.
+    if (typeof encryptedImageContextMenuUnpatch === 'function') {
+      try {
+        encryptedImageContextMenuUnpatch();
+      } catch (_) {}
+    }
+    encryptedImageContextMenuUnpatch = null;
+  }
+
+  function getEncryptedAttachmentDownloadIcon() {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v11"></path>
+        <path d="m7.5 10 4.5 4.5 4.5-4.5"></path>
+        <path d="M5 19h14"></path>
+      </svg>`;
+  }
+
+  function getEncryptedAttachmentSpinner() {
+    return '<span class="sdc-attachment-download-spinner"></span>';
+  }
+
+  function findEncryptedAttachmentCard(anchor) {
+    const preferred = [
+      '[class*="fileWrapper"]',
+      '[class*="nonVisualMediaItem"]',
+      '[class*="attachment"]',
+      '[class*="file__"]',
+      '[class^="file_"]',
+    ];
+
+    for (const selector of preferred) {
+      const card = anchor.closest?.(selector);
+      if (!card) continue;
+      const rect = card.getBoundingClientRect?.();
+      if (
+        !rect ||
+        (rect.width >= 140 && rect.height >= 38 && rect.height <= 220)
+      ) {
+        return card;
+      }
+    }
+
+    let node = anchor.parentElement;
+    let fallback = node;
+    for (let i = 0; node && i < 8; i++, node = node.parentElement) {
+      const rect = node.getBoundingClientRect?.();
+      if (
+        rect &&
+        rect.width >= 180 &&
+        rect.height >= 40 &&
+        rect.height <= 180
+      ) {
+        fallback = node;
+      }
+    }
+    return fallback;
+  }
+
+  async function performEncryptedAttachmentDownload(meta, button) {
+    if (!meta || !button || button.dataset.sdcBusy === '1') return;
+
+    button.dataset.sdcBusy = '1';
+    button.disabled = true;
+    button.classList.add('sdc-attachment-download-loading');
+    button.innerHTML = getEncryptedAttachmentSpinner();
+    button.title = `Déchiffrement de ${meta.filename}…`;
+
+    try {
+      await Discord.window.SdcDecryptDl(
+        meta.filename,
+        meta.keyHash,
+        meta.encryptedUrl
+      );
+
+      button.classList.remove('sdc-attachment-download-loading');
+      button.classList.add('sdc-attachment-download-success');
+      button.textContent = '✓';
+      button.title = `${meta.filename} téléchargé`;
+
+      setTimeout(() => {
+        if (!button.isConnected) return;
+        button.classList.remove('sdc-attachment-download-success');
+        button.innerHTML = getEncryptedAttachmentDownloadIcon();
+        button.title = `Télécharger et déchiffrer ${meta.filename}`;
+      }, 1400);
+    } catch (error) {
+      button.classList.remove('sdc-attachment-download-loading');
+      button.classList.add('sdc-attachment-download-error');
+      button.textContent = '!';
+      button.title =
+        `Échec du téléchargement de ${meta.filename}: ` +
+        (error?.message || String(error));
+
+      setTimeout(() => {
+        if (!button.isConnected) return;
+        button.classList.remove('sdc-attachment-download-error');
+        button.innerHTML = getEncryptedAttachmentDownloadIcon();
+        button.title = `Télécharger et déchiffrer ${meta.filename}`;
+      }, 2500);
+    } finally {
+      button.disabled = false;
+      button.dataset.sdcBusy = '0';
+    }
+  }
+
+  function encryptedAttachmentAnchorClick(event) {
+    const id = this.dataset.sdcEncryptedAttachmentId;
+    const meta = EncryptedAttachmentDownloads.get(id);
+    if (!meta) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+
+    const card = findEncryptedAttachmentCard(this);
+    const escapedId =
+      typeof CSS !== 'undefined' && CSS.escape
+        ? CSS.escape(id)
+        : id.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    const button =
+      card?.querySelector?.(
+        `.sdc-attachment-download-btn[data-sdc-download-id="${escapedId}"]`
+      ) || null;
+
+    if (button) {
+      performEncryptedAttachmentDownload(meta, button);
+    } else {
+      // Fallback if Discord changed the attachment DOM before the observer
+      // managed to inject the visual button.
+      const virtualButton = document.createElement('button');
+      performEncryptedAttachmentDownload(meta, virtualButton);
+    }
+  }
+
+  function ensureEncryptedAttachmentDownloadButton(anchor, meta) {
+    if (!anchor || !meta) return;
+
+    // IMPORTANT: Patcher.observer watches anchor attributes. Reassigning the
+    // same data-sdc-* value on every observer callback creates a self-sustaining
+    // MutationObserver loop and can freeze/crash Discord.
+    if (anchor.dataset.sdcEncryptedAttachmentId !== meta.id) {
+      anchor.dataset.sdcEncryptedAttachmentId = meta.id;
+    }
+
+    if (anchor.dataset.sdcEncryptedAttachmentBound !== '1') {
+      anchor.dataset.sdcEncryptedAttachmentBound = '1';
+      gifResolverLog('attachment', 'download:anchor-bound', {
+        id: meta.id,
+        filename: meta.filename,
+        messageId: meta.messageId,
+      });
+      anchor.addEventListener(
+        'click',
+        encryptedAttachmentAnchorClick,
+        true
+      );
+    }
+
+    const card = findEncryptedAttachmentCard(anchor);
+    if (!card) return;
+
+    if (!card.classList.contains('sdc-attachment-download-card')) {
+      card.classList.add('sdc-attachment-download-card');
+    }
+
+    const escapedId =
+      typeof CSS !== 'undefined' && CSS.escape
+        ? CSS.escape(meta.id)
+        : meta.id.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    let button = card.querySelector(
+      `.sdc-attachment-download-btn[data-sdc-download-id="${escapedId}"]`
+    );
+
+    if (!button) {
+      // Remove stale SDC buttons if React reused the same attachment card.
+      for (const stale of card.querySelectorAll(
+        '.sdc-attachment-download-btn'
+      )) {
+        stale.remove();
+      }
+
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'sdc-attachment-download-btn';
+      button.dataset.sdcDownloadId = meta.id;
+      button.innerHTML = getEncryptedAttachmentDownloadIcon();
+      button.title = `Télécharger et déchiffrer ${meta.filename}`;
+      button.setAttribute(
+        'aria-label',
+        `Télécharger et déchiffrer ${meta.filename}`
+      );
+
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+
+        const currentMeta = EncryptedAttachmentDownloads.get(
+          button.dataset.sdcDownloadId
+        );
+        if (currentMeta) {
+          performEncryptedAttachmentDownload(currentMeta, button);
+        }
+      });
+
+      card.appendChild(button);
+
+      gifResolverLog('attachment', 'download:button-injected', {
+        id: meta.id,
+        filename: meta.filename,
+        messageId: meta.messageId,
+      });
+    }
+  }
+
+  function tryBindEncryptedAttachmentLink(anchor) {
+    if (!anchor || anchor.tagName !== 'A') return false;
+    const href =
+      anchor.getAttribute('href') ||
+      anchor.href ||
+      '';
+    const meta = findEncryptedAttachmentDownloadForHref(href);
+    if (!meta) return false;
+
+    ensureEncryptedAttachmentDownloadButton(anchor, meta);
+    return true;
+  }
+
+  function scanEncryptedAttachmentDownloadLinks(root = document) {
+    if (!root?.querySelectorAll) return;
+
+    if (root.tagName === 'A') {
+      tryBindEncryptedAttachmentLink(root);
+    }
+
+    for (const anchor of root.querySelectorAll('a[href]')) {
+      tryBindEncryptedAttachmentLink(anchor);
+    }
+  }
+
+  let encryptedAttachmentScanTimer = null;
+  function scheduleEncryptedAttachmentDownloadScan() {
+    if (encryptedAttachmentScanTimer != null) return;
+    encryptedAttachmentScanTimer = setTimeout(() => {
+      encryptedAttachmentScanTimer = null;
+      scanEncryptedAttachmentDownloadLinks();
+    }, 0);
+  }
+
+  function cleanupEncryptedAttachmentDownloadUi() {
+    if (encryptedAttachmentScanTimer != null) {
+      clearTimeout(encryptedAttachmentScanTimer);
+      encryptedAttachmentScanTimer = null;
+    }
+
+    for (const anchor of document.querySelectorAll(
+      'a[data-sdc-encrypted-attachment-bound="1"]'
+    )) {
+      anchor.removeEventListener(
+        'click',
+        encryptedAttachmentAnchorClick,
+        true
+      );
+      delete anchor.dataset.sdcEncryptedAttachmentBound;
+      delete anchor.dataset.sdcEncryptedAttachmentId;
+    }
+
+    for (const button of document.querySelectorAll(
+      '.sdc-attachment-download-btn'
+    )) {
+      button.remove();
+    }
+
+    for (const card of document.querySelectorAll(
+      '.sdc-attachment-download-card'
+    )) {
+      card.classList.remove('sdc-attachment-download-card');
+    }
+
+    EncryptedAttachmentDownloads.clear();
+    EncryptedAttachmentDownloadPaths.clear();
+  }
+
   async function decryptAttachment(
     key,
     keyHash,
@@ -5577,10 +6966,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     let match = extensionRegex.exec(filename);
     let mediaType;
     if (match != null) mediaType = mediaTypes[match[1].toLowerCase()];
+    const encryptedDownloadId =
+      registerEncryptedAttachmentDownload(
+        filename,
+        keyHash,
+        encryptedUrl,
+        message?.id,
+        message?.channel_id
+      );
+
     if (mediaType == null) {
-      attachment.url = `javascript:SdcDecryptDl(${JSON.stringify(
-        filename
-      )},'${keyHash}','${encryptedUrl}')`;
+      // Keep Discord's real CDN URL in the attachment object. Modern Discord
+      // filters javascript: URLs, which is why the old SdcDecryptDl link could
+      // render as an unusable/non-downloadable attachment.
+      attachment.url = encryptedUrl;
+      attachment.__sdcEncryptedDownloadId = encryptedDownloadId;
       delete attachment.proxy_url;
       message.attachments.push(attachment);
       return;
@@ -5657,9 +7057,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         new File([fileBuffer], filename)
       )}#${filename}`;
       let url;
-      let downloadUrl = `javascript:SdcDownloadUrl(${JSON.stringify(
-        filename
-      )},${JSON.stringify(bloburl)})`;
+      // Use the blob URL itself for media. The old javascript:SdcDownloadUrl
+      // scheme is filtered by current Discord builds.
+      let downloadUrl = bloburl;
 
       let width;
       let height;
@@ -5836,8 +7236,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       message.embeds.push(createYoutubeEmbed(match[1], match[2]));
   }
   const imageRegex = CONFIG.patterns.image;
-  function embedImage(message, url, queryString) {
-    if (!imageRegex.test(queryString)) return;
+  function embedImage(message, url, queryString, forceImage) {
+    if (!forceImage && !imageRegex.test(queryString)) return;
 
     let placeholder = {
       type: 'image',
@@ -5871,6 +7271,1965 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     tmpimg.src = url;
   }
+
+  // --------------------------------------------------------------------------
+  // Rich GIF link support (v21)
+  // --------------------------------------------------------------------------
+  // Discord never sees the clear-text URL of an encrypted message, so its own
+  // unfurler cannot resolve page-style GIF links. Keep that work isolated to a
+  // strict Tenor/KLIPY allowlist and reuse the existing image renderer once a
+  // trusted direct media URL has been found.
+  const gifPageMediaCache = new Map();
+  const gifPageMediaPending = new Map();
+  const GIF_PAGE_CACHE_LIMIT = 150;
+  const GIF_PAGE_POSITIVE_TTL = 24 * 60 * 60 * 1000;
+  const GIF_PAGE_NEGATIVE_TTL = 2 * 60 * 1000;
+  const GIF_RESOLVER_VERBOSE_LOGS = true;
+
+  // Binary media cache used for providers whose CDN refuses or fails when the
+  // Discord renderer loads the remote image directly. BdApi.Net.fetch runs
+  // outside the page's normal image loading path; the bytes are then exposed
+  // to Discord through a local blob: URL.
+  const gifBlobMediaCache = new Map();
+  const GIF_BLOB_CACHE_LIMIT = 40;
+  const GIF_BLOB_MAX_BYTES = 25 * 1024 * 1024;
+
+  function releaseGifBlobEntry(entry) {
+    if (!entry?.blobUrl) return;
+    try { URL.revokeObjectURL(entry.blobUrl); } catch (_) {}
+  }
+
+  function clearGifBlobMediaCache() {
+    for (const entry of gifBlobMediaCache.values()) releaseGifBlobEntry(entry);
+    gifBlobMediaCache.clear();
+  }
+
+  function cacheGifBlobMedia(mediaUrl, entry) {
+    const previous = gifBlobMediaCache.get(mediaUrl);
+    if (previous && previous.blobUrl !== entry?.blobUrl) releaseGifBlobEntry(previous);
+    gifBlobMediaCache.delete(mediaUrl);
+    gifBlobMediaCache.set(mediaUrl, entry);
+    while (gifBlobMediaCache.size > GIF_BLOB_CACHE_LIMIT) {
+      const firstKey = gifBlobMediaCache.keys().next().value;
+      const first = gifBlobMediaCache.get(firstKey);
+      gifBlobMediaCache.delete(firstKey);
+      releaseGifBlobEntry(first);
+    }
+  }
+
+  function inferGifMediaContentType(mediaUrl, headerValue) {
+    const value = String(headerValue || '').split(';')[0].trim().toLowerCase();
+    if (value.startsWith('image/')) return value;
+    let pathname = '';
+    try { pathname = new URL(mediaUrl).pathname.toLowerCase(); } catch (_) {}
+    if (pathname.endsWith('.gif')) return 'image/gif';
+    if (pathname.endsWith('.webp')) return 'image/webp';
+    if (pathname.endsWith('.png')) return 'image/png';
+    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'image/jpeg';
+    if (pathname.endsWith('.avif')) return 'image/avif';
+    return value || 'application/octet-stream';
+  }
+
+  async function fetchGifMediaAsBlobUrl(mediaUrl, provider, pageUrl) {
+    if (provider === 'klipy') {
+      let parsed;
+      try { parsed = new URL(mediaUrl); } catch (_) {}
+      if (
+        !parsed ||
+        parsed.protocol !== 'https:' ||
+        !(
+          parsed.hostname === 'klipy.com' ||
+          parsed.hostname.endsWith('.klipy.com')
+        ) ||
+        parsed.pathname === '/' ||
+        parsed.pathname.length < 3
+      ) {
+        throw new Error(`Invalid KLIPY media URL: ${mediaUrl}`);
+      }
+    }
+
+    const cached = gifBlobMediaCache.get(mediaUrl);
+    if (cached?.blobUrl) {
+      gifResolverLog(provider, 'binary:cache-hit', {
+        mediaUrl,
+        blobUrl: cached.blobUrl,
+        contentType: cached.contentType,
+        bytes: cached.bytes,
+      });
+      return cached;
+    }
+
+    gifResolverLog(provider, 'binary:fetch', { mediaUrl, pageUrl });
+    const headers = {
+      Accept: 'image/avif,image/webp,image/apng,image/gif,image/*,*/*;q=0.8',
+    };
+    if (pageUrl) headers.Referer = pageUrl;
+
+    const response = await BdApi.Net.fetch(mediaUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      timeout: 15000,
+      headers,
+    });
+
+    const contentTypeHeader = response.headers?.get?.('content-type') || '';
+    const contentLengthHeader = response.headers?.get?.('content-length') || null;
+    const contentType = inferGifMediaContentType(mediaUrl, contentTypeHeader);
+
+    gifResolverLog(provider, 'binary:response', {
+      status: response.status,
+      ok: response.ok,
+      finalUrl: response.url,
+      contentTypeHeader,
+      contentType,
+      contentLength: contentLengthHeader,
+    });
+
+    if (!response.ok) {
+      throw new Error(`GIF media HTTP ${response.status}`);
+    }
+    if (!contentType.startsWith('image/')) {
+      throw new Error(`Unexpected GIF media Content-Type: ${contentType}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = arrayBuffer.byteLength;
+    gifResolverLog(provider, 'binary:downloaded', { mediaUrl, bytes, contentType });
+
+    if (!bytes) throw new Error('GIF media response is empty');
+    if (bytes > GIF_BLOB_MAX_BYTES) {
+      throw new Error(`GIF media too large (${bytes} bytes)`);
+    }
+
+    const blob = new Blob([arrayBuffer], { type: contentType });
+    const blobUrl = URL.createObjectURL(blob);
+    const entry = { blobUrl, contentType, bytes, sourceUrl: mediaUrl };
+    cacheGifBlobMedia(mediaUrl, entry);
+
+    gifResolverLog(provider, 'binary:blob-created', {
+      mediaUrl, blobUrl, contentType, bytes,
+    });
+    return entry;
+  }
+
+  function gifResolverLog(provider, stage, details) {
+    if (!GIF_RESOLVER_VERBOSE_LOGS) return;
+    const prefix = `[SDC][GIF][${String(provider || 'unknown').toUpperCase()}]`;
+    if (details === undefined) console.log(prefix, stage);
+    else console.log(prefix, stage, details);
+  }
+
+  function gifResolverWarn(provider, stage, details) {
+    const prefix = `[SDC][GIF][${String(provider || 'unknown').toUpperCase()}]`;
+    if (details === undefined) console.warn(prefix, stage);
+    else console.warn(prefix, stage, details);
+  }
+
+  const KLIPY_API_KEY_STORAGE = 'SDC_KLIPY_API_KEY';
+  let klipyMissingApiKeyLogged = false;
+
+  function maskKlipyApiKey(value) {
+    const key = String(value || '').trim();
+    if (!key) return null;
+    if (key.length <= 8) return '********';
+    return key.slice(0, 4) + '…' + key.slice(-4);
+  }
+
+  function getKlipyApiKey() {
+    try {
+      return String(
+        SavedLocalStorage?.getItem(KLIPY_API_KEY_STORAGE) || ''
+      ).trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function clearKlipyResolverCaches() {
+    for (const key of Array.from(gifPageMediaCache.keys())) {
+      if (String(key).startsWith('klipy:')) gifPageMediaCache.delete(key);
+    }
+    for (const key of Array.from(gifPageMediaPending.keys())) {
+      if (String(key).startsWith('klipy:')) gifPageMediaPending.delete(key);
+    }
+  }
+
+  function setKlipyApiKey(value) {
+    const key = String(value || '').trim();
+    try {
+      if (!key) {
+        SavedLocalStorage?.removeItem(KLIPY_API_KEY_STORAGE);
+        clearKlipyResolverCaches();
+        klipyMissingApiKeyLogged = false;
+        gifResolverLog('klipy', 'api:key-cleared');
+        return { configured: false };
+      }
+
+      SavedLocalStorage?.setItem(KLIPY_API_KEY_STORAGE, key);
+      clearKlipyResolverCaches();
+      klipyMissingApiKeyLogged = false;
+      gifResolverLog('klipy', 'api:key-saved-but-unused-in-v16', {
+        configured: true,
+        masked: maskKlipyApiKey(key),
+        mode: 'discord-native-unfurl',
+      });
+      return {
+        configured: true,
+        masked: maskKlipyApiKey(key),
+      };
+    } catch (error) {
+      gifResolverWarn('klipy', 'api:key-save-failed', {
+        message: error?.message || String(error),
+      });
+      return { configured: false, error: error?.message || String(error) };
+    }
+  }
+
+  function exposeKlipyApiControl() {
+    const control = {
+      setKey: (key) => setKlipyApiKey(key),
+      clearKey: () => setKlipyApiKey(''),
+      status: () => {
+        const key = getKlipyApiKey();
+        return {
+          configured: Boolean(key),
+          masked: maskKlipyApiKey(key),
+          storage: 'localStorage',
+          endpoint: null,
+          mode: 'discord-native-unfurl',
+          apiKeyRequired: false,
+        };
+      },
+      clearCache: () => {
+        clearKlipyResolverCaches();
+        gifResolverLog('klipy', 'cache:manual-clear');
+        return true;
+      },
+    };
+
+    try {
+      Object.defineProperty(window, 'SDC_KLIPY_API', {
+        value: control,
+        writable: false,
+        enumerable: false,
+        configurable: true,
+      });
+    } catch (_) {
+      try { window.SDC_KLIPY_API = control; } catch (_) {}
+    }
+  }
+
+  exposeKlipyApiControl();
+
+  function cacheGifPageMedia(cacheKey, mediaUrl) {
+    if (gifPageMediaCache.size >= GIF_PAGE_CACHE_LIMIT) {
+      const firstKey = gifPageMediaCache.keys().next().value;
+      if (firstKey != null) gifPageMediaCache.delete(firstKey);
+    }
+    gifPageMediaCache.set(cacheKey, {
+      mediaUrl: mediaUrl || null,
+      expiresAt:
+        Date.now() +
+        (mediaUrl
+          ? GIF_PAGE_POSITIVE_TTL
+          : cacheKey.startsWith('klipy:')
+            ? 30 * 1000
+            : GIF_PAGE_NEGATIVE_TTL),
+    });
+  }
+
+  function getCachedGifPageMedia(cacheKey) {
+    const cached = gifPageMediaCache.get(cacheKey);
+    if (!cached) return { hit: false, mediaUrl: null };
+    if (cached.expiresAt <= Date.now()) {
+      gifPageMediaCache.delete(cacheKey);
+      return { hit: false, mediaUrl: null };
+    }
+    return { hit: true, mediaUrl: cached.mediaUrl };
+  }
+
+  function decodeHtmlUrl(value) {
+    if (!value) return null;
+    let decoded = String(value)
+      .replace(/\\u003A/gi, ':')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\u0026/gi, '&')
+      .replace(/\\u003D/gi, '=')
+      .replace(/\\x3A/gi, ':')
+      .replace(/\\x2F/gi, '/')
+      .replace(/\\x26/gi, '&')
+      .replace(/\\:/g, ':')
+      .replace(/\\\//g, '/');
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = decoded;
+      decoded = textarea.value;
+    } catch (_) {
+      decoded = decoded.replace(/&amp;/gi, '&');
+    }
+
+    // Next.js often percent-encodes the real media URL inside /_next/image?url=...
+    // Decode a few layers, but stop as soon as decoding no longer changes it.
+    for (let i = 0; i < 3; i++) {
+      try {
+        const next = decodeURIComponent(decoded);
+        if (next === decoded) break;
+        decoded = next;
+      } catch (_) {
+        break;
+      }
+    }
+    return decoded;
+  }
+
+  function unwrapGifMediaUrl(value, provider, baseUrl) {
+    let candidate = decodeHtmlUrl(value);
+    if (!candidate) return null;
+
+    for (let depth = 0; depth < 4; depth++) {
+      let absolute;
+      try {
+        absolute = new URL(candidate, baseUrl || undefined).href;
+      } catch (_) {
+        return null;
+      }
+
+      if (isTrustedGifMediaUrl(absolute, provider)) return absolute;
+
+      let parsed;
+      try {
+        parsed = new URL(absolute);
+      } catch (_) {
+        return null;
+      }
+
+      // Next/Image and similar proxy URLs carry the original asset as a query
+      // parameter. Prefer that original URL rather than embedding the proxy.
+      let nested = null;
+      for (const key of [
+        'url',
+        'src',
+        'image',
+        'image_url',
+        'media',
+        'media_url',
+        'original',
+      ]) {
+        const value = parsed.searchParams.get(key);
+        if (value) {
+          nested = value;
+          break;
+        }
+      }
+
+      if (!nested) return null;
+      candidate = decodeHtmlUrl(nested);
+      baseUrl = absolute;
+    }
+
+    return null;
+  }
+
+  function isTrustedGifMediaUrl(candidate, provider) {
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+      const host = parsed.hostname.toLowerCase();
+
+      if (provider === 'tenor') {
+        return (
+          host === 'media.tenor.com' ||
+          /^media\d+\.tenor\.com$/.test(host) ||
+          host === 'c.tenor.com'
+        );
+      }
+
+      if (provider === 'klipy') {
+        // KLIPY currently uses several numbered CDN hosts (static, static2,
+        // static3, ...), but the CDN root itself is NOT media. Require a real
+        // asset path so values such as https://static2.klipy.com/ can never
+        // win candidate selection.
+        if (!/^static\d*\.klipy\.com$/.test(host)) return false;
+        const path = parsed.pathname || '/';
+        if (path === '/' || path.length < 5) return false;
+        return (
+          /^\/ii\//i.test(path) ||
+          /\.(?:gif|webp|png|jpe?g|avif)(?:$|\?)/i.test(path + parsed.search)
+        );
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function scoreGifMediaUrl(candidate, provider, sourcePriority) {
+    if (!isTrustedGifMediaUrl(candidate, provider)) return -1;
+    let score = sourcePriority || 0;
+    let parsed;
+    try {
+      parsed = new URL(candidate);
+    } catch (_) {
+      return -1;
+    }
+    const path = (parsed.pathname + parsed.search).toLowerCase();
+    const host = parsed.hostname.toLowerCase();
+
+    // Prefer animated image formats. PNG/JPEG remain valid fallbacks because
+    // some providers expose only a poster in OpenGraph metadata.
+    if (/\.gif(?:$|\?)/i.test(path)) score += 100;
+    else if (/\.webp(?:$|\?)/i.test(path)) score += 95;
+    else if (/\.(?:png|jpe?g)(?:$|\?)/i.test(path)) score += 45;
+    else score += 30; // Tenor/KLIPY CDN URLs do not always carry extensions.
+
+    if (provider === 'tenor') {
+      if (host === 'media.tenor.com' || /^media\d+\.tenor\.com$/.test(host))
+        score += 30;
+      if (host === 'c.tenor.com') score += 25;
+    } else if (provider === 'klipy') {
+      if (/^static\d*\.klipy\.com$/.test(host)) score += 30;
+      else if (host.endsWith('.klipy.com')) score += 20;
+    }
+
+    // Avoid obviously non-content assets when raw page data contains logos,
+    // favicons or website chrome.
+    if (/(?:logo|favicon|avatar|icon|sprite)/i.test(path)) score -= 80;
+    return score;
+  }
+
+  function selectBestGifMediaUrl(candidates, provider) {
+    let best = null;
+    let bestScore = -1;
+    for (const item of candidates) {
+      const rawValue = item?.url || item;
+      const absolute =
+        unwrapGifMediaUrl(rawValue, provider, item?.baseUrl) ||
+        (() => {
+          try {
+            return new URL(decodeHtmlUrl(rawValue), item?.baseUrl || undefined)
+              .href;
+          } catch (_) {
+            return null;
+          }
+        })();
+      if (!absolute) continue;
+
+      const score = scoreGifMediaUrl(
+        absolute,
+        provider,
+        Number(item?.priority) || 0
+      );
+      if (score > bestScore) {
+        bestScore = score;
+        best = absolute;
+      }
+    }
+    if (provider === 'klipy' && best) {
+      try {
+        const parsed = new URL(best);
+        if (
+          /^static\d*\.klipy\.com$/i.test(parsed.hostname) &&
+          (parsed.pathname === '/' || parsed.pathname.length < 5)
+        ) {
+          gifResolverWarn('klipy', 'candidate:rejected-cdn-root', { best });
+          return null;
+        }
+      } catch (_) {}
+    }
+    return best;
+  }
+
+  function extractKlipyDirectAssetCandidates(rawText, pageUrl) {
+    const candidates = [];
+    if (!rawText) return candidates;
+
+    // Next.js serializes URLs in several forms:
+    //   https://static2.klipy.com/...
+    //   https\://static2.klipy.com/...
+    //   https:\/\/static2.klipy.com\/...
+    //   https:\u002F\u002Fstatic2.klipy.com\u002F...
+    // Normalize only a temporary copy used for URL discovery.
+    let normalized = String(rawText)
+      .replace(/\\u003A/gi, ':')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\x3A/gi, ':')
+      .replace(/\\x2F/gi, '/')
+      .replace(/\\:/g, ':')
+      .replace(/\\\//g, '/')
+      .replace(/&amp;/gi, '&');
+
+    const addMatches = (regex, priority, source) => {
+      for (const match of normalized.matchAll(regex)) {
+        const url = match[0]
+          .replace(/[\\]+$/g, '')
+          .replace(/[),.;]+$/g, '');
+        candidates.push({
+          url,
+          baseUrl: pageUrl,
+          priority,
+          source,
+        });
+      }
+    };
+
+    // Prefer actual GIFs first, then animated WebP/images.
+    addMatches(
+      /https?:\/\/static\d*\.klipy\.com\/ii\/[^\s"'<>\\]+?\.gif(?:\?[^\s"'<>\\]*)?/gi,
+      320,
+      'raw-static-gif'
+    );
+    addMatches(
+      /https?:\/\/static\d*\.klipy\.com\/ii\/[^\s"'<>\\]+?\.webp(?:\?[^\s"'<>\\]*)?/gi,
+      240,
+      'raw-static-webp'
+    );
+    addMatches(
+      /https?:\/\/static\d*\.klipy\.com\/ii\/[^\s"'<>\\]+?\.(?:png|jpe?g|avif)(?:\?[^\s"'<>\\]*)?/gi,
+      160,
+      'raw-static-image'
+    );
+
+    return candidates;
+  }
+
+  function extractGifMediaCandidates(html, pageUrl, provider) {
+    const candidates =
+      provider === 'klipy'
+        ? extractKlipyDirectAssetCandidates(html, pageUrl)
+        : [];
+    const add = (url, priority = 0) => {
+      if (url) candidates.push({ url, baseUrl: pageUrl, priority });
+    };
+
+    const addSrcset = (srcset, priority = 0) => {
+      if (!srcset) return;
+      for (const entry of String(srcset).split(',')) {
+        const url = entry.trim().split(/\s+/)[0];
+        if (url) add(url, priority);
+      }
+    };
+
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const selectors = [
+        ['meta[property="og:image:secure_url"]', 140],
+        ['meta[property="og:image"]', 135],
+        ['meta[name="twitter:image"]', 130],
+        ['meta[name="twitter:image:src"]', 125],
+        ['link[rel="image_src"]', 120],
+        ['meta[property="og:video:secure_url"]', 40],
+        ['meta[property="og:video:url"]', 40],
+        ['meta[property="og:video"]', 35],
+      ];
+      for (const [selector, priority] of selectors) {
+        for (const element of doc.querySelectorAll(selector)) {
+          add(element.content || element.href, priority);
+        }
+      }
+
+      // Structured data is especially useful on KLIPY. Its ImageObject exposes
+      // contentUrl for the actual GIF, independently from the React page.
+      for (const script of doc.querySelectorAll('script[type="application/ld+json"]')) {
+        try {
+          const data = JSON.parse(script.textContent || '');
+          const stack = [data];
+          while (stack.length) {
+            const item = stack.pop();
+            if (!item) continue;
+            if (Array.isArray(item)) {
+              stack.push(...item);
+              continue;
+            }
+            if (typeof item !== 'object') continue;
+
+            if (typeof item.contentUrl === 'string') add(item.contentUrl, 190);
+            if (typeof item.thumbnailUrl === 'string') add(item.thumbnailUrl, 70);
+            for (const value of Object.values(item)) {
+              if (value && typeof value === 'object') stack.push(value);
+            }
+          }
+        } catch (_) {}
+      }
+
+      // KLIPY currently uses Next.js. The original static*.klipy.com asset may
+      // live in srcset, poster, lazy-load attributes, or inside /_next/image.
+      for (const element of doc.querySelectorAll(
+        'img, source, video, picture source'
+      )) {
+        add(element.getAttribute('src'), 80);
+        add(element.getAttribute('poster'), 85);
+        add(element.getAttribute('data-src'), 75);
+        add(element.getAttribute('data-original'), 75);
+        add(element.getAttribute('data-url'), 70);
+        addSrcset(element.getAttribute('srcset'), 90);
+        addSrcset(element.getAttribute('data-srcset'), 85);
+      }
+
+      // Also inspect attributes on arbitrary elements. Frameworks sometimes
+      // keep the media URL in a data-* attribute before hydration.
+      for (const element of doc.querySelectorAll('*')) {
+        for (const attr of [
+          'content',
+          'href',
+          'src',
+          'poster',
+          'data-src',
+          'data-url',
+          'data-image',
+          'data-original',
+        ]) {
+          const value = element.getAttribute?.(attr);
+          if (value && /klipy|tenor|_next\/image/i.test(value)) add(value, 55);
+        }
+        addSrcset(element.getAttribute?.('srcset'), 65);
+      }
+    } catch (_) {}
+
+    // Next.js / serialized JSON data frequently contains the best animated URL
+    // even when OpenGraph exposes only a poster image.
+    let normalized = String(html)
+      .replace(/\\u003A/gi, ':')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\u0026/gi, '&')
+      .replace(/\\u003D/gi, '=')
+      .replace(/\\x3A/gi, ':')
+      .replace(/\\x2F/gi, '/')
+      .replace(/\\x26/gi, '&')
+      .replace(/\\:/g, ':')
+      .replace(/\\\//g, '/');
+
+    // Decode the common percent-encoded form used by Next/Image without
+    // decodeURIComponent() on the whole HTML document.
+    normalized = normalized
+      .replace(/%3A/gi, ':')
+      .replace(/%2F/gi, '/')
+      .replace(/%3F/gi, '?')
+      .replace(/%3D/gi, '=')
+      .replace(/%26/gi, '&');
+
+    let hostPattern;
+    if (provider === 'tenor') {
+      hostPattern =
+        /https?:\/\/(?:media(?:\d+)?|c)\.tenor\.com\/[^\s"'<>\\]+/gi;
+    } else {
+      hostPattern =
+        /https?:\/\/static\d*\.klipy\.com\/[^\s"'<>\\]+/gi;
+    }
+    for (const match of normalized.matchAll(hostPattern)) add(match[0], 110);
+
+    // Extract URLs hidden inside Next.js' image proxy. unwrapGifMediaUrl()
+    // will recover the original static*.klipy.com URL from these candidates.
+    const nextImagePattern =
+      /(?:https?:\/\/(?:www\.)?klipy\.com)?\/_next\/image\?[^\s"'<>\\]+/gi;
+    for (const match of normalized.matchAll(nextImagePattern)) add(match[0], 100);
+
+    return candidates;
+  }
+
+  function collectJsonMediaCandidates(value, pageUrl, out, depth = 0) {
+    if (depth > 7 || value == null) return;
+    if (typeof value === 'string') {
+      out.push({ url: value, baseUrl: pageUrl, priority: 80 });
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value)
+        collectJsonMediaCandidates(item, pageUrl, out, depth + 1);
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) {
+        const bonus = /(?:gif|image|media|url|src|thumbnail)/i.test(key) ? 25 : 0;
+        if (typeof item === 'string')
+          out.push({ url: item, baseUrl: pageUrl, priority: 80 + bonus });
+        else collectJsonMediaCandidates(item, pageUrl, out, depth + 1);
+      }
+    }
+  }
+
+  async function fetchGifPage(pageUrl) {
+    if (typeof BdApi === 'undefined' || !BdApi.Net?.fetch)
+      throw new Error('BdApi.Net.fetch unavailable');
+    return BdApi.Net.fetch(pageUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      timeout: 8000,
+      headers: {
+        Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+      },
+    });
+  }
+
+  async function resolveTenorMedia(pageUrl) {
+    const candidates = [];
+
+    // Tenor exposes an oEmbed endpoint for page-style share URLs. Prefer it
+    // because it is smaller and less sensitive to changes in the website HTML.
+    try {
+      const oembedUrl =
+        'https://tenor.com/oembed?url=' + encodeURIComponent(pageUrl);
+      const response = await fetchGifPage(oembedUrl);
+      if (response.ok) {
+        const data = await response.json();
+        collectJsonMediaCandidates(data, pageUrl, candidates);
+        if (typeof data?.html === 'string') {
+          candidates.push(
+            ...extractGifMediaCandidates(data.html, pageUrl, 'tenor')
+          );
+        }
+        // Do not return yet: the page HTML often contains a higher-quality
+        // animated GIF/WebP than oEmbed's thumbnail. We combine both sets of
+        // candidates and rank them together below.
+      }
+    } catch (error) {
+      console.debug('[SDC] Tenor oEmbed fallback:', error?.message || error);
+    }
+
+    // Fallback to the actual page. This also covers Tenor URL variants not
+    // supported by oEmbed.
+    try {
+      const response = await fetchGifPage(pageUrl);
+      if (!response.ok) return null;
+      const html = await response.text();
+      candidates.push(
+        ...extractGifMediaCandidates(html, response.url || pageUrl, 'tenor')
+      );
+      return selectBestGifMediaUrl(candidates, 'tenor');
+    } catch (error) {
+      console.warn('[SDC] Tenor embed: failed to resolve', pageUrl, error);
+      return null;
+    }
+  }
+
+  function getTopGifCandidateDiagnostics(candidates, provider, limit = 12) {
+    const rows = [];
+    for (const item of candidates) {
+      const rawValue = item?.url || item;
+      const resolved =
+        unwrapGifMediaUrl(rawValue, provider, item?.baseUrl) ||
+        (() => {
+          try {
+            return new URL(decodeHtmlUrl(rawValue), item?.baseUrl || undefined).href;
+          } catch (_) {
+            return null;
+          }
+        })();
+      if (!resolved) continue;
+      const score = scoreGifMediaUrl(
+        resolved,
+        provider,
+        Number(item?.priority) || 0
+      );
+      if (score < 0) continue;
+      rows.push({
+        score,
+        priority: Number(item?.priority) || 0,
+        source: item?.source || null,
+        rawUrl: String(rawValue).slice(0, 500),
+        url: resolved,
+      });
+    }
+    rows.sort((a, b) => b.score - a.score);
+    return rows.slice(0, limit);
+  }
+
+  const KLIPY_FRAME_PREFIX = 'sdc-klipy-frame:';
+
+  function encodeKlipyFrameUrl(url) {
+    return KLIPY_FRAME_PREFIX + encodeURIComponent(url);
+  }
+
+  function decodeKlipyFrameUrl(value) {
+    if (typeof value !== 'string' || !value.startsWith(KLIPY_FRAME_PREFIX))
+      return null;
+    try {
+      return decodeURIComponent(value.slice(KLIPY_FRAME_PREFIX.length));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function isTrustedKlipyFrameUrl(value) {
+    try {
+      const parsed = new URL(value);
+      const host = parsed.hostname.toLowerCase();
+      if (!(host === 'klipy.com' || host.endsWith('.klipy.com'))) return false;
+      return /^https:$/.test(parsed.protocol);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function extractIframeUrls(html, baseUrl) {
+    const urls = [];
+    if (!html) return urls;
+
+    try {
+      const doc = new DOMParser().parseFromString(String(html), 'text/html');
+      for (const iframe of doc.querySelectorAll('iframe[src]')) {
+        const raw = decodeHtmlUrl(iframe.getAttribute('src'));
+        if (!raw) continue;
+        try {
+          urls.push(new URL(raw, baseUrl).href);
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Fallback for malformed/minified oEmbed HTML.
+    const normalized = String(html)
+      .replace(/\\u003A/gi, ':')
+      .replace(/\\u002F/gi, '/')
+      .replace(/\\x3A/gi, ':')
+      .replace(/\\x2F/gi, '/')
+      .replace(/\\:/g, ':')
+      .replace(/\\\//g, '/')
+      .replace(/&amp;/gi, '&');
+    for (const match of normalized.matchAll(/<iframe[^>]+src=["']([^"']+)["']/gi)) {
+      try {
+        const resolved = new URL(decodeHtmlUrl(match[1]), baseUrl).href;
+        if (!urls.includes(resolved)) urls.push(resolved);
+      } catch (_) {}
+    }
+
+    return urls;
+  }
+
+  function chooseKlipyFrameUrl(data, pageUrl) {
+    const iframeUrls = extractIframeUrls(data?.html, pageUrl).filter(
+      isTrustedKlipyFrameUrl
+    );
+
+    // Prefer explicit player/embed URLs returned by oEmbed.
+    iframeUrls.sort((a, b) => {
+      const score = (url) =>
+        (/\/player(?:$|[?/#])/i.test(url) ? 20 : 0) +
+        (/\/embed(?:$|[?/#])/i.test(url) ? 15 : 0) +
+        (/api\.klipy\.com/i.test(url) ? 10 : 0);
+      return score(b) - score(a);
+    });
+    if (iframeUrls[0]) return { url: iframeUrls[0], source: 'oembed-html' };
+
+    // The KLIPY page metadata advertises /gifs/<slug>/player. This is a
+    // player endpoint specifically intended for embedding and avoids fetching
+    // the protected public HTML page from the Discord process.
+    try {
+      const parsed = new URL(pageUrl);
+      if (
+        (parsed.hostname === 'klipy.com' || parsed.hostname === 'www.klipy.com') &&
+        /^\/gifs\/[^/]+\/?$/i.test(parsed.pathname)
+      ) {
+        parsed.hostname = 'klipy.com';
+        parsed.pathname = parsed.pathname.replace(/\/$/, '') + '/player';
+        parsed.search = '';
+        parsed.hash = '';
+        return { url: parsed.href, source: 'derived-player' };
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  function collectKlipyOembedUrlCandidates(data, pageUrl) {
+    const candidates = [];
+    const seen = new Set();
+
+    const add = (value, key = '', priority = 0) => {
+      if (typeof value !== 'string') return;
+      const decoded = decodeHtmlUrl(value);
+      if (!decoded || !/^https?:\/\//i.test(decoded)) return;
+
+      let absolute;
+      try {
+        absolute = new URL(decoded, pageUrl).href;
+      } catch (_) {
+        return;
+      }
+
+      let parsed;
+      try {
+        parsed = new URL(absolute);
+      } catch (_) {
+        return;
+      }
+
+      if (parsed.protocol !== 'https:') return;
+      const host = parsed.hostname.toLowerCase();
+      if (!(host === 'klipy.com' || host.endsWith('.klipy.com'))) return;
+
+      if (absolute === pageUrl || parsed.pathname === '/') return;
+      if (/\/gifs\/[^/]+\/player\/?$/i.test(parsed.pathname)) return;
+
+      if (seen.has(absolute)) return;
+      seen.add(absolute);
+
+      let bonus = priority;
+      if (/gif/i.test(key)) bonus += 80;
+      if (/thumbnail/i.test(key)) bonus += 60;
+      if (/image|media|src|url/i.test(key)) bonus += 30;
+      if (/\.gif(?:$|[?#])/i.test(absolute)) bonus += 160;
+      else if (/\.webp(?:$|[?#])/i.test(absolute)) bonus += 100;
+      else if (/\.(?:png|jpe?g|avif)(?:$|[?#])/i.test(absolute)) bonus += 70;
+
+      candidates.push({ url: absolute, key, priority: bonus });
+    };
+
+    const walk = (value, key = '', depth = 0) => {
+      if (depth > 8 || value == null) return;
+
+      if (typeof value === 'string') {
+        add(value, key, 0);
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) walk(item, key, depth + 1);
+        return;
+      }
+
+      if (typeof value === 'object') {
+        for (const [childKey, child] of Object.entries(value)) {
+          if (childKey === 'html' && typeof child === 'string') {
+            try {
+              const doc = new DOMParser().parseFromString(child, 'text/html');
+              for (const el of doc.querySelectorAll(
+                '[src], [href], [poster], [data-src], [data-url]'
+              )) {
+                for (const attr of [
+                  'src',
+                  'href',
+                  'poster',
+                  'data-src',
+                  'data-url',
+                ]) {
+                  const v = el.getAttribute?.(attr);
+                  if (v) add(v, `html:${attr}`, 20);
+                }
+              }
+            } catch (_) {}
+            continue;
+          }
+
+          walk(child, childKey, depth + 1);
+        }
+      }
+    };
+
+    walk(data);
+    candidates.sort((a, b) => b.priority - a.priority);
+    return candidates;
+  }
+
+  async function probeKlipyImageUrl(candidate, pageUrl) {
+    const mediaUrl = candidate?.url || candidate;
+    if (!mediaUrl) return null;
+
+    gifResolverLog('klipy', 'oembed:probe-fetch', {
+      mediaUrl,
+      key: candidate?.key || null,
+      priority: candidate?.priority || 0,
+    });
+
+    try {
+      const response = await BdApi.Net.fetch(mediaUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        timeout: 8000,
+        headers: {
+          Accept: 'image/avif,image/webp,image/apng,image/gif,image/*,*/*;q=0.8',
+          Referer: pageUrl,
+        },
+      });
+
+      const contentTypeHeader =
+        response.headers?.get?.('content-type') || '';
+      const contentType = inferGifMediaContentType(
+        response.url || mediaUrl,
+        contentTypeHeader
+      );
+
+      gifResolverLog('klipy', 'oembed:probe-response', {
+        requestedUrl: mediaUrl,
+        finalUrl: response.url,
+        status: response.status,
+        ok: response.ok,
+        contentTypeHeader,
+        contentType,
+        contentLength:
+          response.headers?.get?.('content-length') || null,
+      });
+
+      if (!response.ok || !contentType.startsWith('image/')) return null;
+
+      return {
+        url: response.url || mediaUrl,
+        contentType,
+        score:
+          (contentType === 'image/gif' ? 1000 : 0) +
+          (contentType === 'image/webp' ? 700 : 0) +
+          300 +
+          (candidate?.priority || 0),
+      };
+    } catch (error) {
+      gifResolverWarn('klipy', 'oembed:probe-failed', {
+        mediaUrl,
+        key: candidate?.key || null,
+        name: error?.name,
+        message: error?.message || String(error),
+      });
+      return null;
+    }
+  }
+
+  async function resolveKlipyOembedMedia(data, pageUrl) {
+    const rawCandidates = collectKlipyOembedUrlCandidates(data, pageUrl);
+
+    gifResolverLog('klipy', 'oembed:raw-candidates', {
+      count: rawCandidates.length,
+      candidates: rawCandidates.slice(0, 30),
+    });
+
+    const strictCandidates = rawCandidates.map((item) => ({
+      url: item.url,
+      baseUrl: pageUrl,
+      priority: item.priority,
+      source: `oembed:${item.key}`,
+    }));
+
+    const strictDirect = selectBestGifMediaUrl(
+      strictCandidates,
+      'klipy'
+    );
+    if (strictDirect) {
+      gifResolverLog('klipy', 'oembed:strict-direct', {
+        selected: strictDirect,
+      });
+      return strictDirect;
+    }
+
+    const probed = [];
+    for (const candidate of rawCandidates.slice(0, 12)) {
+      const result = await probeKlipyImageUrl(candidate, pageUrl);
+      if (result) probed.push(result);
+      if (result?.contentType === 'image/gif') break;
+    }
+
+    probed.sort((a, b) => b.score - a.score);
+
+    gifResolverLog('klipy', 'oembed:probe-results', {
+      count: probed.length,
+      results: probed,
+      selected: probed[0]?.url || null,
+    });
+
+    return probed[0]?.url || null;
+  }
+
+  async function resolveKlipyPlayerMedia(frameUrl, pageUrl) {
+    if (!frameUrl || !isTrustedKlipyFrameUrl(frameUrl)) return null;
+
+    gifResolverLog('klipy', 'player:fetch', { frameUrl, pageUrl });
+
+    try {
+      const headers = {
+        Accept:
+          'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+        Referer: pageUrl,
+        'Accept-Language':
+          (typeof navigator !== 'undefined' && navigator.language) ||
+          'en-US,en;q=0.9',
+      };
+
+      if (typeof navigator !== 'undefined' && navigator.userAgent) {
+        headers['User-Agent'] = navigator.userAgent;
+      }
+
+      const response = await BdApi.Net.fetch(frameUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        timeout: 10000,
+        headers,
+      });
+
+      gifResolverLog('klipy', 'player:response', {
+        status: response.status,
+        ok: response.ok,
+        finalUrl: response.url,
+        contentType: response.headers?.get?.('content-type') || null,
+      });
+
+      if (!response.ok) return null;
+
+      const body = await response.text();
+      const candidates = extractGifMediaCandidates(
+        body,
+        response.url || frameUrl,
+        'klipy'
+      );
+      const selected = selectBestGifMediaUrl(candidates, 'klipy');
+
+      gifResolverLog('klipy', 'player:candidates', {
+        bytes: body.length,
+        count: candidates.length,
+        selected,
+        top: getTopGifCandidateDiagnostics(candidates, 'klipy'),
+      });
+
+      return selected;
+    } catch (error) {
+      gifResolverWarn('klipy', 'player:failed', {
+        frameUrl,
+        name: error?.name,
+        message: error?.message || String(error),
+      });
+      return null;
+    }
+  }
+
+  function normalizeKlipyIdentity(value) {
+    return String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/https?:\/\/(?:www\.)?klipy\.com\/gifs\//g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ');
+  }
+
+  function getKlipyPageSlug(pageUrl) {
+    try {
+      const parsed = new URL(pageUrl);
+      const match = /^\/gifs\/([^/?#]+)/i.exec(parsed.pathname);
+      return match ? decodeURIComponent(match[1]) : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function redactKlipyApiUrl(value) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.searchParams.has('key')) {
+        parsed.searchParams.set('key', '<redacted>');
+      }
+      return parsed.href;
+    } catch (_) {
+      return String(value || '').replace(
+        /([?&]key=)[^&]+/i,
+        '$1<redacted>'
+      );
+    }
+  }
+
+  function collectKlipyResultStrings(value, out, path = '', depth = 0) {
+    if (depth > 7 || value == null) return;
+    if (typeof value === 'string') {
+      out.push({ path, value });
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) =>
+        collectKlipyResultStrings(
+          item,
+          out,
+          `${path}[${index}]`,
+          depth + 1
+        )
+      );
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const [key, child] of Object.entries(value)) {
+        collectKlipyResultStrings(
+          child,
+          out,
+          path ? `${path}.${key}` : key,
+          depth + 1
+        );
+      }
+    }
+  }
+
+  function extractKlipyApiResults(payload) {
+    const directArrays = [
+      payload?.results,
+      payload?.data?.results,
+      payload?.data?.data,
+      payload?.data,
+    ];
+
+    for (const candidate of directArrays) {
+      if (
+        Array.isArray(candidate) &&
+        candidate.some((item) => item && typeof item === 'object')
+      ) {
+        return candidate.filter(
+          (item) => item && typeof item === 'object'
+        );
+      }
+    }
+
+    // Defensive compatibility with possible wrapper changes.
+    const queue = [{ value: payload, depth: 0 }];
+    const seen = new Set();
+    while (queue.length) {
+      const { value, depth } = queue.shift();
+      if (!value || typeof value !== 'object' || depth > 4) continue;
+      if (seen.has(value)) continue;
+      seen.add(value);
+
+      for (const [key, child] of Object.entries(value)) {
+        if (
+          /results?|items?|gifs?/i.test(key) &&
+          Array.isArray(child) &&
+          child.some((item) => item && typeof item === 'object')
+        ) {
+          return child.filter(
+            (item) => item && typeof item === 'object'
+          );
+        }
+        if (child && typeof child === 'object') {
+          queue.push({ value: child, depth: depth + 1 });
+        }
+      }
+    }
+
+    return [];
+  }
+
+  function collectKlipyApiMediaCandidates(result) {
+    const strings = [];
+    collectKlipyResultStrings(result, strings);
+
+    const candidates = [];
+    const seen = new Set();
+
+    for (const item of strings) {
+      const raw = decodeHtmlUrl(item.value);
+      if (!raw || !/^https:\/\//i.test(raw)) continue;
+
+      let parsed;
+      try {
+        parsed = new URL(raw);
+      } catch (_) {
+        continue;
+      }
+
+      const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname || '/';
+      if (
+        !(
+          host === 'klipy.com' ||
+          host.endsWith('.klipy.com')
+        )
+      ) {
+        continue;
+      }
+
+      // Never confuse a public share/player/API page with media.
+      if (
+        path === '/' ||
+        /^\/gifs\/[^/]+\/?$/i.test(path) ||
+        /\/player\/?$/i.test(path) ||
+        /^\/v\d+\//i.test(path) ||
+        /^\/api\//i.test(path)
+      ) {
+        continue;
+      }
+
+      const id = parsed.href;
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      const field = String(item.path || '').toLowerCase();
+      let score = 0;
+
+      if (/\.gif(?:$|[?#])/i.test(id)) score += 2000;
+      else if (/\.webp(?:$|[?#])/i.test(id)) score += 1200;
+      else if (/\.(?:png|jpe?g|avif)(?:$|[?#])/i.test(id)) score += 700;
+
+      // Tenor-compatible KLIPY v2 response.
+      if (/media_formats\.gif\.url/.test(field)) score += 1200;
+      if (/media_formats\.mediumgif\.url/.test(field)) score += 900;
+      if (/media_formats\.tinygif\.url/.test(field)) score += 700;
+      if (/media_formats\.nanogif\.url/.test(field)) score += 600;
+      if (/media_formats\.preview\.url/.test(field)) score += 400;
+
+      // Native KLIPY-style structures observed in their web data.
+      if (/file\.hd\.gif\.url/.test(field)) score += 1300;
+      if (/file\.md\.gif\.url/.test(field)) score += 1000;
+      if (/file\..*\.gif\.url/.test(field)) score += 800;
+      if (/thumbnail/.test(field)) score -= 200;
+
+      if (/^static\d*\.klipy\.com$/i.test(host)) score += 500;
+      if (/\/ii\//i.test(path)) score += 300;
+
+      if (score <= 0) continue;
+
+      candidates.push({
+        url: id,
+        score,
+        source: item.path,
+      });
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates;
+  }
+
+  function scoreKlipyApiResult(
+    result,
+    pageUrl,
+    slug,
+    title,
+    query,
+    index
+  ) {
+    const strings = [];
+    collectKlipyResultStrings(result, strings);
+
+    const pageCanonical = String(pageUrl).replace(/\/+$/, '');
+    const slugNorm = normalizeKlipyIdentity(slug);
+    const titleNorm = normalizeKlipyIdentity(title);
+    const queryNorm = normalizeKlipyIdentity(query);
+
+    let score = Math.max(0, 100 - index);
+    const reasons = [];
+
+    for (const item of strings) {
+      const value = String(item.value || '');
+      const norm = normalizeKlipyIdentity(value);
+      const field = String(item.path || '').toLowerCase();
+
+      if (
+        value.replace(/\/+$/, '') === pageCanonical
+      ) {
+        score += 6000;
+        reasons.push('exact-page-url');
+      }
+
+      if (
+        slugNorm &&
+        (
+          (/slug/.test(field) && norm === slugNorm) ||
+          /\/gifs\//i.test(value) &&
+            normalizeKlipyIdentity(value) === slugNorm
+        )
+      ) {
+        score += 5000;
+        reasons.push('exact-slug');
+      }
+
+      if (
+        titleNorm &&
+        titleNorm.length >= 3 &&
+        /title|content_description|description|name/.test(field) &&
+        norm === titleNorm
+      ) {
+        score += 2600;
+        reasons.push('exact-title');
+      }
+
+      if (
+        queryNorm &&
+        queryNorm.length >= 3 &&
+        /title|content_description|description|name/.test(field) &&
+        norm === queryNorm
+      ) {
+        score += 1600;
+        reasons.push('exact-query');
+      }
+
+      if (
+        slugNorm &&
+        slugNorm.length >= 5 &&
+        norm.includes(slugNorm)
+      ) {
+        score += 700;
+      }
+
+      if (
+        titleNorm &&
+        titleNorm.length >= 5 &&
+        norm.includes(titleNorm)
+      ) {
+        score += 500;
+      }
+    }
+
+    const media = collectKlipyApiMediaCandidates(result);
+    if (media.length) {
+      score += Math.min(800, Math.round(media[0].score / 4));
+      reasons.push('has-media');
+    }
+
+    return {
+      result,
+      index,
+      score,
+      reasons: Array.from(new Set(reasons)),
+      media,
+    };
+  }
+
+  async function fetchKlipyOfficialSearch(query, apiKey) {
+    const endpoint = new URL('https://api.klipy.com/v2/search');
+    endpoint.searchParams.set('q', query);
+    endpoint.searchParams.set('key', apiKey);
+    endpoint.searchParams.set('limit', '25');
+
+    gifResolverLog('klipy', 'api:search', {
+      query,
+      url: redactKlipyApiUrl(endpoint.href),
+    });
+
+    const response = await BdApi.Net.fetch(endpoint.href, {
+      method: 'GET',
+      redirect: 'follow',
+      timeout: 10000,
+      headers: {
+        Accept: 'application/json,text/plain;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    gifResolverLog('klipy', 'api:response', {
+      query,
+      status: response.status,
+      ok: response.ok,
+      finalUrl: redactKlipyApiUrl(response.url || endpoint.href),
+      contentType: response.headers?.get?.('content-type') || null,
+      rateLimitRemaining:
+        response.headers?.get?.('x-ratelimit-remaining') || null,
+    });
+
+    if (!response.ok) {
+      let bodyPreview = null;
+      try {
+        bodyPreview = (await response.text()).slice(0, 1000);
+      } catch (_) {}
+
+      gifResolverWarn('klipy', 'api:http-error', {
+        query,
+        status: response.status,
+        bodyPreview,
+      });
+      return null;
+    }
+
+    try {
+      return await response.json();
+    } catch (error) {
+      gifResolverWarn('klipy', 'api:json-parse-failed', {
+        query,
+        message: error?.message || String(error),
+      });
+      return null;
+    }
+  }
+
+  async function resolveKlipyOfficialApiMedia(
+    pageUrl,
+    oembedData,
+    apiKey
+  ) {
+    const slug = getKlipyPageSlug(pageUrl);
+    const title = String(oembedData?.title || '').trim();
+
+    const queries = [];
+    const addQuery = (value) => {
+      const query = String(value || '').trim();
+      if (!query) return;
+      if (!queries.some((item) => item.toLowerCase() === query.toLowerCase())) {
+        queries.push(query);
+      }
+    };
+
+    // Search by the human title first; it is provided by KLIPY's successful
+    // oEmbed endpoint. The slug is the deterministic fallback.
+    addQuery(title);
+    addQuery(slug.replace(/[-_]+/g, ' ').trim());
+
+    gifResolverLog('klipy', 'api:resolver-start', {
+      pageUrl,
+      slug,
+      title,
+      queries,
+      key: maskKlipyApiKey(apiKey),
+    });
+
+    let best = null;
+
+    for (const query of queries.slice(0, 2)) {
+      const payload = await fetchKlipyOfficialSearch(query, apiKey);
+      if (!payload) continue;
+
+      const results = extractKlipyApiResults(payload);
+
+      gifResolverLog('klipy', 'api:result-count', {
+        query,
+        count: results.length,
+        topLevelKeys:
+          payload && typeof payload === 'object'
+            ? Object.keys(payload).slice(0, 30)
+            : [],
+      });
+
+      const ranked = results
+        .map((result, index) =>
+          scoreKlipyApiResult(
+            result,
+            pageUrl,
+            slug,
+            title,
+            query,
+            index
+          )
+        )
+        .filter((item) => item.media.length)
+        .sort((a, b) => b.score - a.score);
+
+      gifResolverLog('klipy', 'api:ranked', {
+        query,
+        top: ranked.slice(0, 8).map((item) => ({
+          index: item.index,
+          score: item.score,
+          reasons: item.reasons,
+          media: item.media.slice(0, 3),
+        })),
+      });
+
+      if (ranked.length && (!best || ranked[0].score > best.score)) {
+        best = ranked[0];
+      }
+
+      // An exact URL/slug match is deterministic; no second API call needed.
+      if (
+        best &&
+        (
+          best.reasons.includes('exact-page-url') ||
+          best.reasons.includes('exact-slug')
+        )
+      ) {
+        break;
+      }
+    }
+
+    if (!best?.media?.length) {
+      gifResolverWarn('klipy', 'api:no-matching-media', {
+        pageUrl,
+        slug,
+        title,
+      });
+      return null;
+    }
+
+    // Avoid returning an unrelated GIF for extremely ambiguous one-character
+    // titles unless the API result actually matched the slug/page.
+    const deterministic =
+      best.reasons.includes('exact-page-url') ||
+      best.reasons.includes('exact-slug');
+    const strongTitle =
+      title.length >= 3 &&
+      (
+        best.reasons.includes('exact-title') ||
+        best.reasons.includes('exact-query')
+      );
+
+    if (!deterministic && !strongTitle) {
+      gifResolverWarn('klipy', 'api:match-too-weak', {
+        pageUrl,
+        slug,
+        title,
+        score: best.score,
+        reasons: best.reasons,
+      });
+      return null;
+    }
+
+    const selected = best.media[0].url;
+
+    gifResolverLog('klipy', 'api:selected', {
+      pageUrl,
+      slug,
+      title,
+      score: best.score,
+      reasons: best.reasons,
+      selected,
+      mediaSource: best.media[0].source,
+    });
+
+    return selected;
+  }
+
+  async function resolveKlipyMedia(pageUrl) {
+    gifResolverLog('klipy', 'resolver:start', { pageUrl });
+
+    const apiKey = getKlipyApiKey();
+    gifResolverLog('klipy', 'api:key-status', {
+      configured: Boolean(apiKey),
+      masked: maskKlipyApiKey(apiKey),
+    });
+
+    if (!apiKey) {
+      if (!klipyMissingApiKeyLogged) {
+        klipyMissingApiKeyLogged = true;
+        gifResolverWarn('klipy', 'api:key-missing', {
+          message:
+            'KLIPY API key required. In DevTools run: ' +
+            'SDC_KLIPY_API.setKey("YOUR_KLIPY_API_KEY")',
+        });
+      }
+      return null;
+    }
+
+    // KLIPY's oEmbed endpoint is reachable from Discord and gives us the
+    // canonical content title. It deliberately does not expose the actual GIF
+    // URL, so the official v2 API is used for media resolution.
+    try {
+      const oembedUrl =
+        'https://api.klipy.com/api/v1/web/gifs/embed/oembed?format=json&url=' +
+        encodeURIComponent(pageUrl);
+
+      gifResolverLog('klipy', 'oembed:fetch', { url: oembedUrl });
+
+      const oembedResponse = await BdApi.Net.fetch(oembedUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        timeout: 8000,
+        headers: {
+          Accept: 'application/json,text/plain;q=0.9,*/*;q=0.8',
+        },
+      });
+
+      gifResolverLog('klipy', 'oembed:response', {
+        status: oembedResponse.status,
+        ok: oembedResponse.ok,
+        finalUrl: oembedResponse.url,
+        contentType: oembedResponse.headers?.get?.('content-type') || null,
+      });
+
+      let oembedData = null;
+      if (oembedResponse.ok) {
+        try {
+          oembedData = await oembedResponse.json();
+        } catch (error) {
+          gifResolverWarn('klipy', 'oembed:json-parse-failed', {
+            message: error?.message || String(error),
+          });
+        }
+      }
+
+      gifResolverLog('klipy', 'oembed:identity', {
+        pageUrl,
+        title: oembedData?.title ?? null,
+        thumbnail_width: oembedData?.thumbnail_width ?? null,
+        thumbnail_height: oembedData?.thumbnail_height ?? null,
+      });
+
+      const apiMedia = await resolveKlipyOfficialApiMedia(
+        pageUrl,
+        oembedData,
+        apiKey
+      );
+
+      if (apiMedia) {
+        gifResolverLog('klipy', 'resolver:success-official-api', {
+          pageUrl,
+          selected: apiMedia,
+        });
+        return apiMedia;
+      }
+
+      gifResolverWarn('klipy', 'resolver:no-media-from-official-api', {
+        pageUrl,
+        title: oembedData?.title ?? null,
+      });
+      return null;
+    } catch (error) {
+      gifResolverWarn('klipy', 'resolver:exception', {
+        pageUrl,
+        name: error?.name,
+        message: error?.message || String(error),
+        stack: error?.stack,
+      });
+      return null;
+    }
+  }
+
+  async function resolveGifPageMedia(pageUrl, provider) {
+    const cacheKey = provider + ':' + pageUrl;
+    const cached = getCachedGifPageMedia(cacheKey);
+    if (cached.hit) {
+      gifResolverLog(provider, 'cache:hit', {
+        pageUrl,
+        mediaUrl: cached.mediaUrl,
+      });
+      return cached.mediaUrl;
+    }
+
+    gifResolverLog(provider, 'cache:miss', { pageUrl });
+
+    if (gifPageMediaPending.has(cacheKey)) {
+      gifResolverLog(provider, 'pending:reuse', { pageUrl });
+      return gifPageMediaPending.get(cacheKey);
+    }
+
+    const pending = (async () => {
+      let mediaUrl = null;
+      try {
+        mediaUrl =
+          provider === 'tenor'
+            ? await resolveTenorMedia(pageUrl)
+            : await resolveKlipyMedia(pageUrl);
+
+        if (provider === 'klipy' && mediaUrl) {
+          try {
+            const parsed = new URL(mediaUrl);
+            if (
+              parsed.protocol !== 'https:' ||
+              !(
+                parsed.hostname === 'klipy.com' ||
+                parsed.hostname.endsWith('.klipy.com')
+              ) ||
+              parsed.pathname === '/' ||
+              /^\/gifs\/[^/]+\/?$/i.test(parsed.pathname) ||
+              /\/player\/?$/i.test(parsed.pathname) ||
+              /^\/v\d+\//i.test(parsed.pathname) ||
+              /^\/api\//i.test(parsed.pathname)
+            ) {
+              gifResolverWarn(
+                'klipy',
+                'cache:reject-invalid-media-url',
+                { pageUrl, mediaUrl }
+              );
+              mediaUrl = null;
+            }
+          } catch (_) {
+            mediaUrl = null;
+          }
+        }
+
+        cacheGifPageMedia(cacheKey, mediaUrl);
+        gifResolverLog(provider, 'cache:store', {
+          pageUrl,
+          mediaUrl,
+          positive: Boolean(mediaUrl),
+        });
+        return mediaUrl;
+      } finally {
+        gifPageMediaPending.delete(cacheKey);
+      }
+    })();
+
+    gifPageMediaPending.set(cacheKey, pending);
+    return pending;
+  }
+
+  function embedResolvedGifImage(message, displayUrl, sourceUrl, provider) {
+    if (!Array.isArray(message.embeds)) message.embeds = [];
+
+    const placeholder = {
+      type: 'image',
+      // Keep the original remote URL in embed.url so repeated MESSAGE_UPDATE
+      // processing can recognize this embed even when thumbnail.url is blob:.
+      url: sourceUrl,
+      ...(provider === 'klipy'
+        ? {
+            provider: {
+              name: 'KLIPY',
+              url: 'https://klipy.com',
+            },
+          }
+        : {}),
+      thumbnail: {
+        url: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+        width: 1,
+        height: 300,
+      },
+    };
+    message.embeds.push(placeholder);
+
+    gifResolverLog(provider, 'image:probe-start', {
+      sourceUrl,
+      displayUrl,
+      isBlob: /^blob:/i.test(displayUrl),
+      messageId: message?.id || null,
+    });
+
+    const tmpimg = document.createElement('img');
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      gifResolverWarn(provider, 'image:probe-timeout', {
+        sourceUrl,
+        displayUrl,
+        messageId: message?.id || null,
+      });
+      const index = message.embeds.indexOf(placeholder);
+      if (index !== -1) message.embeds.splice(index, 1);
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
+    }, 10000);
+
+    tmpimg.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      const width = tmpimg.naturalWidth || tmpimg.width || 1;
+      const height = tmpimg.naturalHeight || tmpimg.height || 1;
+      placeholder.thumbnail = { url: displayUrl, width, height };
+
+      gifResolverLog(provider, 'image:onload', {
+        sourceUrl,
+        displayUrl,
+        width,
+        height,
+        complete: tmpimg.complete,
+        messageId: message?.id || null,
+      });
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
+    };
+
+    tmpimg.onerror = (event) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      gifResolverWarn(provider, 'image:onerror', {
+        sourceUrl,
+        displayUrl,
+        isBlob: /^blob:/i.test(displayUrl),
+        eventType: event?.type || null,
+        messageId: message?.id || null,
+      });
+      // Do not leave the old 300px blank placeholder behind on failure.
+      const index = message.embeds.indexOf(placeholder);
+      if (index !== -1) message.embeds.splice(index, 1);
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
+    };
+
+    tmpimg.src = displayUrl;
+    return placeholder;
+  }
+
+  async function embedKlipyResolvedImage(message, mediaUrl, pageUrl) {
+    try {
+      const entry = await fetchGifMediaAsBlobUrl(mediaUrl, 'klipy', pageUrl);
+      return embedResolvedGifImage(
+        message,
+        entry.blobUrl,
+        mediaUrl,
+        'klipy'
+      );
+    } catch (error) {
+      gifResolverWarn('klipy', 'binary:fallback-to-direct', {
+        mediaUrl,
+        pageUrl,
+        name: error?.name,
+        message: error?.message || String(error),
+        stack: error?.stack,
+      });
+      // Last resort: try the remote URL, but with explicit onerror cleanup and
+      // diagnostics so a failed CDN load can no longer leave a blank square.
+      return embedResolvedGifImage(message, mediaUrl, mediaUrl, 'klipy');
+    }
+  }
+
+  function embedTrustedDirectImage(message, url) {
+    let queryString = '';
+    try {
+      const parsed = new URL(url);
+      queryString = parsed.pathname.replace(/^\//, '') + parsed.search;
+    } catch (_) {}
+    embedImage(message, url, queryString, true);
+  }
+
+  function embedGifPage(message, url, queryString, provider) {
+    queryString = queryString || '';
+    if (provider === 'tenor' && !/^view\//i.test(queryString)) return;
+    if (provider === 'klipy' && !/^gifs\//i.test(queryString)) return;
+
+    gifResolverLog(provider, 'embed:detected-page', {
+      url,
+      queryString,
+      messageId: message?.id || null,
+      channelId: message?.channel_id || null,
+    });
+
+    resolveGifPageMedia(url, provider).then(async (mediaUrl) => {
+      gifResolverLog(provider, 'embed:resolved', {
+        pageUrl: url,
+        mediaUrl,
+        messageId: message?.id || null,
+      });
+      if (!mediaUrl) return;
+      if (!Array.isArray(message.embeds)) message.embeds = [];
+
+      const klipyFrameUrl =
+        provider === 'klipy' ? decodeKlipyFrameUrl(mediaUrl) : null;
+      if (klipyFrameUrl) {
+        gifResolverWarn('klipy', 'embed:legacy-frame-rejected', {
+          pageUrl: url,
+          frameUrl: klipyFrameUrl,
+          messageId: message?.id || null,
+        });
+        return;
+      }
+
+      if (
+        message.embeds.some(
+          (embed) =>
+            embed?.url === mediaUrl ||
+            embed?.thumbnail?.url === mediaUrl ||
+            embed?.image?.url === mediaUrl
+        )
+      ) {
+        gifResolverLog(provider, 'embed:already-present', {
+          pageUrl: url,
+          mediaUrl,
+          messageId: message?.id || null,
+        });
+        return;
+      }
+
+      if (provider === 'klipy') {
+        await embedKlipyResolvedImage(message, mediaUrl, url);
+      } else {
+        embedTrustedDirectImage(message, mediaUrl);
+      }
+
+      gifResolverLog(provider, 'embed:dispatch-message-update', {
+        pageUrl: url,
+        mediaUrl,
+        embedCount: Array.isArray(message.embeds) ? message.embeds.length : null,
+        messageId: message?.id || null,
+      });
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
+    }).catch((error) => {
+      gifResolverWarn(provider, 'embed:promise-rejected', {
+        pageUrl: url,
+        name: error?.name,
+        message: error?.message || String(error),
+        stack: error?.stack,
+      });
+    });
+  }
+
+  function embedTenor(message, url, queryString) {
+    embedGifPage(message, url, queryString, 'tenor');
+  }
+
+  function embedKlipy(message, url, queryString) {
+    gifResolverLog('klipy', 'native-unfurl:client-resolver-skipped', {
+      url,
+      queryString: queryString || '',
+      messageId: message?.id || null,
+      nativeEmbedPresent:
+        Array.isArray(message?.embeds) &&
+        message.embeds.some(isNativeKlipyEmbed),
+    });
+    // v16 intentionally does not fetch klipy.com, /player, oEmbed, or the KLIPY
+    // API. Discord's own backend has already seen the plaintext transport URL
+    // and is responsible for producing the native link preview.
+  }
+
   var EmbedFrames = [];
   function embedEncrypted(message, url, queryString) {
     if (Discord.detour_setAttribute != null) {
@@ -5916,6 +9275,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     'cdn.discordapp.com': embedImage,
     'media.discordapp.net': embedImage,
     'i.imgur.com': embedImage,
+
+    // v17: native Discord KLIPY unfurl + safe encrypted attachment download buttons.
+    'gif.fxtwitter.com': embedImage,
+    'static.klipy.com': embedTrustedDirectImage,
+    'static1.klipy.com': embedTrustedDirectImage,
+    'static2.klipy.com': embedTrustedDirectImage,
+    'static3.klipy.com': embedTrustedDirectImage,
+    'static4.klipy.com': embedTrustedDirectImage,
+    'media.tenor.com': embedTrustedDirectImage,
+    'media1.tenor.com': embedTrustedDirectImage,
+    'c.tenor.com': embedTrustedDirectImage,
+    'tenor.com': embedTenor,
+    'www.tenor.com': embedTenor,
+    'klipy.com': embedKlipy,
+    'www.klipy.com': embedKlipy,
   };
   if (FixedCsp)
     Object.assign(linkEmbedders, {
@@ -5930,6 +9304,78 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const roleMentionRegex = CONFIG.patterns.roleMention;
   const urlRegex =
     /(?:<https?:\/\/(?:[^\s\/?\.#]+\.)+(?:[^\s\/?\.#]+)\/[^\s<>'"]+>|https?:\/\/((?:[^\s\/?\.#]+\.)+(?:[^\s\/?\.#]+))\/([^\s<>'"]+))/g;
+  const KLIPY_NATIVE_UNFURL_ENABLED = true;
+
+  function normalizeKlipyNativeUrl(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      if (parsed.protocol !== 'https:') return null;
+      const host = parsed.hostname.toLowerCase();
+      if (host !== 'klipy.com' && host !== 'www.klipy.com') return null;
+      if (!/^\/gifs\/[^/?#]+/i.test(parsed.pathname)) return null;
+      parsed.hash = '';
+      return parsed.href;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function extractKlipyNativeUnfurlUrls(content) {
+    if (!KLIPY_NATIVE_UNFURL_ENABLED || !content) return [];
+
+    const found = new Set();
+    const regex =
+      /https:\/\/(?:www\.)?klipy\.com\/gifs\/[^\s<>'"\])}]+/gi;
+
+    for (const match of String(content).matchAll(regex)) {
+      let candidate = String(match[0] || '')
+        .replace(/[.,;:!?]+$/g, '')
+        .trim();
+      const normalized = normalizeKlipyNativeUrl(candidate);
+      if (normalized) found.add(normalized);
+    }
+
+    return Array.from(found).slice(0, 4);
+  }
+
+  function isNativeKlipyEmbed(embed) {
+    if (!embed || typeof embed !== 'object') return false;
+
+    const providerName = String(embed.provider?.name || '').toLowerCase();
+    if (providerName === 'klipy') return true;
+
+    const urls = [
+      embed.url,
+      embed.image?.url,
+      embed.image?.proxy_url,
+      embed.thumbnail?.url,
+      embed.thumbnail?.proxy_url,
+      embed.video?.url,
+      embed.video?.proxy_url,
+    ].filter(Boolean);
+
+    return urls.some((value) => {
+      try {
+        const parsed = new URL(String(value));
+        const host = parsed.hostname.toLowerCase();
+        return (
+          host === 'klipy.com' ||
+          host === 'www.klipy.com' ||
+          /^static\d*\.klipy\.com$/.test(host) ||
+          host === 'media.discordapp.net' ||
+          /^images-ext-\d+\.discordapp\.net$/.test(host)
+        );
+      } catch (_) {
+        return false;
+      }
+    });
+  }
+
+  function appendKlipyNativeUnfurlTransport(content, urls) {
+    if (!urls || urls.length === 0) return content;
+    return String(content) + '\n' + urls.join('\n');
+  }
+
   function postProcessMessage(message, content) {
     let currentUser = Discord.getCurrentUser();
     if (
@@ -6130,7 +9576,32 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     }
 
-    message.embeds = []; //remove embeds in case of edit and in case of the payload is from the embed
+    const preservedNativeKlipyEmbeds = Array.isArray(message.embeds)
+      ? message.embeds.filter(isNativeKlipyEmbed)
+      : [];
+
+    if (preservedNativeKlipyEmbeds.length) {
+      gifResolverLog('klipy', 'native-unfurl:preserve-server-embed', {
+        messageId: message?.id || null,
+        count: preservedNativeKlipyEmbeds.length,
+        embeds: preservedNativeKlipyEmbeds.map((embed) => ({
+          type: embed?.type || null,
+          url: embed?.url || null,
+          provider: embed?.provider?.name || null,
+          imageUrl: embed?.image?.url || null,
+          videoUrl: embed?.video?.url || null,
+          proxyUrl:
+            embed?.video?.proxy_url ||
+            embed?.image?.proxy_url ||
+            embed?.thumbnail?.proxy_url ||
+            null,
+        })),
+      });
+    }
+
+    // Keep only Discord's native KLIPY preview. SDC's encrypted-message embed
+    // and stale third-party embeds are still removed as before.
+    message.embeds = preservedNativeKlipyEmbeds;
 
     if (payloadBuffer.byteLength === 16) {
       if (!differentKey) message.content = '<:ENC:465534298662109185>⁣';
@@ -6190,6 +9661,51 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const invalidSystemMessage = CONFIG.messages.invalidSystem;
   const blockedSystemMessage = CONFIG.messages.blocked;
   var keyExchangeWhitelist = {};
+
+  // Peers explicitly refused by the local user. This is persisted inside the SDC
+  // database so a message refresh/restart cannot reopen the same confirmation.
+  // The entry is intentionally peer-wide: a refused stranger cannot just request a
+  // different key to force another popup. It is cleared only by a manual DM exchange.
+  function IsDeniedKeyPeer(userId) {
+    return !!(
+      userId &&
+      DataBase &&
+      DataBase.deniedKeyPeers &&
+      Object.prototype.hasOwnProperty.call(DataBase.deniedKeyPeers, userId)
+    );
+  }
+
+  function DenyKeyPeer(userId, reason) {
+    if (!userId || !DataBase) return;
+    if (!DataBase.deniedKeyPeers) DataBase.deniedKeyPeers = {};
+    DataBase.deniedKeyPeers[userId] = {
+      t: Date.now(),
+      r: reason || 'denied',
+    };
+    Utils.dbChanged = true;
+    // Save immediately: a Discord refresh right after pressing Cancel must not lose
+    // the refusal before the regular 10-second database save interval runs.
+    try {
+      Utils.FastSaveDb();
+    } catch (error) {
+      console.warn('[SDC] Could not immediately persist denied key peer', error);
+    }
+  }
+
+  function ClearDeniedKeyPeer(userId) {
+    if (!IsDeniedKeyPeer(userId)) return;
+    delete DataBase.deniedKeyPeers[userId];
+    if (Object.keys(DataBase.deniedKeyPeers).length === 0)
+      delete DataBase.deniedKeyPeers;
+    Utils.dbChanged = true;
+    try {
+      Utils.FastSaveDb();
+    } catch (error) {
+      console.warn('[SDC] Could not immediately persist cleared key peer refusal', error);
+    }
+    console.log('[SDC] Previous key refusal cleared by manual exchange', { userId });
+  }
+
   async function processSystemMessage(message, sysmsg) {
     let channel = Discord.getChannel(message.channel_id);
     if (channel.type !== 1 /*DM*/) return false;
@@ -6235,6 +9751,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         messageType === 'DH RESPONSE' ||
         messageType === 'PERSONAL KEY';
 
+      if (
+        isIncomingKeyExchange &&
+        IsDeniedKeyPeer(userId) &&
+        !keyExchangeWhitelist[userId]
+      ) {
+        const username =
+          message.author.global_name || message.author.username || userId;
+        const discriminator =
+          message.author.discriminator && message.author.discriminator !== '0'
+            ? `#${message.author.discriminator}`
+            : '';
+        message.content = `💻 Key exchange from ${username}${discriminator} ignored (previously declined).`;
+        message.embeds = [];
+        return true;
+      }
+
       if (isIncomingKeyExchange && !keyExchangeWhitelist[userId]) {
         const username =
           message.author.global_name || message.author.username || userId;
@@ -6263,6 +9795,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             userId,
             messageType,
           });
+          DenyKeyPeer(userId, 'incoming-exchange');
           message.content = `💻 Key exchange from ${username}${discriminator} declined.`;
           return true;
         }
@@ -6478,6 +10011,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               ? Utils.FormatDescriptor(requestedKey.d)
               : keyHash.slice(0, 12) + '…';
 
+            if (IsDeniedKeyPeer(userId)) {
+              console.log('[SDC] Key request ignored for previously denied peer', {
+                userId,
+                keyHash: keyHash.slice(0, 8),
+              });
+              message.content = `💻 Key request from ${requesterName}${requesterDiscriminator} ignored (previously declined).`;
+              return true;
+            }
+
             const allowShare = await PopupManager.NewPromise(
               `Allow ${requesterName}${requesterDiscriminator} to receive key "${requestedDescriptor}"?`,
               true
@@ -6488,6 +10030,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 userId,
                 keyHash: keyHash.slice(0, 8),
               });
+              DenyKeyPeer(userId, 'key-request');
               Utils.SendSystemMessage(
                 message.channel_id,
                 `*type*: \`KEY SHARE\`\n*status*: \`DENIED\``
@@ -6537,6 +10080,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             message.author.discriminator && message.author.discriminator !== '0'
               ? `#${message.author.discriminator}`
               : '';
+
+          if (IsDeniedKeyPeer(userId)) {
+            console.log('[SDC] Shared key ignored for previously denied peer', {
+              userId,
+              keyTypeName,
+              keyDescriptor,
+            });
+            message.content = `💻 Shared key from ${senderName}${senderDiscriminator} ignored (previously declined).`;
+            delete channelConfig.w;
+            Utils.dbChanged = true;
+            delete keyExchangeWhitelist[userId];
+            return true;
+          }
+
           message.content = `💻 ${senderName}${senderDiscriminator} wants to share key "${keyDescriptor}" — waiting for your confirmation…`;
 
           const acceptSharedKey = await PopupManager.NewPromise(
@@ -6549,6 +10106,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               keyTypeName,
               keyDescriptor,
             });
+            DenyKeyPeer(userId, 'shared-key');
             message.content = `💻 Shared key from ${senderName}${senderDiscriminator} declined.`;
             delete channelConfig.w;
             Utils.dbChanged = true;
@@ -6738,6 +10296,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return null;
     }
 
+    const klipyNativeUnfurlUrls =
+      extractKlipyNativeUnfurlUrls(content);
+
+    if (klipyNativeUnfurlUrls.length) {
+      gifResolverLog('klipy', 'native-unfurl:expose-transport-url', {
+        channelId,
+        count: klipyNativeUnfurlUrls.length,
+        urls: klipyNativeUnfurlUrls,
+        privacy:
+          'KLIPY URL is intentionally plaintext so Discord can generate its native embed; message text remains encrypted.',
+      });
+    }
+
     let key = await Utils.GetKeyByHash(channelConfig.k);
     let keyHashBytes = Utils.Base64ToBytes(channelConfig.k);
     let messageBytes;
@@ -6755,14 +10326,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       (channel.type === 0 &&
         !Utils.Can(EMBED_LINKS_CHECK, Discord.getCurrentUser(), channel))
     ) {
-      message.content = payload + ' `🔒`';
+      message.content = appendKlipyNativeUnfurlTransport(
+        payload + ' `🔒`',
+        klipyNativeUnfurlUrls
+      );
     } else {
       // Pour les messages avec attachments uniquement (content vide), ne pas utiliser d'embed
       // car cela empêche l'affichage des attachments
       if (content === '') {
-        message.content = payload + ' `🔒`';
+        message.content = appendKlipyNativeUnfurlTransport(
+        payload + ' `🔒`',
+        klipyNativeUnfurlUrls
+      );
       } else {
-        message.content = '';
+        message.content = klipyNativeUnfurlUrls.join('\n');
         message.embed = {
           color: BaseColorInt,
           author: {
@@ -7183,6 +10760,59 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       })();
     };
 
+    if (Discord.detour_editMessage != null) {
+      Discord.detour_editMessage = function () {
+        const args = Array.from(arguments);
+
+        return (async () => {
+          let channelId = null;
+          let contentContainer = null;
+          let contentIndex = -1;
+          let contentWasString = false;
+
+          // Known Discord shapes include:
+          //   editMessage(channelId, messageId, contentString)
+          //   editMessage(channelId, messageId, {content: ...})
+          //   editMessage(channelId, {content: ...})
+          //   editMessage({channelId, content: ...})
+          if (typeof args[0] === 'string') channelId = args[0];
+          else if (args[0] && typeof args[0] === 'object')
+            channelId = args[0].channelId || args[0].channel_id || null;
+
+          // Prefer structured message/content objects because they preserve other
+          // edit options. Fall back to the third string argument used by Discord's
+          // classic MessageActions.editMessage signature.
+          for (const index of [2, 1, 0]) {
+            const value = args[index];
+            if (value && typeof value === 'object' && typeof value.content === 'string') {
+              contentContainer = value;
+              contentIndex = index;
+              break;
+            }
+          }
+
+          if (!contentContainer && typeof args[2] === 'string') {
+            contentContainer = { content: args[2] };
+            contentIndex = 2;
+            contentWasString = true;
+          }
+
+          if (channelId && contentContainer) {
+            await handleSend(channelId, contentContainer, true);
+
+            if (contentWasString) args[contentIndex] = contentContainer.content;
+            else args[contentIndex] = contentContainer;
+          }
+
+          return Reflect.apply(
+            Discord.original_editMessage,
+            Discord.editMessageTarget,
+            args
+          );
+        })();
+      };
+    }
+
     Discord.detour_dispatch = HandleDispatch;
 
     Discord.detour_upload = function (params) {
@@ -7227,8 +10857,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (
           key === 'src' &&
           value?.startsWith('https://open.spotify.com/embed/playlist//')
-        )
+        ) {
+          const placeholderValue = value;
           value = EmbedFrames[value.split(/\/playlist\/\/|\?/g, 2)[1]];
+
+          if (value && isTrustedKlipyFrameUrl(value)) {
+            gifResolverWarn('klipy', 'iframe:legacy-redirect-blocked', {
+              placeholderValue,
+              frameUrl: value,
+            });
+            value = placeholderValue;
+          }
+        }
 
         return Discord.original_setAttribute.call(this, key, value);
       };
@@ -7439,6 +11079,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return executeCall(event, this, this.attributes.href.value.substr(13));
     };
     const tryReplaceLink = (a) => {
+      // v17: encrypted attachments no longer rely on javascript: URLs. Match
+      // the real Discord CDN URL against the internal registry and attach both
+      // a safe click handler and the small download button.
+      if (tryBindEncryptedAttachmentLink(a)) return;
+
       let href = a.attributes.href;
       if (href === undefined) return;
       href = href.value;
@@ -7489,6 +11134,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         observer: new MutationObserver((mutations) => {
           for (let mutation of mutations) {
             if (mutation.type === 'attributes') {
+              // v18: mutations created by the encrypted-attachment UI must
+              // never be fed back into tryReplaceLink().
+              if (
+                typeof mutation.attributeName === 'string' &&
+                mutation.attributeName.startsWith('data-sdc-')
+              ) {
+                continue;
+              }
+
               let tagName = mutation.target.tagName;
               if (tagName === 'IMG') {
                 if (mutation.attributeName !== 'src') continue;
@@ -7500,7 +11154,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               for (let addedNode of mutation.addedNodes) {
                 if (addedNode.tagName === 'IMG') {
                   tryReplaceImage(addedNode);
-                  return;
+                } else if (addedNode.tagName === 'A') {
+                  tryReplaceLink(addedNode);
                 }
 
                 if (addedNode.getElementsByTagName == null) continue;
@@ -7524,11 +11179,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         observer: new MutationObserver((mutations) => {
           for (let mutation of mutations) {
             if (mutation.type === 'attributes') {
+              // v18: ignore attributes written by our own attachment binder.
+              if (
+                typeof mutation.attributeName === 'string' &&
+                mutation.attributeName.startsWith('data-sdc-')
+              ) {
+                continue;
+              }
+
               if (mutation.target.tagName === 'A') {
                 tryReplaceLink(mutation.target);
               }
             } else {
               for (let addedNode of mutation.addedNodes) {
+                if (addedNode.tagName === 'A') {
+                  tryReplaceLink(addedNode);
+                }
                 if (addedNode.getElementsByTagName == null) continue;
                 for (let a of addedNode.getElementsByTagName('a')) {
                   tryReplaceLink(a);
@@ -7544,6 +11210,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       childList: true,
       subtree: true,
     });
+
+    // Messages already present in the viewport predate the observer.
+    scanEncryptedAttachmentDownloadLinks();
+
+    // Images already decrypt/render inside Discord; v19 exposes their download
+    // through Discord's own message context menu rather than overlaying another
+    // button on top of the image.
+    installEncryptedImageContextMenu();
 
     dbSaveInterval = setInterval(() => {
       Utils.SaveDb();
@@ -7577,6 +11251,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
 
     restoreFunction('MessageQueue', 'enqueue');
+    if (Discord.detour_editMessage != null)
+      restoreFunction('MessageQueue', 'editMessage');
     restoreFunction('MessageDispatcher', 'dispatch');
     restoreFunction('FileUploader', 'upload');
     restoreFunction('FileUploader', 'instantBatchUpload');
@@ -7594,6 +11270,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     if (Patcher != null) Patcher.observer.disconnect();
 
+    cleanupEncryptedAttachmentDownloadUi();
+    uninstallEncryptedImageContextMenu();
+
     //Style.Remove();
     UnlockWindow.Remove();
     NewdbWindow.Remove();
@@ -7608,6 +11287,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     clearInterval(dbSaveInterval);
 
     ImageZoom.observer.disconnect();
+
+    clearGifBlobMediaCache();
 
     Utils.Log('unloaded');
   }
