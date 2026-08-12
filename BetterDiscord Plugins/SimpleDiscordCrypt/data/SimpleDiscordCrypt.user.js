@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.5.5
+// @version      1.7.5.6
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -18,7 +18,7 @@
   // SECTION 1: CONSTANTS & CONFIGURATION
   // ============================================================================
 
-  // v47: v46 unchanged except clickable full-screen viewer for the embedded Chat Control comparison image.
+  // v56: lock inline edit to its original message row, recover on cancel/Escape, and strip ENC again at the final edit plaintext boundary.
   const CONFIG = {
     // URLs & Resources
     urls: {
@@ -1291,6 +1291,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           }
         } catch (_) {}
 
+        try {
+          SecureComposer?.SetVisualSuppressed?.(
+            true,
+            'image-lightbox'
+          );
+        } catch (_) {}
+
         const lightbox =
           document.createElement(
             'div'
@@ -1384,6 +1391,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
           this.imageLightboxKeyHandler =
             null;
+
+          try {
+            SecureComposer?.SetVisualSuppressed?.(
+              false,
+              'image-lightbox-close'
+            );
+          } catch (_) {}
         };
 
         this.imageLightboxKeyHandler =
@@ -12133,6 +12147,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const SECURE_COMPOSER_PLACEHOLDER =
     '🔒 SDC Secure Input [ChatControl protected]';
 
+  // Keep the Secure Input hint visually stable from the first rendered frame.
+  // Do not inherit Discord's transient focus/activation placeholder color.
+  const SECURE_COMPOSER_PLACEHOLDER_COLOR =
+    'rgba(148, 155, 164, 0.55)';
+
   // SDC's on-wire key identifier is SHA-512 truncated to 128 bits.
   // decryptMessage() consumes exactly the first 16 payload bytes as key hash.
   const SECURE_COMPOSER_KEY_HASH_BYTES = 16;
@@ -12552,7 +12571,7 @@ self.onmessage = async (event) => {
     width: 100%;
     height: 22px;
     min-height: 22px;
-    max-height: 176px;
+    max-height: var(--sdc-max-height, 900px);
     resize: none;
     border: 0;
     outline: 0;
@@ -12573,7 +12592,8 @@ self.onmessage = async (event) => {
     overflow-wrap: anywhere;
   }
   #sdcSecureInput::placeholder {
-    color: var(--sdc-placeholder, #949ba4);
+    color: var(--sdc-placeholder, rgba(148, 155, 164, 0.55));
+    -webkit-text-fill-color: var(--sdc-placeholder, rgba(148, 155, 164, 0.55));
     opacity: 1;
   }
 
@@ -12600,11 +12620,142 @@ self.onmessage = async (event) => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const SECURE_INPUT_LIMIT = 10000;
+  let secureInputMaxHeight = 176;
 
   function countCharacters(value) {
     return Array.from(
       String(value || '')
     ).length;
+  }
+
+  function sanitizeSecureEditDraft(value) {
+    let text = String(value || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
+
+    const patterns = [
+      /^[\s\\]*<a?:ENC(?:_[A-Za-z0-9_-]+)?:\d{1,24}>[\s]*/i,
+      /^[\s\\]*:ENC(?:_[A-Za-z0-9_-]+)?:[\s]*/i,
+      /^[\s\\]*ENC(?:_[A-Za-z0-9_-]+)?(?::|\b)[\s]*/i,
+    ];
+
+    let changed = false;
+
+    for (let pass = 0; pass < 2; pass++) {
+      let matched = false;
+
+      for (const pattern of patterns) {
+        if (pattern.test(text)) {
+          text = text.replace(pattern, '');
+          changed = true;
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) break;
+    }
+
+    if (changed) {
+      text = text.replace(/^(?:[ \t]*\n)+/, '');
+    }
+
+    return text;
+  }
+
+  function normalizeSecureEmojiShortcuts(value) {
+    let text = String(value || '');
+
+    const aliases = {
+      heart_eyes: '😍',
+      joy: '😂',
+      smile: '😄',
+      blush: '😊',
+      wink: '😉',
+      sob: '😭',
+      cry: '😢',
+      angry: '😠',
+      thinking: '🤔',
+      eyes: '👀',
+      heart: '❤️',
+      fire: '🔥',
+      tada: '🎉',
+      rocket: '🚀',
+      wave: '👋',
+      clap: '👏',
+      pray: '🙏',
+      thumbsup: '👍',
+      thumbsdown: '👎',
+      ok_hand: '👌',
+      100: '💯',
+      skull: '💀',
+      sunglasses: '😎',
+      laughing: '😆',
+      stuck_out_tongue: '😛',
+      open_mouth: '😮',
+      face_holding_back_tears: '🥹',
+      pleading_face: '🥺',
+      slightly_smiling_face: '🙂',
+      frowning_face: '☹️',
+      disappointed: '😞',
+      weary: '😩',
+      tired_face: '😫',
+      scream: '😱',
+      fearful: '😨',
+      cold_sweat: '😰',
+      sweat: '😓',
+      confounded: '😖',
+      flushed: '😳',
+      kissing_heart: '😘',
+      heart_eyes_cat: '😻',
+      crying_cat_face: '😿',
+      smile_cat: '😸',
+    };
+
+    text = text.replace(
+      /:([a-zA-Z0-9_+-]+):/g,
+      (full, rawName) =>
+        aliases[
+          String(rawName || '')
+            .toLowerCase()
+        ] || full
+    );
+
+    const rules = [
+      [/(^|\s)(?:<3)(?=\s|$)/g, '$1❤️'],
+      [/(^|\s)(?:[:=]-?\))(?=\s|$)/g, '$1🙂'],
+      [/(^|\s)(?:[:=]-?\()(?=\s|$)/g, '$1🙁'],
+      [/(^|\s)(?::['’]-?\()(?=\s|$)/g, '$1😢'],
+      [/(^|\s)(?:[Tt][_.-][Tt])(?=\s|$)/g, '$1😭'],
+      [/(^|\s)(?::['’]-?\))(?=\s|$)/g, '$1🥲'],
+      [/(^|\s)(?::[-]?[dD]|=[dD])(?=\s|$)/g, '$1😄'],
+      [/(^|\s)(?:[xX][dD])(?=\s|$)/g, '$1😆'],
+      [/(^|\s)(?:;-?\))(?=\s|$)/g, '$1😉'],
+      [/(^|\s)(?::[-]?[pP])(?=\s|$)/g, '$1😛'],
+      [/(^|\s)(?::[-]?[oO])(?=\s|$)/g, '$1😮'],
+      [/(^|\s)(?::[-]?\/)(?=\s|$)/g, '$1😕'],
+      [/(^|\s)(?::\|)(?=\s|$)/g, '$1😐'],
+      [/(^|\s)(?::[-]?\*)(?=\s|$)/g, '$1😘'],
+      [/(^|\s)(?::3)(?=\s|$)/g, '$1😺'],
+      [/(^|\s)(?:[oO]:-?\))(?=\s|$)/g, '$1😇'],
+      [/(^|\s)(?:>:-?\()(?=\s|$)/g, '$1😠'],
+      [/(^|\s)(?:>:-?[dD])(?=\s|$)/g, '$1😈'],
+      [/(^|\s)(?:[dD]:)(?=\s|$)/g, '$1😨'],
+      [/(^|\s)(?:-_-)(?=\s|$)/g, '$1😑'],
+      [/(^|\s)(?:\^_\^)(?=\s|$)/g, '$1😊'],
+      [/(^|\s)(?:[oO]_[oO])(?=\s|$)/g, '$1🤨'],
+      [/(^|\s)(?::[sS])(?=\s|$)/g, '$1😖'],
+      [/(^|\s)(?::\$)(?=\s|$)/g, '$1😳'],
+    ];
+
+    for (const [pattern, replacement] of rules) {
+      text = text.replace(
+        pattern,
+        replacement
+      );
+    }
+
+    return text;
   }
 
   function truncateToLimit(value) {
@@ -12666,6 +12817,7 @@ self.onmessage = async (event) => {
   let composing = false;
   let draftTimer = null;
   let initialized = false;
+  let nativeEditMode = false;
 
   function sendParent(type, fields, transfer) {
     const message = Object.assign(
@@ -13236,6 +13388,23 @@ self.onmessage = async (event) => {
     rawKey.fill(0);
     initialized = true;
 
+    secureInputMaxHeight =
+      Math.max(
+        176,
+        Math.min(
+          900,
+          Number(
+            data.maxInputHeight ||
+            176
+          )
+        )
+      );
+
+    document.documentElement.style.setProperty(
+      '--sdc-max-height',
+      secureInputMaxHeight + 'px'
+    );
+
     applyTheme(data.theme);
 
     if (
@@ -13276,14 +13445,15 @@ self.onmessage = async (event) => {
     const height = Math.max(
       22,
       Math.min(
-        176,
+        secureInputMaxHeight,
         Number(input.scrollHeight || 22)
       )
     );
 
     input.style.height = height + 'px';
     input.style.overflowY =
-      Number(input.scrollHeight || 0) > 176
+      Number(input.scrollHeight || 0) >
+        secureInputMaxHeight
         ? 'auto'
         : 'hidden';
 
@@ -13426,8 +13596,111 @@ self.onmessage = async (event) => {
   );
 
   input.addEventListener(
+    'paste',
+    (event) => {
+      const files = [];
+
+      try {
+        for (
+          const file of
+          Array.from(
+            event.clipboardData?.files ||
+            []
+          )
+        ) {
+          if (file instanceof File) {
+            files.push(file);
+          }
+        }
+      } catch (_) {}
+
+      if (!files.length) {
+        try {
+          for (
+            const item of
+            Array.from(
+              event.clipboardData?.items ||
+              []
+            )
+          ) {
+            if (
+              item?.kind ===
+                'file'
+            ) {
+              const file =
+                item.getAsFile?.();
+
+              if (
+                file instanceof File
+              ) {
+                files.push(file);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (files.length) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+
+        sendParent(
+          'sdc-secure-paste-files',
+          {
+            files: files
+          }
+        );
+      }
+    },
+    true
+  );
+
+  input.addEventListener(
     'keydown',
     (event) => {
+      if (
+        event.key ===
+          'Escape' &&
+        nativeEditMode &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        sendParent(
+          'sdc-secure-native-cancel-edit'
+        );
+
+        return;
+      }
+
+      if (
+        event.key ===
+          'ArrowUp' &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !composing &&
+        String(
+          input.value ||
+          ''
+        ).trim() === ''
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        sendParent(
+          'sdc-secure-native-arrow-up-edit'
+        );
+
+        return;
+      }
+
       if (
         event.key === 'Enter' &&
         !event.shiftKey &&
@@ -13444,8 +13717,36 @@ self.onmessage = async (event) => {
         busy = true;
         clearTimeout(draftTimer);
 
-        const plaintext =
+        let rawPlaintext =
           String(input.value || '');
+
+        if (
+          nativeEditMode
+        ) {
+          const sanitized =
+            sanitizeSecureEditDraft(
+              rawPlaintext
+            );
+
+          if (
+            sanitized !==
+              rawPlaintext
+          ) {
+            rawPlaintext =
+              sanitized;
+
+            input.value =
+              sanitized;
+
+            syncInputHeight();
+            emitDraftSoon();
+          }
+        }
+
+        const plaintext =
+          normalizeSecureEmojiShortcuts(
+            rawPlaintext
+          );
 
         const sendPromise =
           countCharacters(
@@ -13554,6 +13855,105 @@ self.onmessage = async (event) => {
       ) {
         input.focus();
       } else if (
+        data.command ===
+          'set-edit-mode'
+      ) {
+        nativeEditMode =
+          !!data.enabled;
+
+        if (
+          nativeEditMode
+        ) {
+          const sanitized =
+            sanitizeSecureEditDraft(
+              input.value
+            );
+
+          if (
+            sanitized !==
+              input.value
+          ) {
+            input.value =
+              sanitized;
+
+            syncInputHeight();
+            emitDraftSoon();
+          }
+        }
+      } else if (
+        data.command ===
+          'set-max-height'
+      ) {
+        secureInputMaxHeight =
+          Math.max(
+            176,
+            Math.min(
+              900,
+              Number(
+                data.maxHeight ||
+                secureInputMaxHeight
+              )
+            )
+          );
+
+        document.documentElement.style.setProperty(
+          '--sdc-max-height',
+          secureInputMaxHeight + 'px'
+        );
+
+        syncInputHeight();
+      } else if (
+        data.command ===
+          'insert-text' &&
+        typeof data.text ===
+          'string'
+      ) {
+        const start =
+          Number.isFinite(
+            input.selectionStart
+          )
+            ? input.selectionStart
+            : input.value.length;
+
+        const end =
+          Number.isFinite(
+            input.selectionEnd
+          )
+            ? input.selectionEnd
+            : start;
+
+        if (
+          typeof input.setRangeText ===
+            'function'
+        ) {
+          input.setRangeText(
+            data.text,
+            start,
+            end,
+            'end'
+          );
+        } else {
+          input.value =
+            input.value.slice(0, start) +
+            data.text +
+            input.value.slice(end);
+
+          const cursor =
+            start +
+            data.text.length;
+
+          input.selectionStart =
+            cursor;
+
+          input.selectionEnd =
+            cursor;
+        }
+
+        enforceInputLimit();
+        syncInputHeight();
+        emitDraftSoon();
+        input.focus();
+      } else if (
         data.command === 'seed' &&
         typeof data.text === 'string'
       ) {
@@ -13634,6 +14034,32 @@ self.onmessage = async (event) => {
     // webpack modules across client releases.
     componentDispatchCache:
       null,
+
+    // Secure Input can sit above almost every Discord layer. Temporarily hide
+    // that surface while SDC's own full-screen image viewer is open.
+    visualSuppressed:
+      false,
+
+    // ComponentDispatch is also used by Discord's emoji picker to insert text
+    // into the native composer. Bridge those INSERT_TEXT actions into Secure
+    // Input instead of letting plaintext enter Slate.
+    componentDispatchBridgeTarget:
+      null,
+    componentDispatchBridgeOriginal:
+      null,
+    componentDispatchBridgeWrapper:
+      null,
+    lastSecureEmojiInsert:
+      null,
+    lastDiscordPickerSelection:
+      null,
+    discordEmojiPickerClickHandler:
+      null,
+    lastDiscordPickerCaptureTarget:
+      null,
+    lastDiscordPickerCaptureAt:
+      0,
+
     internalNativeWrite: false,
     unavailableReason: null,
     disabledUntil: 0,
@@ -13923,6 +14349,2185 @@ self.onmessage = async (event) => {
       }
     },
 
+    isElementActuallyVisible(
+      element
+    ) {
+      if (
+        !element ||
+        !(element instanceof Element)
+      ) {
+        return false;
+      }
+
+      try {
+        const rect =
+          element.getBoundingClientRect();
+
+        if (
+          rect.width < 2 ||
+          rect.height < 2 ||
+          rect.bottom <= 0 ||
+          rect.right <= 0 ||
+          rect.top >= window.innerHeight ||
+          rect.left >= window.innerWidth
+        ) {
+          return false;
+        }
+
+        const style =
+          getComputedStyle(element);
+
+        if (
+          style.display ===
+            'none' ||
+          style.visibility ===
+            'hidden' ||
+          Number(style.opacity || 1) ===
+            0
+        ) {
+          return false;
+        }
+
+        return true;
+      } catch (_) {
+        return false;
+      }
+    },
+
+    hasBlockingDiscordOverlay() {
+      // SDC's own info window is intentionally excluded. Its dedicated image
+      // lightbox still uses visualSuppressed directly.
+      const isOwnUi = (element) => {
+        try {
+          return !!element.closest(
+            '.SDC_INFO_DIALOG_HOST, .SDC_IMAGE_LIGHTBOX_HOST, .sdc-secure-composer-frame'
+          );
+        } catch (_) {
+          return false;
+        }
+      };
+
+      // Discord emoji/sticker/GIF pickers are popouts and can overlap the
+      // composer. Secure Input must temporarily get out of their stacking layer
+      // so the picker is fully clickable.
+      const popoutSelectors = [
+        '[class*="emojiPicker"]',
+        '[class*="emojiPickerListWrapper"]',
+        '[class*="stickerPicker"]',
+        '[class*="gifPicker"]',
+        '[aria-label*="emoji" i][role="dialog"]',
+        '[aria-label*="emoji" i][role="grid"]',
+        '[aria-label*="émoji" i][role="dialog"]',
+        '[aria-label*="émoji" i][role="grid"]',
+      ];
+
+      for (
+        const selector of
+        popoutSelectors
+      ) {
+        let elements = [];
+
+        try {
+          elements =
+            document.querySelectorAll(
+              selector
+            );
+        } catch (_) {
+          continue;
+        }
+
+        for (
+          const element of
+          elements
+        ) {
+          if (
+            !isOwnUi(element) &&
+            this.isElementActuallyVisible(
+              element
+            )
+          ) {
+            return true;
+          }
+        }
+      }
+
+      // Native Discord media viewer. Class names move regularly, therefore use
+      // both known semantic fragments and a generic large dialog + media test.
+      const modalSelectors = [
+        '[class*="carouselModal"]',
+        '[class*="modalCarousel"]',
+        '[class*="imageModal"]',
+        '[class*="mediaViewer"]',
+        '[class*="modalRoot"]',
+        '[role="dialog"][aria-modal="true"]',
+        '[role="dialog"]',
+      ];
+
+      const checked =
+        new Set();
+
+      for (
+        const selector of
+        modalSelectors
+      ) {
+        let elements = [];
+
+        try {
+          elements =
+            document.querySelectorAll(
+              selector
+            );
+        } catch (_) {
+          continue;
+        }
+
+        for (
+          const element of
+          elements
+        ) {
+          if (
+            checked.has(element)
+          ) {
+            continue;
+          }
+
+          checked.add(element);
+
+          if (
+            isOwnUi(element) ||
+            !this.isElementActuallyVisible(
+              element
+            )
+          ) {
+            continue;
+          }
+
+          let rect;
+
+          try {
+            rect =
+              element.getBoundingClientRect();
+          } catch (_) {
+            continue;
+          }
+
+          const largeLayer =
+            rect.width >=
+              window.innerWidth *
+                0.45 ||
+            rect.height >=
+              window.innerHeight *
+                0.45;
+
+          const hasMedia =
+            !!element.querySelector?.(
+              'img[src], video, [class*="imageWrapper"], [class*="media"]'
+            );
+
+          const semanticClass =
+            /(?:carouselModal|modalCarousel|imageModal|mediaViewer|modalRoot)/i.test(
+              String(
+                element.className ||
+                ''
+              )
+            );
+
+          if (
+            semanticClass ||
+            (
+              largeLayer &&
+              hasMedia
+            )
+          ) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    },
+
+    shouldHideSecureSurface() {
+      return (
+        !!this.visualSuppressed ||
+        this.hasBlockingDiscordOverlay()
+      );
+    },
+
+    applySecureSurfaceVisibility(
+      surface
+    ) {
+      if (!surface) return;
+
+      const hidden =
+        this.shouldHideSecureSurface();
+
+      try {
+        surface.style.visibility =
+          hidden
+            ? 'hidden'
+            : 'visible';
+
+        surface.style.pointerEvents =
+          hidden
+            ? 'none'
+            : 'auto';
+      } catch (_) {}
+    },
+
+    SetVisualSuppressed(
+      suppressed,
+      reason = 'unknown'
+    ) {
+      this.visualSuppressed =
+        !!suppressed;
+
+      const active =
+        this.active;
+
+      const surfaces = [
+        active?.iframe,
+        active?.shadowHost,
+      ].filter(Boolean);
+
+      for (
+        const surface of
+        surfaces
+      ) {
+        this.applySecureSurfaceVisibility(
+          surface
+        );
+      }
+
+      if (
+        !this.visualSuppressed
+      ) {
+        try {
+          this.positionFrame();
+        } catch (_) {}
+
+        queueMicrotask(() => {
+          try {
+            this.frameCommand(
+              'focus'
+            );
+          } catch (_) {}
+        });
+      }
+
+      this.log(
+        'visual-suppression',
+        {
+          suppressed:
+            this.visualSuppressed,
+          reason,
+          isolation:
+            this.currentIsolationMode,
+        }
+      );
+    },
+
+    hasMeaningfulSecureText(
+      value
+    ) {
+      const text =
+        String(value || '')
+          .replace(
+            /[\u200B-\u200D\u2060\uFEFF]/g,
+            ''
+          );
+
+      return text.trim() !== '';
+    },
+
+    hasPendingNativeAttachmentState() {
+      const active =
+        this.active;
+
+      const root =
+        active?.composerRoot;
+
+      if (!root) return false;
+
+      try {
+        const selectors = [
+          '[class*="upload"][class*="container"]',
+          '[class*="upload"][class*="item"]',
+          '[class*="attachment"][class*="container"]',
+          '[data-list-item-id*="upload"]',
+        ];
+
+        return selectors.some(
+          (selector) =>
+            !!root.querySelector(
+              selector
+            )
+        );
+      } catch (_) {
+        return false;
+      }
+    },
+
+    normalizeSecureEmojiShortcuts(
+      value
+    ) {
+      let text =
+        String(value || '');
+
+      // Common Discord-style named aliases. The picker bridge normally receives
+      // Unicode/custom emoji directly when Discord exposes the emoji object;
+      // these aliases are a safe fallback for current picker builds that emit
+      // :name: text.
+      const aliases = {
+        heart_eyes: '😍',
+        joy: '😂',
+        smile: '😄',
+        smiling_face_with_3_hearts: '🥰',
+        blush: '😊',
+        wink: '😉',
+        sob: '😭',
+        cry: '😢',
+        angry: '😠',
+        rage: '😡',
+        thinking: '🤔',
+        eyes: '👀',
+        heart: '❤️',
+        orange_heart: '🧡',
+        yellow_heart: '💛',
+        green_heart: '💚',
+        blue_heart: '💙',
+        purple_heart: '💜',
+        black_heart: '🖤',
+        white_heart: '🤍',
+        broken_heart: '💔',
+        fire: '🔥',
+        tada: '🎉',
+        rocket: '🚀',
+        wave: '👋',
+        clap: '👏',
+        pray: '🙏',
+        thumbsup: '👍',
+        thumbsdown: '👎',
+        ok_hand: '👌',
+        muscle: '💪',
+        point_right: '👉',
+        point_left: '👈',
+        100: '💯',
+        warning: '⚠️',
+        check: '✅',
+        x: '❌',
+        skull: '💀',
+        clown: '🤡',
+        poop: '💩',
+        sunglasses: '😎',
+        innocent: '😇',
+        neutral_face: '😐',
+        expressionless: '😑',
+        unamused: '😒',
+        sweat_smile: '😅',
+        rofl: '🤣',
+        laughing: '😆',
+        stuck_out_tongue: '😛',
+        open_mouth: '😮',
+        face_holding_back_tears: '🥹',
+        pleading_face: '🥺',
+        slightly_smiling_face: '🙂',
+        frowning_face: '☹️',
+        disappointed: '😞',
+        weary: '😩',
+        tired_face: '😫',
+        scream: '😱',
+        fearful: '😨',
+        cold_sweat: '😰',
+        sweat: '😓',
+        confounded: '😖',
+        flushed: '😳',
+        kissing_heart: '😘',
+        heart_eyes_cat: '😻',
+        crying_cat_face: '😿',
+        smile_cat: '😸',
+      };
+
+      text =
+        text.replace(
+          /:([a-zA-Z0-9_+-]+):/g,
+          (full, rawName) => {
+            const name =
+              String(rawName || '')
+                .toLowerCase();
+
+            return aliases[name] ||
+              full;
+          }
+        );
+
+      // Native-style textual emoticons. Only replace standalone tokens so code,
+      // URLs and arbitrary punctuation are not rewritten.
+      const shortcutRules = [
+        [/(^|\s)(?:<3)(?=\s|$)/g, '$1❤️'],
+        [/(^|\s)(?:[:=]-?\))(?=\s|$)/g, '$1🙂'],
+        [/(^|\s)(?:[:=]-?\()(?=\s|$)/g, '$1🙁'],
+        [/(^|\s)(?::['’]-?\()(?=\s|$)/g, '$1😢'],
+        [/(^|\s)(?:[Tt][_.-][Tt])(?=\s|$)/g, '$1😭'],
+        [/(^|\s)(?::['’]-?\))(?=\s|$)/g, '$1🥲'],
+        [/(^|\s)(?::[-]?[dD]|=[dD])(?=\s|$)/g, '$1😄'],
+        [/(^|\s)(?:[xX][dD])(?=\s|$)/g, '$1😆'],
+        [/(^|\s)(?:;-?\))(?=\s|$)/g, '$1😉'],
+        [/(^|\s)(?::[-]?[pP])(?=\s|$)/g, '$1😛'],
+        [/(^|\s)(?::[-]?[oO])(?=\s|$)/g, '$1😮'],
+        [/(^|\s)(?::[-]?\/)(?=\s|$)/g, '$1😕'],
+        [/(^|\s)(?::\|)(?=\s|$)/g, '$1😐'],
+        [/(^|\s)(?::[-]?\*)(?=\s|$)/g, '$1😘'],
+        [/(^|\s)(?::3)(?=\s|$)/g, '$1😺'],
+        [/(^|\s)(?:[oO]:-?\))(?=\s|$)/g, '$1😇'],
+        [/(^|\s)(?:>:-?\()(?=\s|$)/g, '$1😠'],
+        [/(^|\s)(?:>:-?[dD])(?=\s|$)/g, '$1😈'],
+        [/(^|\s)(?:[dD]:)(?=\s|$)/g, '$1😨'],
+        [/(^|\s)(?:-_-)(?=\s|$)/g, '$1😑'],
+        [/(^|\s)(?:\^_\^)(?=\s|$)/g, '$1😊'],
+        [/(^|\s)(?:[oO]_[oO])(?=\s|$)/g, '$1🤨'],
+        [/(^|\s)(?::[sS])(?=\s|$)/g, '$1😖'],
+        [/(^|\s)(?::\$)(?=\s|$)/g, '$1😳'],
+      ];
+
+      for (
+        const [
+          pattern,
+          replacement
+        ] of shortcutRules
+      ) {
+        text =
+          text.replace(
+            pattern,
+            replacement
+          );
+      }
+
+      return text;
+    },
+
+    extractEmojiNamesFromObject(
+      value,
+      depth = 0,
+      seen = new Set()
+    ) {
+      const names =
+        new Set();
+
+      if (
+        !value ||
+        depth > 2 ||
+        typeof value !==
+          'object' ||
+        seen.has(value)
+      ) {
+        return names;
+      }
+
+      seen.add(value);
+
+      const addName =
+        (candidate) => {
+          if (
+            typeof candidate !==
+              'string'
+          ) {
+            return;
+          }
+
+          const normalized =
+            candidate
+              .trim()
+              .replace(
+                /^:+|:+$/g,
+                ''
+              )
+              .toLowerCase();
+
+          if (
+            normalized &&
+            normalized.length <=
+              80
+          ) {
+            names.add(
+              normalized
+            );
+          }
+        };
+
+      for (
+        const key of [
+          'name',
+          'emojiName',
+          'emoji_name',
+          'originalName',
+          'uniqueName',
+          'shortName',
+          'short_name',
+        ]
+      ) {
+        addName(
+          value[key]
+        );
+      }
+
+      for (
+        const key of [
+          'names',
+          'aliases',
+          'aliasNames',
+        ]
+      ) {
+        const list =
+          value[key];
+
+        if (Array.isArray(list)) {
+          for (
+            const candidate of
+            list.slice(0, 12)
+          ) {
+            addName(
+              candidate
+            );
+          }
+        }
+      }
+
+      // IMPORTANT: never recurse through Object.values(props). Discord React
+      // props can contain entire stores/fibers. Only inspect the handful of
+      // locations where emoji metadata is known to live.
+      for (
+        const key of [
+          'emoji',
+          'emojiData',
+          'emojiRecord',
+          'item',
+          'option',
+          'data',
+        ]
+      ) {
+        const nested =
+          value[key];
+
+        if (
+          nested &&
+          typeof nested ===
+            'object'
+        ) {
+          const nestedNames =
+            this.extractEmojiNamesFromObject(
+              nested,
+              depth + 1,
+              seen
+            );
+
+          for (
+            const name of
+            nestedNames
+          ) {
+            names.add(name);
+          }
+        }
+      }
+
+      return names;
+    },
+
+    getEmojiReactPropsFromNode(
+      node
+    ) {
+      const result = [];
+
+      if (!node) {
+        return result;
+      }
+
+      const seen =
+        new Set();
+
+      const push =
+        (props) => {
+          if (
+            !props ||
+            typeof props !==
+              'object' ||
+            seen.has(props)
+          ) {
+            return;
+          }
+
+          seen.add(props);
+          result.push(props);
+        };
+
+      try {
+        for (
+          const key of
+          Object.keys(node)
+        ) {
+          if (
+            key.startsWith(
+              '__reactProps$'
+            )
+          ) {
+            push(
+              node[key]
+            );
+            continue;
+          }
+
+          if (
+            key.startsWith(
+              '__reactFiber$'
+            )
+          ) {
+            let fiber =
+              node[key];
+
+            // Emoji buttons only need their own component plus a few immediate
+            // wrappers. The old generic helper traversed 40 Fiber parents.
+            let depth = 0;
+
+            while (
+              fiber &&
+              depth < 4
+            ) {
+              push(
+                fiber.memoizedProps
+              );
+
+              push(
+                fiber.pendingProps
+              );
+
+              fiber =
+                fiber.return;
+
+              depth++;
+            }
+          }
+
+          if (
+            result.length >= 12
+          ) {
+            break;
+          }
+        }
+      } catch (_) {}
+
+      return result;
+    },
+
+    rememberDiscordPickerSelection(
+      target
+    ) {
+      if (
+        !target ||
+        !(target instanceof Element) ||
+        !this.active
+      ) {
+        return false;
+      }
+
+      let picker = null;
+
+      try {
+        picker =
+          target.closest(
+            '[class*="emojiPicker"], [class*="emojiPickerListWrapper"], [aria-label*="emoji" i][role="dialog"], [aria-label*="emoji" i][role="grid"], [aria-label*="émoji" i][role="dialog"], [aria-label*="émoji" i][role="grid"]'
+          );
+      } catch (_) {}
+
+      if (!picker) {
+        return false;
+      }
+
+      let hitNode =
+        target;
+
+      try {
+        hitNode =
+          target.closest(
+            '[role="gridcell"], [role="button"], button, [data-name], [data-emoji-name]'
+          ) ||
+          target;
+      } catch (_) {}
+
+      const now =
+        performance.now();
+
+      // pointerdown is sufficient. Also guard against synthetic/replayed events
+      // targeting the exact same picker cell.
+      if (
+        this.lastDiscordPickerCaptureTarget ===
+          hitNode &&
+        now -
+          Number(
+            this.lastDiscordPickerCaptureAt ||
+            0
+          ) <
+          160
+      ) {
+        return false;
+      }
+
+      this.lastDiscordPickerCaptureTarget =
+        hitNode;
+
+      this.lastDiscordPickerCaptureAt =
+        now;
+
+      let emojiText = '';
+
+      const aliases =
+        new Set();
+
+      const addAlias =
+        (raw) => {
+          if (
+            typeof raw !==
+              'string'
+          ) {
+            return;
+          }
+
+          const value =
+            raw
+              .trim()
+              .replace(
+                /^:+|:+$/g,
+                ''
+              );
+
+          if (
+            !value ||
+            value.length > 80
+          ) {
+            return;
+          }
+
+          if (
+            /^[a-zA-Z0-9_+\- ]+$/.test(
+              value
+            )
+          ) {
+            aliases.add(
+              value
+                .toLowerCase()
+                .replace(
+                  /\s+/g,
+                  '_'
+                )
+            );
+          }
+        };
+
+      const maybeEmoji =
+        (candidate) => {
+          const value =
+            this.sanitizeSecureRoutedInsert(
+              candidate,
+              'Discord.emoji-picker-click'
+            );
+
+          if (
+            !value ||
+            value.length > 80
+          ) {
+            return '';
+          }
+
+          if (
+            /[\u{1F000}-\u{1FAFF}\u2600-\u27BF]/u.test(
+              value
+            ) ||
+            /^<a?:[a-zA-Z0-9_]+:\d+>$/.test(
+              value
+            )
+          ) {
+            return value;
+          }
+
+          return '';
+        };
+
+      // Fast path: most Unicode picker cells already expose the glyph in the
+      // rendered DOM. This costs essentially nothing compared with Fiber scans.
+      try {
+        const image =
+          hitNode.querySelector?.(
+            'img[alt]'
+          ) ||
+          (
+            hitNode.matches?.(
+              'img[alt]'
+            )
+              ? hitNode
+              : null
+          );
+
+        const alt =
+          image?.getAttribute?.(
+            'alt'
+          ) ||
+          '';
+
+        const fromAlt =
+          maybeEmoji(
+            alt
+          );
+
+        if (fromAlt) {
+          emojiText =
+            fromAlt;
+        } else {
+          addAlias(
+            alt
+          );
+        }
+      } catch (_) {}
+
+      if (!emojiText) {
+        try {
+          const directText =
+            String(
+              hitNode.textContent ||
+              ''
+            ).trim();
+
+          if (
+            directText.length <= 16
+          ) {
+            emojiText =
+              maybeEmoji(
+                directText
+              );
+          }
+        } catch (_) {}
+      }
+
+      // DOM names are useful even if Unicode was already obtained.
+      for (
+        const node of [
+          hitNode,
+          target,
+        ]
+      ) {
+        if (
+          !node ||
+          !(node instanceof Element)
+        ) {
+          continue;
+        }
+
+        try {
+          for (
+            const attr of [
+              'data-name',
+              'data-emoji-name',
+              'aria-label',
+              'title',
+            ]
+          ) {
+            addAlias(
+              node.getAttribute?.(
+                attr
+              )
+            );
+          }
+        } catch (_) {}
+      }
+
+      // Only if DOM data was insufficient, inspect React metadata on at most
+      // three nearby nodes, with at most four Fiber levels per node.
+      const reactNodes = [];
+
+      const addNode =
+        (node) => {
+          if (
+            node &&
+            node instanceof Element &&
+            !reactNodes.includes(
+              node
+            ) &&
+            reactNodes.length < 3
+          ) {
+            reactNodes.push(
+              node
+            );
+          }
+        };
+
+      addNode(
+        hitNode
+      );
+
+      addNode(
+        target
+      );
+
+      addNode(
+        hitNode?.parentElement
+      );
+
+      for (
+        const node of
+        reactNodes
+      ) {
+        const propsList =
+          this.getEmojiReactPropsFromNode(
+            node
+          );
+
+        for (
+          const props of
+          propsList
+        ) {
+          if (!emojiText) {
+            emojiText =
+              maybeEmoji(
+                this.extractEmojiTextFromObject(
+                  props
+                )
+              );
+          }
+
+          const names =
+            this.extractEmojiNamesFromObject(
+              props
+            );
+
+          for (
+            const name of
+            names
+          ) {
+            aliases.add(
+              name
+            );
+          }
+
+          if (
+            emojiText &&
+            aliases.size >= 3
+          ) {
+            break;
+          }
+        }
+
+        if (
+          emojiText &&
+          aliases.size >= 3
+        ) {
+          break;
+        }
+      }
+
+      if (!emojiText) {
+        return false;
+      }
+
+      this.lastDiscordPickerSelection = {
+        text:
+          emojiText,
+        aliases:
+          Array.from(
+            aliases
+          ).slice(0, 16),
+        at:
+          now,
+      };
+
+      // Intentionally no per-click console log here. Emoji selection is a
+      // latency-sensitive hot path.
+      return true;
+    },
+
+    resolveRecentDiscordPickerAlias(
+      value
+    ) {
+      const recent =
+        this.lastDiscordPickerSelection;
+
+      if (
+        !recent ||
+        performance.now() -
+          Number(recent.at || 0) >
+          1500
+      ) {
+        return '';
+      }
+
+      const raw =
+        String(value || '')
+          .replace(
+            /[\u200B\u2060\uFEFF]/g,
+            ''
+          )
+          .trim();
+
+      const match =
+        /^:([a-zA-Z0-9_+\-]+):$/.exec(
+          raw
+        );
+
+      if (!match) {
+        return '';
+      }
+
+      const alias =
+        String(
+          match[1] || ''
+        )
+          .toLowerCase();
+
+      if (
+        Array.isArray(
+          recent.aliases
+        ) &&
+        recent.aliases.includes(
+          alias
+        )
+      ) {
+        return String(
+          recent.text || ''
+        );
+      }
+
+      return '';
+    },
+
+    installDiscordEmojiPickerClickObserver() {
+      if (
+        this.discordEmojiPickerClickHandler
+      ) {
+        return;
+      }
+
+      const handler =
+        (event) => {
+          try {
+            this.rememberDiscordPickerSelection(
+              event?.target
+            );
+          } catch (_) {}
+        };
+
+      // pointerdown happens before Discord commits the picker insertion and is
+      // enough to capture the selected emoji. Do not repeat the same expensive
+      // work on click.
+      document.addEventListener(
+        'pointerdown',
+        handler,
+        true
+      );
+
+      this.discordEmojiPickerClickHandler =
+        handler;
+    },
+
+    removeDiscordEmojiPickerClickObserver() {
+      const handler =
+        this.discordEmojiPickerClickHandler;
+
+      if (!handler) return;
+
+      try {
+        document.removeEventListener(
+          'pointerdown',
+          handler,
+          true
+        );
+      } catch (_) {}
+
+      this.discordEmojiPickerClickHandler =
+        null;
+
+      this.lastDiscordPickerSelection =
+        null;
+
+      this.lastDiscordPickerCaptureTarget =
+        null;
+
+      this.lastDiscordPickerCaptureAt =
+        0;
+    },
+
+    extractEmojiTextFromObject(
+      value,
+      depth = 0
+    ) {
+      if (
+        !value ||
+        depth > 4
+      ) {
+        return '';
+      }
+
+      if (
+        typeof value ===
+          'string'
+      ) {
+        return value;
+      }
+
+      if (
+        typeof value !==
+          'object'
+      ) {
+        return '';
+      }
+
+      // Custom Discord emoji.
+      const id =
+        value.id ||
+        value.emojiId ||
+        value.emoji_id;
+
+      const name =
+        value.name ||
+        value.emojiName ||
+        value.emoji_name;
+
+      if (
+        id &&
+        name
+      ) {
+        const animated =
+          !!(
+            value.animated ||
+            value.isAnimated
+          );
+
+        return `<${animated ? 'a' : ''}:${name}:${id}>`;
+      }
+
+      // Unicode emoji objects used by Discord.
+      for (
+        const key of [
+          'surrogates',
+          'optionallyDiverseSequence',
+          'diversitySequence',
+          'unicode',
+          'emoji',
+        ]
+      ) {
+        const candidate =
+          value[key];
+
+        if (
+          typeof candidate ===
+            'string' &&
+          candidate !== ''
+        ) {
+          return candidate;
+        }
+      }
+
+      // Prefer nested emoji records over generic content strings.
+      for (
+        const key of [
+          'emoji',
+          'emojiData',
+          'emojiRecord',
+          'item',
+          'option',
+        ]
+      ) {
+        const nested =
+          value[key];
+
+        if (
+          nested &&
+          typeof nested ===
+            'object'
+        ) {
+          const found =
+            this.extractEmojiTextFromObject(
+              nested,
+              depth + 1
+            );
+
+          if (found) {
+            return found;
+          }
+        }
+      }
+
+      for (
+        const key of [
+          'content',
+          'plainText',
+          'text',
+          'value',
+        ]
+      ) {
+        const candidate =
+          value[key];
+
+        if (
+          typeof candidate ===
+            'string' &&
+          candidate !== ''
+        ) {
+          return candidate;
+        }
+      }
+
+      return '';
+    },
+
+    extractSecureComponentInsert(
+      payload,
+      extraArgs = []
+    ) {
+      const candidates = [
+        payload,
+        ...Array.from(
+          extraArgs || []
+        ),
+      ];
+
+      for (
+        const candidate of
+        candidates
+      ) {
+        const extracted =
+          this.extractEmojiTextFromObject(
+            candidate
+          );
+
+        if (extracted) {
+          return String(
+            extracted
+          )
+            .replace(
+              /[\u200B\u2060\uFEFF]+$/g,
+              ''
+            );
+        }
+      }
+
+      return '';
+    },
+
+    sanitizeSecureRoutedInsert(
+      value,
+      source =
+        'unknown'
+    ) {
+      let text =
+        String(value || '')
+          .replace(
+            /\r\n?/g,
+            '\n'
+          )
+          .replace(
+            /[\u200B\u2060\uFEFF]+/g,
+            ''
+          );
+
+      // Discord/Slate may represent one picker emoji as a separate block.
+      // Remove only the OUTER block separators generated by picker/bridge paths.
+      if (
+        /(?:ComponentDispatch|beforeinput|Slate|emoji|picker)/i.test(
+          String(source || '')
+        )
+      ) {
+        text =
+          text
+            .replace(
+              /^(?:[ \t]*\n)+/,
+              ''
+            )
+            .replace(
+              /(?:\n[ \t]*)+$/,
+              ''
+            );
+      }
+
+      return text;
+    },
+
+    insertTextIntoSecureComposer(
+      value,
+      source =
+        'component-dispatch'
+    ) {
+      const active =
+        this.active;
+
+      if (!active) {
+        return false;
+      }
+
+      let text =
+        this.sanitizeSecureRoutedInsert(
+          value,
+          source
+        );
+
+      if (!text) {
+        return false;
+      }
+
+      const pickerResolved =
+        this.resolveRecentDiscordPickerAlias(
+          text
+        );
+
+      if (pickerResolved) {
+        text =
+          pickerResolved;
+      }
+
+      text =
+        this.normalizeSecureEmojiShortcuts(
+          text
+        );
+
+      const now =
+        performance.now();
+
+      const signature =
+        text.replace(
+          /[\u200B\u2060\uFEFF]/g,
+          ''
+        );
+
+      const previous =
+        this.lastSecureEmojiInsert;
+
+      // Discord currently emits the same picker insertion twice in some builds.
+      // Suppress only near-simultaneous identical INSERT_TEXT events.
+      if (
+        previous &&
+        previous.signature ===
+          signature &&
+        now - previous.at <
+          180
+      ) {
+        this.log(
+          'emoji-insert-deduplicated',
+          {
+            source,
+            text:
+              signature,
+          }
+        );
+
+        return true;
+      }
+
+      this.lastSecureEmojiInsert = {
+        signature,
+        at: now,
+      };
+
+      if (
+        active.shadowInput
+      ) {
+        const input =
+          active.shadowInput;
+
+        if (
+          !this.replaceSecureSelection(
+            input,
+            text
+          )
+        ) {
+          return false;
+        }
+
+        try {
+          input.dispatchEvent(
+            new Event(
+              'input',
+              {
+                bubbles: false
+              }
+            )
+          );
+        } catch (_) {}
+
+        this.updateSecureInputCounter(
+          active,
+          input
+        );
+
+        this.syncSecureInputHeight(
+          active,
+          input
+        );
+
+        try {
+          input.focus();
+        } catch (_) {}
+
+        this.log(
+          'emoji-insert-routed',
+          {
+            source,
+            isolation:
+              'closed-shadow-parent-crypto',
+            characters:
+              this.countSecureTextCharacters(
+                text
+              ),
+          }
+        );
+
+        return true;
+      }
+
+      if (
+        active.iframe?.contentWindow
+      ) {
+        this.frameCommand(
+          'insert-text',
+          {
+            text,
+          }
+        );
+
+        this.log(
+          'emoji-insert-routed',
+          {
+            source,
+            isolation:
+              'sandbox-iframe-self-crypto',
+            characters:
+              this.countSecureTextCharacters(
+                text
+              ),
+          }
+        );
+
+        return true;
+      }
+
+      return false;
+    },
+
+    routeNativeInsertFromBeforeInput(
+      event,
+      editor
+    ) {
+      if (
+        !event ||
+        this.internalNativeWrite ||
+        !this.active ||
+        this.active.editor !==
+          editor
+      ) {
+        return false;
+      }
+
+      const inputType =
+        String(
+          event.inputType ||
+          ''
+        );
+
+      if (
+        inputType ===
+          'insertFromPaste'
+      ) {
+        const clipboardFiles =
+          this.extractSecureClipboardFiles(
+            event.dataTransfer
+          );
+
+        if (
+          clipboardFiles.length >
+            0
+        ) {
+          this.queueSecureClipboardFiles(
+            this.active.channelId,
+            clipboardFiles,
+            'native-beforeinput-paste'
+          )
+            .catch((error) => {
+              this.warn(
+                'clipboard-files-paste-failed',
+                {
+                  channelId:
+                    this.active?.channelId ||
+                    null,
+                  reason:
+                    error?.message ||
+                    String(error),
+                  isolation:
+                    'native-beforeinput',
+                }
+              );
+            });
+
+          return true;
+        }
+      }
+
+      if (
+        !inputType.startsWith(
+          'insert'
+        )
+      ) {
+        return false;
+      }
+
+      let insertedText = '';
+
+      if (
+        typeof event.data ===
+          'string'
+      ) {
+        insertedText =
+          event.data;
+      }
+
+      if (
+        !insertedText &&
+        event.dataTransfer
+      ) {
+        try {
+          insertedText =
+            event.dataTransfer.getData(
+              'text/plain'
+            ) ||
+            '';
+        } catch (_) {}
+      }
+
+      insertedText =
+        String(
+          insertedText ||
+          ''
+        )
+          .replace(
+            /[\u200B\u2060\uFEFF]+$/g,
+            ''
+          );
+
+      if (!insertedText) {
+        return false;
+      }
+
+      const routed =
+        this.insertTextIntoSecureComposer(
+          insertedText,
+          `Discord.beforeinput.${inputType || 'insert'}`
+        );
+
+      if (routed) {
+        this.log(
+          'native-beforeinput-routed',
+          {
+            channelId:
+              this.active?.channelId ||
+              null,
+            inputType:
+              inputType ||
+              null,
+            characters:
+              this.countSecureTextCharacters(
+                insertedText
+              ),
+          }
+        );
+      }
+
+      return routed;
+    },
+
+    sanitizeNativeEditDraft(
+      value
+    ) {
+      let text =
+        String(value || '')
+          .replace(
+            /\r\n?/g,
+            '\n'
+          )
+          .replace(
+            /[\u200B-\u200D\u2060\uFEFF]/g,
+            ''
+          );
+
+      const patterns = [
+        /^[\s\\]*<a?:ENC(?:_[A-Za-z0-9_-]+)?:\d{1,24}>[\s]*/i,
+        /^[\s\\]*:ENC(?:_[A-Za-z0-9_-]+)?:[\s]*/i,
+        /^[\s\\]*ENC(?:_[A-Za-z0-9_-]+)?(?::|\b)[\s]*/i,
+      ];
+
+      let changed =
+        false;
+
+      for (
+        let pass = 0;
+        pass < 2;
+        pass++
+      ) {
+        let matched =
+          false;
+
+        for (
+          const pattern of
+          patterns
+        ) {
+          if (
+            pattern.test(text)
+          ) {
+            text =
+              text.replace(
+                pattern,
+                ''
+              );
+
+            changed =
+              true;
+
+            matched =
+              true;
+
+            break;
+          }
+        }
+
+        if (!matched) {
+          break;
+        }
+      }
+
+      if (changed) {
+        text =
+          text.replace(
+            /^(?:[ \t]*\n)+/,
+            ''
+          );
+      }
+
+      return text;
+    },
+
+
+    evacuateUnexpectedNativeEditorText(
+      editor,
+      source =
+        'native-slate-mutation'
+    ) {
+      if (
+        this.internalNativeWrite ||
+        !this.active ||
+        this.active.editor !==
+          editor
+      ) {
+        return false;
+      }
+
+      let nativeText =
+        this.sanitizeSecureRoutedInsert(
+          this.nativeEditorText(
+            editor
+          ),
+          source
+        );
+
+      const isEditDraft =
+        (
+          this.active?.nativeEditModeArmed &&
+          (
+            this.active?.editTarget?.editor ===
+              editor ||
+            this.active?.editor ===
+              editor
+          )
+        ) ||
+        /(?:ArrowUp.*edit|inline-edit)/i.test(
+          String(source || '')
+        );
+
+      if (
+        isEditDraft
+      ) {
+        const before =
+          nativeText;
+
+        nativeText =
+          this.sanitizeNativeEditDraft(
+            nativeText
+          );
+
+        if (
+          before !== nativeText
+        ) {
+          this.log(
+            'native-edit-display-marker-stripped',
+            {
+              channelId:
+                this.active?.channelId ||
+                null,
+              source,
+            }
+          );
+        }
+      }
+
+      if (!nativeText) {
+        return false;
+      }
+
+      // Private encrypted transport is intentionally inserted into native Slate
+      // only during Discord's real send/reply/upload path. Never route it back
+      // into Secure Input.
+      if (
+        /^NOENC:SDCSECURE:[0-9a-f]{24}:/s.test(
+          nativeText
+        )
+      ) {
+        return false;
+      }
+
+      const routed =
+        this.insertTextIntoSecureComposer(
+          nativeText,
+          source
+        );
+
+      if (!routed) {
+        return false;
+      }
+
+      this.log(
+        'native-slate-evacuated',
+        {
+          channelId:
+            this.active?.channelId ||
+            null,
+          characters:
+            this.countSecureTextCharacters(
+              nativeText
+            ),
+          source,
+        }
+      );
+
+      // Clear only after the plaintext has been copied into Secure Input.
+      // clearNativeEditor marks the operation internalNativeWrite, so the
+      // observer cannot recursively re-import the deletion.
+      this.clearNativeEditor(
+        editor
+      );
+
+      queueMicrotask(() => {
+        if (
+          this.active?.editor ===
+            editor
+        ) {
+          this.frameCommand(
+            'focus'
+          );
+        }
+      });
+
+      return true;
+    },
+
+    scheduleNativeEditorEvacuation(
+      editor,
+      source =
+        'native-slate-mutation'
+    ) {
+      const active =
+        this.active;
+
+      if (
+        !active ||
+        active.editor !==
+          editor ||
+        active.nativeEmojiEvacuationScheduled
+      ) {
+        return;
+      }
+
+      active.nativeEmojiEvacuationScheduled =
+        true;
+
+      queueMicrotask(() => {
+        const current =
+          this.active;
+
+        if (
+          !current ||
+          current.editor !==
+            editor
+        ) {
+          return;
+        }
+
+        current.nativeEmojiEvacuationScheduled =
+          false;
+
+        try {
+          this.evacuateUnexpectedNativeEditorText(
+            editor,
+            source
+          );
+        } catch (error) {
+          this.warn(
+            'native-slate-evacuation-failed',
+            {
+              channelId:
+                current.channelId,
+              reason:
+                error?.message ||
+                String(error),
+            }
+          );
+        }
+      });
+    },
+
+    createNativeInputBlocker(
+      active,
+      editor
+    ) {
+      return (event) => {
+        if (
+          this.internalNativeWrite ||
+          !active ||
+          this.active !== active ||
+          active.editor !== editor
+        ) {
+          return;
+        }
+
+        if (
+          event?.type ===
+            'beforeinput'
+        ) {
+          try {
+            this.routeNativeInsertFromBeforeInput(
+              event,
+              editor
+            );
+          } catch (_) {}
+
+          try {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation?.();
+          } catch (_) {}
+        }
+
+        const now =
+          Date.now();
+
+        if (
+          !this.lastNativeInputBlockedAt ||
+          now -
+            this.lastNativeInputBlockedAt >
+            1000
+        ) {
+          this.lastNativeInputBlockedAt =
+            now;
+
+          this.warn(
+            'native-input-prevented',
+            {
+              channelId:
+                active.channelId,
+              eventType:
+                event?.type ||
+                null,
+              target:
+                active.editTarget
+                  ? 'inline-edit'
+                  : 'main-composer',
+            }
+          );
+        }
+
+        queueMicrotask(() => {
+          if (
+            this.active === active &&
+            active.editor === editor
+          ) {
+            this.frameCommand(
+              'focus'
+            );
+          }
+        });
+      };
+    },
+
+    bindNativeEditorProtection(
+      active,
+      editor
+    ) {
+      if (
+        !active ||
+        !editor
+      ) {
+        return false;
+      }
+
+      try {
+        if (
+          active.inputBlocker &&
+          active.editor
+        ) {
+          active.editor.removeEventListener(
+            'beforeinput',
+            active.inputBlocker,
+            true
+          );
+        }
+      } catch (_) {}
+
+      try {
+        active.nativeEmojiObserver
+          ?.disconnect?.();
+      } catch (_) {}
+
+      active.nativeEmojiObserver =
+        null;
+
+      active.nativeEmojiEvacuationScheduled =
+        false;
+
+      active.editor =
+        editor;
+
+      const inputBlocker =
+        this.createNativeInputBlocker(
+          active,
+          editor
+        );
+
+      active.inputBlocker =
+        inputBlocker;
+
+      this.protectNativeEditor(
+        editor
+      );
+
+      editor.addEventListener(
+        'beforeinput',
+        inputBlocker,
+        true
+      );
+
+      this.installNativeEditorEvacuationObserver(
+        active
+      );
+
+      return true;
+    },
+
+    installNativeEditorEvacuationObserver(
+      active
+    ) {
+      if (
+        !active?.editor ||
+        active.nativeEmojiObserver
+      ) {
+        return;
+      }
+
+      try {
+        const observer =
+          new MutationObserver(() => {
+            if (
+              this.internalNativeWrite ||
+              this.active !==
+                active
+            ) {
+              return;
+            }
+
+            this.scheduleNativeEditorEvacuation(
+              active.editor,
+              'Discord.native-Slate-MutationObserver'
+            );
+          });
+
+        observer.observe(
+          active.editor,
+          {
+            childList: true,
+            subtree: true,
+            characterData: true,
+          }
+        );
+
+        active.nativeEmojiObserver =
+          observer;
+
+        this.log(
+          'native-slate-emoji-observer-installed',
+          {
+            channelId:
+              active.channelId,
+          }
+        );
+      } catch (error) {
+        this.warn(
+          'native-slate-emoji-observer-failed',
+          {
+            channelId:
+              active?.channelId ||
+              null,
+            reason:
+              error?.message ||
+              String(error),
+          }
+        );
+      }
+    },
+
+    installComponentDispatchBridge() {
+      if (
+        this.componentDispatchBridgeOriginal
+      ) {
+        return true;
+      }
+
+      const dispatcher =
+        this.resolveComponentDispatch();
+
+      if (
+        !dispatcher ||
+        typeof dispatcher.dispatchToLastSubscribed !==
+          'function'
+      ) {
+        return false;
+      }
+
+      const original =
+        dispatcher.dispatchToLastSubscribed;
+
+      const self =
+        this;
+
+      const wrapper =
+        function (
+          type,
+          payload,
+          ...extraArgs
+        ) {
+          try {
+            if (
+              type ===
+                'INSERT_TEXT' &&
+              !self.internalNativeWrite &&
+              self.active
+            ) {
+              const insertedText =
+                self.extractSecureComponentInsert(
+                  payload,
+                  extraArgs
+                );
+
+              if (
+                insertedText &&
+                self.insertTextIntoSecureComposer(
+                  insertedText,
+                  'Discord.ComponentDispatch.INSERT_TEXT'
+                )
+              ) {
+                return undefined;
+              }
+            }
+          } catch (error) {
+            self.warn(
+              'emoji-bridge-error',
+              {
+                reason:
+                  error?.message ||
+                  String(error),
+              }
+            );
+          }
+
+          return Reflect.apply(
+            original,
+            this,
+            [
+              type,
+              payload,
+              ...extraArgs
+            ]
+          );
+        };
+
+      try {
+        dispatcher.dispatchToLastSubscribed =
+          wrapper;
+      } catch (_) {
+        return false;
+      }
+
+      if (
+        dispatcher.dispatchToLastSubscribed !==
+          wrapper
+      ) {
+        return false;
+      }
+
+      this.componentDispatchBridgeTarget =
+        dispatcher;
+
+      this.componentDispatchBridgeOriginal =
+        original;
+
+      this.componentDispatchBridgeWrapper =
+        wrapper;
+
+      this.log(
+        'emoji-bridge-installed',
+        {
+          target:
+            'ComponentDispatch',
+        }
+      );
+
+      return true;
+    },
+
+    removeComponentDispatchBridge() {
+      const target =
+        this.componentDispatchBridgeTarget;
+
+      const original =
+        this.componentDispatchBridgeOriginal;
+
+      const wrapper =
+        this.componentDispatchBridgeWrapper;
+
+      try {
+        if (
+          target &&
+          original &&
+          target.dispatchToLastSubscribed ===
+            wrapper
+        ) {
+          target.dispatchToLastSubscribed =
+            original;
+        }
+      } catch (_) {}
+
+      this.componentDispatchBridgeTarget =
+        null;
+
+      this.componentDispatchBridgeOriginal =
+        null;
+
+      this.componentDispatchBridgeWrapper =
+        null;
+
+      this.lastSecureEmojiInsert =
+        null;
+    },
+
     resolveComponentDispatch() {
       const cached =
         this.componentDispatchCache;
@@ -14141,28 +16746,36 @@ self.onmessage = async (event) => {
 
         let result;
 
+        this.internalNativeWrite =
+          true;
+
         try {
-          result =
-            dispatcher.dispatchToLastSubscribed(
-              'INSERT_TEXT',
-              {
-                content:
-                  wireContent,
-                plainText:
-                  wireContent,
-              }
-            );
-        } catch (firstError) {
-          // Older/current Discord builds observed in plugins generally accept
-          // {content}; retry that narrower contract before falling back.
-          result =
-            dispatcher.dispatchToLastSubscribed(
-              'INSERT_TEXT',
-              {
-                content:
-                  wireContent,
-              }
-            );
+          try {
+            result =
+              dispatcher.dispatchToLastSubscribed(
+                'INSERT_TEXT',
+                {
+                  content:
+                    wireContent,
+                  plainText:
+                    wireContent,
+                }
+              );
+          } catch (firstError) {
+            // Older/current Discord builds observed in plugins generally accept
+            // {content}; retry that narrower contract before falling back.
+            result =
+              dispatcher.dispatchToLastSubscribed(
+                'INSERT_TEXT',
+                {
+                  content:
+                    wireContent,
+                }
+              );
+          }
+        } finally {
+          this.internalNativeWrite =
+            false;
         }
 
         if (
@@ -14537,24 +17150,1419 @@ self.onmessage = async (event) => {
       }
     },
 
+    objectContainsPendingReply(
+      value,
+      depth = 0,
+      seen = new Set()
+    ) {
+      if (
+        !value ||
+        depth > 2 ||
+        typeof value !==
+          'object' ||
+        seen.has(value)
+      ) {
+        return false;
+      }
+
+      seen.add(value);
+
+      const replyKeys = [
+        'replyingMessage',
+        'pendingReply',
+        'replyMessage',
+        'referencedMessage',
+        'messageReference',
+        'message_reference',
+        'reply',
+      ];
+
+      for (
+        const key of
+        replyKeys
+      ) {
+        const candidate =
+          value[key];
+
+        if (!candidate) {
+          continue;
+        }
+
+        if (
+          typeof candidate ===
+            'string' &&
+          candidate.length >= 8
+        ) {
+          return true;
+        }
+
+        if (
+          typeof candidate ===
+            'object'
+        ) {
+          if (
+            candidate.id ||
+            candidate.messageId ||
+            candidate.message_id ||
+            candidate.channelId ||
+            candidate.channel_id ||
+            candidate.message?.id
+          ) {
+            return true;
+          }
+        }
+      }
+
+      // Only follow known composer-ish containers. Never walk Object.values()
+      // generically: Reply detection runs on every secure submit.
+      for (
+        const key of [
+          'reply',
+          'replyState',
+          'pendingReplyState',
+          'composerState',
+          'draftState',
+          'channelState',
+        ]
+      ) {
+        const nested =
+          value[key];
+
+        if (
+          nested &&
+          typeof nested ===
+            'object' &&
+          this.objectContainsPendingReply(
+            nested,
+            depth + 1,
+            seen
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+
+    hasPendingNativeReplyState() {
+      const active =
+        this.active;
+
+      if (!active) {
+        return false;
+      }
+
+      const roots = [];
+      let node =
+        active.composerRoot ||
+        active.editor;
+
+      let depth = 0;
+
+      while (
+        node &&
+        depth < 5
+      ) {
+        if (
+          node instanceof Element &&
+          !roots.includes(node)
+        ) {
+          roots.push(node);
+        }
+
+        node =
+          node.parentElement;
+
+        depth++;
+      }
+
+      const selectors = [
+        '[class*="replyBar"]',
+        '[class*="reply_"]',
+        '[class*="replying"]',
+        '[class*="attachedBars"] [class*="reply"]',
+        '[data-list-item-id*="reply"]',
+        '[aria-label*="cancel reply" i]',
+        '[aria-label*="replying" i]',
+        '[aria-label*="annuler la réponse" i]',
+        '[aria-label*="répondre à" i]',
+      ];
+
+      for (
+        const root of
+        roots
+      ) {
+        try {
+          for (
+            const selector of
+            selectors
+          ) {
+            if (
+              root.matches?.(
+                selector
+              ) ||
+              root.querySelector?.(
+                selector
+              )
+            ) {
+              return true;
+            }
+          }
+        } catch (_) {}
+
+        try {
+          const text =
+            String(
+              root.textContent ||
+              ''
+            )
+              .replace(
+                /\s+/g,
+                ' '
+              )
+              .trim();
+
+          if (
+            /\b(?:Replying to|Reply to|Répondre à|Réponse à|En réponse à)\b/i.test(
+              text
+            )
+          ) {
+            return true;
+          }
+        } catch (_) {}
+      }
+
+      // DOM class names change often. Inspect only a few nearby React prop
+      // objects with the v52 bounded Fiber helper.
+      for (
+        const reactNode of [
+          active.editor,
+          active.composerRoot,
+          active.composerRoot?.parentElement,
+        ]
+      ) {
+        if (
+          !reactNode ||
+          !(reactNode instanceof Element)
+        ) {
+          continue;
+        }
+
+        const propsList =
+          this.getEmojiReactPropsFromNode(
+            reactNode
+          );
+
+        for (
+          const props of
+          propsList
+        ) {
+          if (
+            this.objectContainsPendingReply(
+              props
+            )
+          ) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    },
+
     hasPendingNativeComposerState() {
-      const active = this.active;
-      const root = active?.composerRoot;
-      if (!root) return false;
+      const active =
+        this.active;
+
+      if (!active) {
+        return false;
+      }
+
+      if (
+        active.nativeEditModeArmed
+      ) {
+        return true;
+      }
+
+      if (
+        this.hasPendingNativeReplyState()
+      ) {
+        return true;
+      }
+
+      return this.hasPendingNativeAttachmentState();
+    },
+
+    getNativeMessageContainer(
+      editor
+    ) {
+      if (
+        !editor ||
+        !(editor instanceof Element)
+      ) {
+        return null;
+      }
+
+      for (
+        const selector of [
+          '[data-list-item-id^="chat-messages"]',
+          '[id^="chat-messages"]',
+          '[class*="messageListItem"]',
+        ]
+      ) {
+        try {
+          const row =
+            editor.closest(
+              selector
+            );
+
+          if (row) {
+            return row;
+          }
+        } catch (_) {}
+      }
+
+      return null;
+    },
+
+    isNativeInlineEditTargetValid(
+      active = this.active
+    ) {
+      const editor =
+        active?.editTarget
+          ?.editor;
+
+      if (
+        !editor ||
+        !editor.isConnected ||
+        editor ===
+          active?.mainEditor
+      ) {
+        return false;
+      }
 
       try {
-        const selectors = [
-          '[class*="replyBar"]',
-          '[class*="reply_"]',
-          '[class*="upload"][class*="container"]',
-          '[class*="upload"][class*="item"]',
-          '[class*="attachment"][class*="container"]',
-          '[data-list-item-id*="upload"]',
-        ];
-        return selectors.some((selector) => root.querySelector(selector));
+        if (
+          editor.getAttribute(
+            'contenteditable'
+          ) !== 'true'
+        ) {
+          return false;
+        }
       } catch (_) {
         return false;
       }
+
+      const row =
+        active.editTarget
+          ?.messageContainer;
+
+      if (
+        row &&
+        (
+          !row.isConnected ||
+          !row.contains(editor)
+        )
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+
+    findNativeInlineEditEditor(
+      mainEditor,
+      preferredMessageContainer =
+        null
+    ) {
+      const selectors = [
+        '[contenteditable="true"][data-slate-editor="true"]',
+        '[contenteditable="true"][data-slate-editor]',
+        '[contenteditable="true"][role="textbox"]',
+      ];
+
+      const seen =
+        new Set();
+
+      const candidates = [];
+
+      let mainRect = null;
+
+      try {
+        mainRect =
+          mainEditor?.getBoundingClientRect?.() ||
+          null;
+      } catch (_) {}
+
+      for (
+        const selector of
+        selectors
+      ) {
+        let elements = [];
+
+        try {
+          const queryRoot =
+            preferredMessageContainer
+              ?.isConnected
+              ? preferredMessageContainer
+              : document;
+
+          elements =
+            queryRoot.querySelectorAll(
+              selector
+            );
+        } catch (_) {
+          continue;
+        }
+
+        for (
+          const editor of
+          elements
+        ) {
+          if (
+            seen.has(editor) ||
+            editor === mainEditor ||
+            !(editor instanceof HTMLElement)
+          ) {
+            continue;
+          }
+
+          seen.add(editor);
+
+          if (
+            preferredMessageContainer &&
+            (
+              !preferredMessageContainer
+                .isConnected ||
+              !preferredMessageContainer
+                .contains(editor)
+            )
+          ) {
+            continue;
+          }
+
+          // Never consider Secure Input's own UI.
+          try {
+            if (
+              editor.closest(
+                '.sdc-secure-composer-frame, .SDC_INFO_DIALOG_HOST, .SDC_IMAGE_LIGHTBOX_HOST'
+              )
+            ) {
+              continue;
+            }
+          } catch (_) {}
+
+          let rect;
+
+          try {
+            rect =
+              editor.getBoundingClientRect();
+          } catch (_) {
+            continue;
+          }
+
+          if (
+            !rect ||
+            rect.width < 120 ||
+            rect.height < 10 ||
+            rect.bottom <= 0 ||
+            rect.right <= 0 ||
+            rect.top >=
+              window.innerHeight ||
+            rect.left >=
+              window.innerWidth
+          ) {
+            continue;
+          }
+
+          const style =
+            getComputedStyle(
+              editor
+            );
+
+          if (
+            style.display ===
+              'none' ||
+            style.visibility ===
+              'hidden'
+          ) {
+            continue;
+          }
+
+          let score = 0;
+
+          // Discord's inline editor lives inside the edited message row.
+          try {
+            if (
+              editor.closest(
+                '[data-list-item-id^="chat-messages"], [id^="chat-messages"], [class*="messageListItem"], [class*="messageContent"], [class*="message_"]'
+              )
+            ) {
+              score += 500;
+            }
+          } catch (_) {}
+
+          const label =
+            String(
+              editor.getAttribute(
+                'aria-label'
+              ) ||
+              ''
+            );
+
+          if (
+            /(?:edit|editing|modifier|modification)/i.test(
+              label
+            )
+          ) {
+            score += 180;
+          }
+
+          const nativeText =
+            this.nativeEditorText(
+              editor
+            );
+
+          if (nativeText) {
+            score += 120;
+          }
+
+          // The inline editor should normally be above the bottom composer.
+          if (
+            mainRect &&
+            rect.bottom <=
+              mainRect.top + 48
+          ) {
+            score += 80;
+          }
+
+          // Strongly penalize other bottom-area composers/popouts.
+          if (
+            mainRect &&
+            Math.abs(
+              rect.top -
+              mainRect.top
+            ) < 32
+          ) {
+            score -= 250;
+          }
+
+          candidates.push({
+            editor,
+            rect,
+            score,
+          });
+        }
+      }
+
+      candidates.sort(
+        (a, b) =>
+          b.score -
+          a.score
+      );
+
+      const best =
+        candidates[0];
+
+      if (
+        !best ||
+        best.score < 100
+      ) {
+        return null;
+      }
+
+      return best.editor;
+    },
+
+    retargetSecureInputToInlineEdit(
+      active,
+      editEditor,
+      preferredMessageContainer =
+        null
+    ) {
+      if (
+        !active ||
+        !editEditor ||
+        editEditor ===
+          active.mainEditor
+      ) {
+        return false;
+      }
+
+      if (
+        active.editTarget?.editor ===
+          editEditor
+      ) {
+        return true;
+      }
+
+      // Save the inline editor before hiding it.
+      const editPlaceholder =
+        this.findNativePlaceholder(
+          editEditor
+        );
+
+      const editState =
+        this.saveNativeEditorState(
+          editEditor
+        );
+
+      const editPlaceholderState =
+        this.saveNativePlaceholderState(
+          editPlaceholder
+        );
+
+      const editComposerRoot =
+        this.getComposerRoot(
+          editEditor
+        );
+
+      const editTheme =
+        this.getTheme(
+          editEditor,
+          editPlaceholder
+        );
+
+      const editGeometry =
+        this.captureNativeTextGeometry(
+          editEditor,
+          editPlaceholder,
+          editTheme,
+          editComposerRoot
+        );
+
+      const messageContainer =
+        preferredMessageContainer ||
+        active.editTarget
+          ?.messageContainer ||
+        this.getNativeMessageContainer(
+          editEditor
+        );
+
+      active.editTarget = {
+        editor:
+          editEditor,
+        messageContainer,
+        composerRoot:
+          editComposerRoot,
+        nativeState:
+          editState,
+        placeholder:
+          editPlaceholder,
+        placeholderState:
+          editPlaceholderState,
+        theme:
+          editTheme,
+        nativeTextGeometry:
+          editGeometry,
+      };
+
+      // Remove protection listener/observer from the bottom composer and bind
+      // them to the inline editor. The bottom composer remains visually hidden
+      // using the state already established when Secure Input was mounted.
+      this.bindNativeEditorProtection(
+        active,
+        editEditor
+      );
+
+      active.composerRoot =
+        editComposerRoot;
+
+      active.nativeState =
+        editState;
+
+      active.placeholder =
+        editPlaceholder;
+
+      active.placeholderState =
+        editPlaceholderState;
+
+      active.theme =
+        editTheme;
+
+      active.nativeTextGeometry =
+        editGeometry;
+
+      this.protectNativePlaceholder(
+        editPlaceholder
+      );
+
+      if (
+        active.shadowHost
+      ) {
+        this.applyThemeToShadowHost(
+          active.shadowHost,
+          editTheme
+        );
+      }
+
+      this.frameCommand(
+        'set-edit-mode',
+        {
+          enabled: true,
+        }
+      );
+
+      this.startPositionLoop();
+
+      this.positionFrame();
+
+      this.log(
+        'native-edit-inline-target',
+        {
+          channelId:
+            active.channelId,
+          found:
+            true,
+          top:
+            Math.round(
+              editEditor
+                .getBoundingClientRect()
+                .top
+            ),
+        }
+      );
+
+      return true;
+    },
+
+    restoreMainComposerTarget(
+      active,
+      reason =
+        'edit-ended'
+    ) {
+      if (
+        !active ||
+        !active.editTarget
+      ) {
+        return false;
+      }
+
+      const editTarget =
+        active.editTarget;
+
+      try {
+        active.editor?.removeEventListener(
+          'beforeinput',
+          active.inputBlocker,
+          true
+        );
+      } catch (_) {}
+
+      try {
+        active.nativeEmojiObserver
+          ?.disconnect?.();
+      } catch (_) {}
+
+      active.nativeEmojiObserver =
+        null;
+
+      try {
+        this.restoreNativeEditorState(
+          editTarget.editor,
+          editTarget.nativeState
+        );
+      } catch (_) {}
+
+      try {
+        this.restoreNativePlaceholderState(
+          editTarget.placeholder,
+          editTarget.placeholderState
+        );
+      } catch (_) {}
+
+      active.editTarget =
+        null;
+
+      let mainEditor =
+        active.mainEditor;
+
+      if (
+        !mainEditor ||
+        !mainEditor.isConnected
+      ) {
+        const replacementMain =
+          this.findNativeEditor();
+
+        if (
+          replacementMain &&
+          replacementMain !==
+            editTarget.editor
+        ) {
+          const replacementPlaceholder =
+            this.findNativePlaceholder(
+              replacementMain
+            );
+
+          const replacementRoot =
+            this.getComposerRoot(
+              replacementMain
+            );
+
+          active.mainEditor =
+            replacementMain;
+
+          active.mainComposerRoot =
+            replacementRoot;
+
+          active.mainNativeState =
+            this.saveNativeEditorState(
+              replacementMain
+            );
+
+          active.mainPlaceholder =
+            replacementPlaceholder;
+
+          active.mainPlaceholderState =
+            this.saveNativePlaceholderState(
+              replacementPlaceholder
+            );
+
+          active.mainTheme =
+            this.getTheme(
+              replacementMain,
+              replacementPlaceholder
+            );
+
+          active.mainNativeTextGeometry =
+            this.captureNativeTextGeometry(
+              replacementMain,
+              replacementPlaceholder,
+              active.mainTheme,
+              replacementRoot
+            );
+
+          mainEditor =
+            replacementMain;
+        }
+      }
+
+      if (
+        !mainEditor ||
+        !mainEditor.isConnected
+      ) {
+        this.RefreshSoon();
+        return false;
+      }
+
+      active.composerRoot =
+        active.mainComposerRoot;
+
+      active.nativeState =
+        active.mainNativeState;
+
+      active.placeholder =
+        active.mainPlaceholder;
+
+      active.placeholderState =
+        active.mainPlaceholderState;
+
+      active.theme =
+        active.mainTheme;
+
+      active.nativeTextGeometry =
+        active.mainNativeTextGeometry;
+
+      this.bindNativeEditorProtection(
+        active,
+        mainEditor
+      );
+
+      this.protectNativePlaceholder(
+        active.mainPlaceholder
+      );
+
+      if (
+        active.shadowHost
+      ) {
+        this.applyThemeToShadowHost(
+          active.shadowHost,
+          active.mainTheme
+        );
+      }
+
+      this.startPositionLoop();
+
+      this.positionFrame();
+
+      this.log(
+        'native-edit-main-target-restored',
+        {
+          channelId:
+            active.channelId,
+          reason,
+        }
+      );
+
+      return true;
+    },
+
+    clearNativeEditMode(
+      reason =
+        'unknown'
+    ) {
+      const active =
+        this.active;
+
+      if (!active) {
+        return;
+      }
+
+      if (
+        active.nativeEditModeArmed
+      ) {
+        this.log(
+          'native-edit-mode-cleared',
+          {
+            channelId:
+              active.channelId,
+            reason,
+          }
+        );
+      }
+
+      if (
+        active.editTarget
+      ) {
+        this.restoreMainComposerTarget(
+          active,
+          reason
+        );
+      }
+
+      active.nativeEditModeArmed =
+        false;
+
+      active.nativeEditMessageCapturedAt =
+        0;
+
+      active.nativeEditSubmissionPending =
+        false;
+
+      this.frameCommand(
+        'set-edit-mode',
+        {
+          enabled: false,
+        }
+      );
+    },
+
+    async cancelNativeEditMode(
+      active = this.active,
+      reason =
+        'secure-input-escape'
+    ) {
+      if (
+        !active ||
+        !active.nativeEditModeArmed ||
+        active.nativeEditSubmissionPending
+      ) {
+        return false;
+      }
+
+      const editor =
+        active.editTarget
+          ?.editor ||
+        active.editor;
+
+      if (
+        editor &&
+        editor.isConnected
+      ) {
+        const restore =
+          this.temporarilyRevealNativeEditor(
+            editor
+          );
+
+        try {
+          try {
+            editor.focus({
+              preventScroll: true
+            });
+          } catch (_) {}
+
+          try {
+            editor.dispatchEvent(
+              new KeyboardEvent(
+                'keydown',
+                {
+                  key: 'Escape',
+                  code: 'Escape',
+                  keyCode: 27,
+                  which: 27,
+                  bubbles: true,
+                  cancelable: true,
+                }
+              )
+            );
+
+            editor.dispatchEvent(
+              new KeyboardEvent(
+                'keyup',
+                {
+                  key: 'Escape',
+                  code: 'Escape',
+                  keyCode: 27,
+                  which: 27,
+                  bubbles: true,
+                  cancelable: true,
+                }
+              )
+            );
+          } catch (_) {}
+
+          const handlers =
+            this.collectNativeSubmitHandlers(
+              editor
+            )
+              .filter(
+                (handler) =>
+                  handler.kind ===
+                    'onKeyDown'
+              )
+              .slice(0, 6);
+
+          for (
+            const handler of
+            handlers
+          ) {
+            try {
+              Reflect.apply(
+                handler.fn,
+                null,
+                [
+                  this.createNativeKeyEvent(
+                    editor,
+                    'Escape'
+                  )
+                ]
+              );
+            } catch (_) {}
+          }
+        } finally {
+          restore();
+        }
+      }
+
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            50
+          )
+      );
+
+      this.clearNativeEditMode(
+        reason
+      );
+
+      this.frameCommand(
+        'focus'
+      );
+
+      this.RefreshSoon();
+
+      return true;
+    },
+
+    async triggerNativeArrowUpEdit(
+      active = this.active
+    ) {
+      if (
+        !active ||
+        !active.editor ||
+        active.nativeShortcutInProgress
+      ) {
+        return false;
+      }
+
+      active.nativeShortcutInProgress =
+        true;
+
+      const editor =
+        active.mainEditor ||
+        active.editor;
+
+      const secureInput =
+        active.shadowInput ||
+        null;
+
+      const beforeSecureValue =
+        secureInput
+          ? String(
+              secureInput.value ||
+              ''
+            )
+          : null;
+
+      const restoreEditor =
+        this.temporarilyRevealNativeEditor(
+          editor
+        );
+
+      try {
+        try {
+          editor.focus({
+            preventScroll: true
+          });
+        } catch (_) {}
+
+        const dispatchArrow =
+          () => {
+            const down =
+              new KeyboardEvent(
+                'keydown',
+                {
+                  key: 'ArrowUp',
+                  code: 'ArrowUp',
+                  keyCode: 38,
+                  which: 38,
+                  bubbles: true,
+                  cancelable: true,
+                }
+              );
+
+            const up =
+              new KeyboardEvent(
+                'keyup',
+                {
+                  key: 'ArrowUp',
+                  code: 'ArrowUp',
+                  keyCode: 38,
+                  which: 38,
+                  bubbles: true,
+                  cancelable: true,
+                }
+              );
+
+            editor.dispatchEvent(
+              down
+            );
+
+            editor.dispatchEvent(
+              up
+            );
+          };
+
+        dispatchArrow();
+
+        await new Promise(
+          (resolve) =>
+            setTimeout(
+              resolve,
+              60
+            )
+        );
+
+        // Some current Discord builds expose the relevant React onKeyDown
+        // callback but do not react to a synthetic DOM key event on the hidden
+        // editor. Reuse the already-bounded native submit handler collector.
+        const nativeTextAfterDom =
+          this.nativeEditorText(
+            editor
+          );
+
+        if (
+          !nativeTextAfterDom &&
+          !active.nativeEditModeArmed
+        ) {
+          const handlers =
+            this.collectNativeSubmitHandlers(
+              editor
+            )
+              .filter(
+                (handler) =>
+                  handler.kind ===
+                    'onKeyDown'
+              )
+              .slice(0, 8);
+
+          for (
+            const handler of
+            handlers
+          ) {
+            try {
+              const event =
+                this.createNativeKeyEvent(
+                  editor,
+                  'ArrowUp'
+                );
+
+              Reflect.apply(
+                handler.fn,
+                null,
+                [event]
+              );
+            } catch (_) {}
+          }
+        }
+
+        await new Promise(
+          (resolve) =>
+            setTimeout(
+              resolve,
+              90
+            )
+        );
+
+        // Discord normally creates a separate inline Slate editor inside the
+        // message row. Secure Input must follow that editor instead of staying
+        // over the bottom composer.
+        const inlineEditEditor =
+          this.findNativeInlineEditEditor(
+            editor
+          );
+
+        if (
+          inlineEditEditor
+        ) {
+          const inlineMessageContainer =
+            this.getNativeMessageContainer(
+              inlineEditEditor
+            );
+
+          const inlineText =
+            this.nativeEditorText(
+              inlineEditEditor
+            );
+
+          // Arm first so a DOM mutation/Refresh cannot remount the bottom
+          // composer in the small window while we are switching targets.
+          active.nativeEditModeArmed =
+            true;
+
+          active.nativeEditMessageCapturedAt =
+            Date.now();
+
+          this.retargetSecureInputToInlineEdit(
+            active,
+            inlineEditEditor,
+            inlineMessageContainer
+          );
+
+          if (
+            inlineText &&
+            !/^NOENC:SDCSECURE:/s.test(
+              inlineText
+            )
+          ) {
+            this.evacuateUnexpectedNativeEditorText(
+              inlineEditEditor,
+              'Discord.native-ArrowUp-inline-edit'
+            );
+          }
+
+          this.log(
+            'native-edit-mode-armed',
+            {
+              channelId:
+                active.channelId,
+              source:
+                'ArrowUp-inline',
+              inline:
+                true,
+            }
+          );
+
+          this.frameCommand(
+            'focus'
+          );
+
+          return true;
+        }
+
+        // Compatibility path for Discord builds that reuse the main native
+        // composer instead of creating an inline editor.
+        const nativeText =
+          this.nativeEditorText(
+            editor
+          );
+
+        if (
+          nativeText &&
+          !/^NOENC:SDCSECURE:/s.test(
+            nativeText
+          )
+        ) {
+          this.evacuateUnexpectedNativeEditorText(
+            editor,
+            'Discord.native-ArrowUp-edit'
+          );
+        }
+
+        let captured = false;
+
+        if (
+          active.shadowInput
+        ) {
+          const afterValue =
+            String(
+              active.shadowInput.value ||
+              ''
+            );
+
+          captured =
+            this.hasMeaningfulSecureText(
+              afterValue
+            ) &&
+            (
+              beforeSecureValue == null ||
+              afterValue !==
+                beforeSecureValue
+            );
+        } else {
+          // Sandbox mode cannot synchronously inspect its textarea. Native edit
+          // mode itself is still retained by Discord; the evacuation bridge
+          // posts the draft into the iframe.
+          captured =
+            !this.nativeEditorText(
+              editor
+            );
+        }
+
+        if (captured) {
+          active.nativeEditModeArmed =
+            true;
+
+          active.nativeEditMessageCapturedAt =
+            Date.now();
+
+          this.log(
+            'native-edit-mode-armed',
+            {
+              channelId:
+                active.channelId,
+              source:
+                'ArrowUp',
+            }
+          );
+
+          this.frameCommand(
+            'set-edit-mode',
+            {
+              enabled: true,
+            }
+          );
+
+          this.frameCommand(
+            'focus'
+          );
+
+          return true;
+        }
+
+        this.log(
+          'native-edit-arrowup-no-draft',
+          {
+            channelId:
+              active.channelId,
+          }
+        );
+
+        this.frameCommand(
+          'focus'
+        );
+
+        return false;
+      } finally {
+        restoreEditor();
+
+        active.nativeShortcutInProgress =
+          false;
+      }
+    },
+
+    createNativeKeyEvent(
+      editor,
+      key =
+        'Enter'
+    ) {
+      const isArrowUp =
+        key ===
+          'ArrowUp';
+
+      const code =
+        isArrowUp
+          ? 'ArrowUp'
+          : key;
+
+      const keyCode =
+        isArrowUp
+          ? 38
+          : (
+              key === 'Enter'
+                ? 13
+                : (
+                    key === 'Escape'
+                      ? 27
+                      : 0
+                  )
+            );
+
+      let defaultPrevented =
+        false;
+
+      let propagationStopped =
+        false;
+
+      const nativeEvent = {
+        type:
+          'keydown',
+        key,
+        code,
+        keyCode,
+        which:
+          keyCode,
+        charCode:
+          key === 'Enter'
+            ? 13
+            : 0,
+        shiftKey: false,
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        repeat: false,
+        isComposing: false,
+        target:
+          editor,
+      };
+
+      return {
+        ...nativeEvent,
+        currentTarget:
+          editor,
+        nativeEvent,
+
+        preventDefault() {
+          defaultPrevented =
+            true;
+        },
+
+        stopPropagation() {
+          propagationStopped =
+            true;
+        },
+
+        stopImmediatePropagation() {
+          propagationStopped =
+            true;
+        },
+
+        persist() {},
+
+        isDefaultPrevented() {
+          return defaultPrevented;
+        },
+
+        isPropagationStopped() {
+          return propagationStopped;
+        },
+
+        get defaultPrevented() {
+          return defaultPrevented;
+        },
+      };
     },
 
     makeToken() {
@@ -14578,7 +18586,10 @@ self.onmessage = async (event) => {
         return {
           suppress: false,
           normalizedContent: `NOENC: ${transport}`,
+          transport,
           token,
+          nativeMode:
+            'unknown',
         };
       }
 
@@ -14611,16 +18622,135 @@ self.onmessage = async (event) => {
             ),
         }
       );
-      if (record.resolveObserved) {
-        record.resolveObserved(true);
-        record.resolveObserved = null;
+      // For normal send/reply/attachment, observing MessageQueue means Discord
+      // accepted the ciphertext and the secure submit may complete immediately.
+      //
+      // For editMessage this callback fires BEFORE original_editMessage().
+      // Do not resolve the Secure Input send and do not restore the main
+      // composer yet: wait for the real Discord edit promise to succeed.
+      if (
+        record.nativeMode !==
+          'edit'
+      ) {
+        if (record.resolveObserved) {
+          record.resolveObserved(true);
+          record.resolveObserved = null;
+        }
       }
 
       return {
         suppress: false,
-        normalizedContent: `NOENC: ${record.transport}`,
+        normalizedContent:
+          `NOENC: ${record.transport}`,
+        transport:
+          record.transport,
         token,
+        nativeMode:
+          record.nativeMode,
       };
+    },
+
+    CompleteNativeEditSubmission(
+      token,
+      succeeded,
+      error = null
+    ) {
+      const record =
+        this.sendTokens.get(
+          token
+        );
+
+      if (
+        !record ||
+        record.nativeMode !==
+          'edit'
+      ) {
+        return false;
+      }
+
+      record.editCompletedAt =
+        Date.now();
+
+      record.editSucceeded =
+        !!succeeded;
+
+      if (
+        this.active?.channelId ===
+          record.channelId
+      ) {
+        this.active.nativeEditSubmissionPending =
+          false;
+      }
+
+      if (
+        succeeded
+      ) {
+        // Only now is it safe to tear down the inline target and restore the
+        // permanent bottom composer.
+        this.clearNativeEditMode(
+          'native-editMessage-succeeded'
+        );
+
+        if (
+          record.resolveObserved
+        ) {
+          record.resolveObserved(
+            true
+          );
+
+          record.resolveObserved =
+            null;
+        }
+
+        this.log(
+          'native-edit-complete',
+          {
+            channelId:
+              record.channelId,
+            token,
+            latencyMs:
+              Math.max(
+                0,
+                record.editCompletedAt -
+                  record.createdAt
+              ),
+          }
+        );
+
+        return true;
+      }
+
+      // Keep the inline Secure Input and its plaintext intact so the user can
+      // retry. submitTransport receives false and therefore does not clear the
+      // Secure Input draft.
+      if (
+        record.resolveObserved
+      ) {
+        record.resolveObserved(
+          false
+        );
+
+        record.resolveObserved =
+          null;
+      }
+
+      this.warn(
+        'native-edit-failed',
+        {
+          channelId:
+            record.channelId,
+          token,
+          reason:
+            error?.message ||
+            (
+              error
+                ? String(error)
+                : 'Discord editMessage failed'
+            ),
+        }
+      );
+
+      return true;
     },
 
     async dispatchDirect(channelId, wireContent) {
@@ -15375,87 +19505,24 @@ self.onmessage = async (event) => {
       editor,
       kind
     ) {
-      let defaultPrevented =
-        false;
+      const event =
+        this.createNativeKeyEvent(
+          editor,
+          'Enter'
+        );
 
-      let propagationStopped =
-        false;
-
-      const isSubmit =
+      if (
         kind ===
-          'onSubmit';
+          'onSubmit'
+      ) {
+        event.type =
+          'submit';
 
-      const nativeEvent = {
-        type:
-          isSubmit
-            ? 'submit'
-            : 'keydown',
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        which: 13,
-        charCode: 13,
-        shiftKey: false,
-        altKey: false,
-        ctrlKey: false,
-        metaKey: false,
-        repeat: false,
-        isComposing: false,
-        target:
-          editor,
-      };
+        event.nativeEvent.type =
+          'submit';
+      }
 
-      return {
-        type:
-          nativeEvent.type,
-        key:
-          nativeEvent.key,
-        code:
-          nativeEvent.code,
-        keyCode: 13,
-        which: 13,
-        charCode: 13,
-        shiftKey: false,
-        altKey: false,
-        ctrlKey: false,
-        metaKey: false,
-        repeat: false,
-        isComposing: false,
-        target:
-          editor,
-        currentTarget:
-          editor,
-        nativeEvent,
-
-        preventDefault() {
-          defaultPrevented =
-            true;
-        },
-
-        stopPropagation() {
-          propagationStopped =
-            true;
-        },
-
-        stopImmediatePropagation() {
-          propagationStopped =
-            true;
-        },
-
-        persist() {},
-
-        isDefaultPrevented() {
-          return defaultPrevented;
-        },
-
-        isPropagationStopped() {
-          return propagationStopped;
-        },
-
-        get defaultPrevented() {
-          return defaultPrevented;
-        },
-      };
+      return event;
     },
 
     async invokeNativeReactSubmit(
@@ -16008,6 +20075,22 @@ self.onmessage = async (event) => {
       const wireContent =
         `NOENC:SDCSECURE:${token}:${transport}`;
 
+      const nativeReplyPending =
+        this.hasPendingNativeReplyState();
+
+      const nativeEditPending =
+        !!active.nativeEditModeArmed;
+
+      const nativeAttachmentPending =
+        this.hasPendingNativeAttachmentState();
+
+      if (
+        nativeEditPending
+      ) {
+        active.nativeEditSubmissionPending =
+          true;
+      }
+
       let resolveObserved;
       const observedPromise =
         new Promise((resolve) => {
@@ -16021,6 +20104,18 @@ self.onmessage = async (event) => {
         sent: false,
         createdAt: Date.now(),
         resolveObserved,
+        nativeMode:
+          nativeEditPending
+            ? 'edit'
+            : (
+                nativeReplyPending
+                  ? 'reply'
+                  : (
+                      nativeAttachmentPending
+                        ? 'attachment'
+                        : 'none'
+                    )
+              ),
       };
 
       this.sendTokens.set(token, record);
@@ -16030,7 +20125,9 @@ self.onmessage = async (event) => {
       // only the already-encrypted transport.
       if (
         !forceNative &&
-        !this.hasPendingNativeComposerState()
+        !nativeEditPending &&
+        !nativeReplyPending &&
+        !nativeAttachmentPending
       ) {
         await this.dispatchDirect(
           channelId,
@@ -16055,9 +20152,24 @@ self.onmessage = async (event) => {
         };
       }
 
-      // A reply/upload belongs to Discord's native composer. v45 first calls
-      // its React submit callback with the encrypted wire string itself.
-      // Native Slate mutation is only a compatibility fallback.
+      // Reply, edit and upload state belongs to Discord's native composer. Keep
+      // that state native while inserting only the already-encrypted wire
+      // packet. Native Slate mutation is only a ciphertext compatibility path.
+      this.log(
+        'native-composer-submit-required',
+        {
+          channelId,
+          nativeMode:
+            record.nativeMode,
+          reply:
+            nativeReplyPending,
+          edit:
+            nativeEditPending,
+          attachment:
+            nativeAttachmentPending,
+        }
+      );
+
       await this.triggerNativeEnter(
         active.editor,
         record,
@@ -16088,13 +20200,20 @@ self.onmessage = async (event) => {
       }
 
       // Do not execCommand-delete the Slate editor on failure. Restore focus to
-      // Secure Input and leave Discord's pending reply/upload state untouched.
+      // Secure Input and leave Discord's pending reply/upload/edit state untouched.
       this.sendTokens.delete(token);
+
+      if (
+        nativeEditPending
+      ) {
+        active.nativeEditSubmissionPending =
+          false;
+      }
 
       throw new Error(
         record.attachmentClearedAt
           ? 'Discord started attachment submit but MessageQueue did not receive encrypted text'
-          : 'Discord native React composer did not accept encrypted packet while attachment/reply state is pending'
+          : 'Discord native React composer did not accept encrypted packet while edit/reply/attachment state is pending'
       );
     },
 
@@ -16135,7 +20254,7 @@ self.onmessage = async (event) => {
           width: 100%;
           height: 22px;
           min-height: 22px;
-          max-height: 176px;
+          max-height: var(--sdc-max-height, 900px);
           resize: none;
           border: 0;
           outline: 0;
@@ -16163,8 +20282,8 @@ self.onmessage = async (event) => {
         }
 
         .sdc-secure-shadow-input::placeholder {
-          color: var(--sdc-placeholder, rgb(148, 155, 164));
-          -webkit-text-fill-color: var(--sdc-placeholder, rgb(148, 155, 164));
+          color: var(--sdc-placeholder, rgba(148, 155, 164, 0.55));
+          -webkit-text-fill-color: var(--sdc-placeholder, rgba(148, 155, 164, 0.55));
           opacity: 1;
         }
 
@@ -16229,9 +20348,7 @@ self.onmessage = async (event) => {
 
       style.setProperty(
         '--sdc-placeholder',
-        this.isVisibleCssColor(theme.placeholder)
-          ? theme.placeholder
-          : 'rgb(148, 155, 164)'
+        SECURE_COMPOSER_PLACEHOLDER_COLOR
       );
 
       if (theme.fontFamily)
@@ -16242,6 +20359,79 @@ self.onmessage = async (event) => {
         style.setProperty('--sdc-line-height', theme.lineHeight);
       if (theme.fontWeight)
         style.setProperty('--sdc-font-weight', theme.fontWeight);
+
+      style.setProperty(
+        '--sdc-max-height',
+        `${
+          this.getSecureInputMaxHeight()
+        }px`
+      );
+    },
+
+    getSecureInputMaxHeight() {
+      const viewportHeight =
+        Math.max(
+          320,
+          Number(
+            window.innerHeight ||
+            document.documentElement
+              ?.clientHeight ||
+            768
+          )
+        );
+
+      // Like Discord, let a long draft occupy a large part of the viewport
+      // before switching to internal scrolling.
+      return Math.max(
+        176,
+        Math.min(
+          900,
+          Math.floor(
+            viewportHeight * 0.68
+          )
+        )
+      );
+    },
+
+    applySecureInputMaxHeight(
+      active = this.active
+    ) {
+      if (!active) return 176;
+
+      const maxHeight =
+        this.getSecureInputMaxHeight();
+
+      active.secureInputMaxHeight =
+        maxHeight;
+
+      try {
+        active.shadowHost?.style
+          ?.setProperty(
+            '--sdc-max-height',
+            `${maxHeight}px`
+          );
+      } catch (_) {}
+
+      try {
+        if (active.shadowInput) {
+          active.shadowInput.style.maxHeight =
+            `${maxHeight}px`;
+        }
+      } catch (_) {}
+
+      if (
+        active.iframe &&
+        active.frameReady
+      ) {
+        this.frameCommand(
+          'set-max-height',
+          {
+            maxHeight,
+          }
+        );
+      }
+
+      return maxHeight;
     },
 
     measureSecureInputHeight(input) {
@@ -16253,9 +20443,15 @@ self.onmessage = async (event) => {
       const measured =
         Number(input.scrollHeight || 22);
 
+      const maxHeight =
+        this.getSecureInputMaxHeight();
+
       return Math.max(
         22,
-        Math.min(176, measured)
+        Math.min(
+          maxHeight,
+          measured
+        )
       );
     },
 
@@ -16265,9 +20461,15 @@ self.onmessage = async (event) => {
       const height =
         this.measureSecureInputHeight(input);
 
+      const maxHeight =
+        this.applySecureInputMaxHeight(
+          active
+        );
+
       input.style.height = `${height}px`;
       input.style.overflowY =
-        Number(input.scrollHeight || 0) > 176
+        Number(input.scrollHeight || 0) >
+          maxHeight
           ? 'auto'
           : 'hidden';
 
@@ -16300,7 +20502,13 @@ self.onmessage = async (event) => {
         );
         active.editor.style.setProperty(
           'max-height',
-          `${baseEditorHeight + 154}px`,
+          `${
+            baseEditorHeight +
+            Math.max(
+              0,
+              maxHeight - 22
+            )
+          }px`,
           'important'
         );
         active.editor.style.setProperty(
@@ -16493,6 +20701,213 @@ self.onmessage = async (event) => {
         new Event('input', {
           bubbles: false
         })
+      );
+
+      return true;
+    },
+
+    extractSecureClipboardFiles(
+      clipboardData
+    ) {
+      const files = [];
+
+      if (!clipboardData) {
+        return files;
+      }
+
+      try {
+        for (
+          const file of
+          Array.from(
+            clipboardData.files ||
+            []
+          )
+        ) {
+          if (file instanceof File) {
+            files.push(file);
+          }
+        }
+      } catch (_) {}
+
+      if (!files.length) {
+        try {
+          for (
+            const item of
+            Array.from(
+              clipboardData.items ||
+              []
+            )
+          ) {
+            if (
+              item?.kind ===
+                'file'
+            ) {
+              const file =
+                item.getAsFile?.();
+
+              if (
+                file instanceof File
+              ) {
+                files.push(file);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      const seen =
+        new Set();
+
+      return files.filter(
+        (file) => {
+          const key = [
+            file.name || '',
+            file.type || '',
+            file.size || 0,
+            file.lastModified || 0,
+          ].join('|');
+
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+          return true;
+        }
+      );
+    },
+
+    normalizeSecureClipboardFile(
+      file,
+      index = 0
+    ) {
+      if (!(file instanceof File)) {
+        return null;
+      }
+
+      const existingName =
+        String(
+          file.name || ''
+        ).trim();
+
+      if (
+        existingName &&
+        existingName !==
+          'image'
+      ) {
+        return file;
+      }
+
+      const type =
+        String(
+          file.type || ''
+        )
+          .toLowerCase();
+
+      const extensionByMime = {
+        'image/png': 'png',
+        'image/jpeg': 'jpg',
+        'image/webp': 'webp',
+        'image/gif': 'gif',
+        'image/avif': 'avif',
+        'image/bmp': 'bmp',
+      };
+
+      const extension =
+        extensionByMime[type] ||
+        'bin';
+
+      const generatedName =
+        type.startsWith(
+          'image/'
+        )
+          ? `image-${Date.now()}-${index + 1}.${extension}`
+          : `clipboard-${Date.now()}-${index + 1}.${extension}`;
+
+      return new File(
+        [file],
+        generatedName,
+        {
+          type:
+            file.type ||
+            'application/octet-stream',
+          lastModified:
+            Number(
+              file.lastModified ||
+              Date.now()
+            ),
+        }
+      );
+    },
+
+    async queueSecureClipboardFiles(
+      channelId,
+      inputFiles,
+      source =
+        'secure-clipboard-paste'
+    ) {
+      if (
+        typeof Discord.addFiles !==
+          'function'
+      ) {
+        throw new Error(
+          'MessageAttachmentManager.addFiles unavailable'
+        );
+      }
+
+      const files =
+        Array.from(
+          inputFiles || []
+        )
+          .map(
+            (file, index) =>
+              this.normalizeSecureClipboardFile(
+                file,
+                index
+              )
+          )
+          .filter(Boolean);
+
+      if (!files.length) {
+        return false;
+      }
+
+      // Normal clipboard files are deliberately NOT pre-marked as encrypted:
+      // the existing SDC UPLOAD_ATTACHMENT_ADD_FILES hook must encrypt them.
+      await Discord.addFiles({
+        files:
+          files.map(
+            (file) => ({
+              file,
+              platform: 1,
+              isThumbnail: false,
+            })
+          ),
+        channelId,
+        showLargeMessageDialog:
+          false,
+        draftType: 0,
+      });
+
+      this.log(
+        'clipboard-files-queued',
+        {
+          channelId,
+          source,
+          count:
+            files.length,
+          imageCount:
+            files.filter(
+              (file) =>
+                String(
+                  file.type || ''
+                ).startsWith(
+                  'image/'
+                )
+            ).length,
+          encryption:
+            'normal-sdc-attachment-hook',
+        }
       );
 
       return true;
@@ -17000,6 +21415,50 @@ self.onmessage = async (event) => {
         input.addEventListener(
           'paste',
           (event) => {
+            const clipboardFiles =
+              this.extractSecureClipboardFiles(
+                event.clipboardData
+              );
+
+            if (
+              clipboardFiles.length >
+                0
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation?.();
+
+              this.queueSecureClipboardFiles(
+                active.channelId,
+                clipboardFiles,
+                'closed-shadow-paste'
+              )
+                .then(() => {
+                  input.focus();
+                })
+                .catch((error) => {
+                  this.warn(
+                    'clipboard-files-paste-failed',
+                    {
+                      channelId:
+                        active.channelId,
+                      reason:
+                        error?.message ||
+                        String(error),
+                      isolation:
+                        'closed-shadow-parent-crypto',
+                    }
+                  );
+
+                  this.toast(
+                    'SDC Secure Input : collage de l’image/fichier impossible.',
+                    'error'
+                  );
+                });
+
+              return;
+            }
+
             const pasted =
               event.clipboardData?.getData(
                 'text/plain'
@@ -17094,6 +21553,40 @@ self.onmessage = async (event) => {
               String(event.key || '')
                 .toLowerCase();
 
+            if (
+              event.key ===
+                'Escape' &&
+              active.nativeEditModeArmed &&
+              !event.shiftKey &&
+              !event.altKey &&
+              !event.ctrlKey &&
+              !event.metaKey
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation?.();
+
+              try {
+                await this.cancelNativeEditMode(
+                  active,
+                  'closed-shadow-escape'
+                );
+              } catch (error) {
+                this.warn(
+                  'native-edit-cancel-failed',
+                  {
+                    channelId:
+                      active.channelId,
+                    reason:
+                      error?.message ||
+                      String(error),
+                  }
+                );
+              }
+
+              return;
+            }
+
             const clipboardShortcut =
               (event.ctrlKey || event.metaKey) &&
               !event.altKey &&
@@ -17107,6 +21600,46 @@ self.onmessage = async (event) => {
               // Do NOT preventDefault. Native textarea clipboard behavior is
               // more reliable than async Clipboard API permissions here.
               event.stopPropagation();
+              return;
+            }
+
+            if (
+              event.key ===
+                'ArrowUp' &&
+              !event.shiftKey &&
+              !event.altKey &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !composing &&
+              !this.hasMeaningfulSecureText(
+                input.value
+              )
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation?.();
+
+              try {
+                await this.triggerNativeArrowUpEdit(
+                  active
+                );
+              } catch (error) {
+                this.warn(
+                  'native-edit-arrowup-failed',
+                  {
+                    channelId:
+                      active.channelId,
+                    reason:
+                      error?.message ||
+                      String(error),
+                    isolation:
+                      'closed-shadow-parent-crypto',
+                  }
+                );
+
+                input.focus();
+              }
+
               return;
             }
 
@@ -17153,8 +21686,51 @@ self.onmessage = async (event) => {
             busy = true;
 
             try {
-              const plaintext =
+              let rawPlaintext =
                 String(input.value || '');
+
+              if (
+                active.nativeEditModeArmed
+              ) {
+                const sanitizedEditDraft =
+                  this.sanitizeNativeEditDraft(
+                    rawPlaintext
+                  );
+
+                if (
+                  sanitizedEditDraft !==
+                    rawPlaintext
+                ) {
+                  rawPlaintext =
+                    sanitizedEditDraft;
+
+                  input.value =
+                    sanitizedEditDraft;
+
+                  this.updateSecureInputCounter(
+                    active,
+                    input
+                  );
+
+                  this.syncSecureInputHeight(
+                    active,
+                    input
+                  );
+
+                  this.log(
+                    'native-edit-send-marker-stripped',
+                    {
+                      channelId:
+                        active.channelId,
+                    }
+                  );
+                }
+              }
+
+              const plaintext =
+                this.normalizeSecureEmojiShortcuts(
+                  rawPlaintext
+                );
 
               let result;
 
@@ -17162,6 +21738,30 @@ self.onmessage = async (event) => {
                 this.getSecureQueuedAttachments(
                   active.channelId
                 );
+
+              const hasAttachment =
+                secureQueuedAttachments.length >
+                  0 ||
+                this.hasPendingNativeAttachmentState();
+
+              if (
+                !this.hasMeaningfulSecureText(
+                  plaintext
+                ) &&
+                !hasAttachment
+              ) {
+                this.log(
+                  'empty-send-blocked',
+                  {
+                    channelId:
+                      active.channelId,
+                    isolation:
+                      'closed-shadow-parent-crypto',
+                  }
+                );
+
+                return;
+              }
 
               if (
                 secureQueuedAttachments.length >
@@ -17278,6 +21878,13 @@ self.onmessage = async (event) => {
         };
 
         document.body.appendChild(host);
+
+        this.applySecureSurfaceVisibility(
+          host
+        );
+
+        this.installComponentDispatchBridge();
+        this.installDiscordEmojiPickerClickObserver();
         this.positionFrame();
 
         if (
@@ -17366,6 +21973,37 @@ self.onmessage = async (event) => {
           } else if (
             command === 'focus'
           ) {
+            active.shadowInput.focus();
+          } else if (
+            command ===
+              'insert-text' &&
+            typeof extra.text ===
+              'string'
+          ) {
+            this.replaceSecureSelection(
+              active.shadowInput,
+              extra.text
+            );
+
+            active.shadowInput.dispatchEvent(
+              new Event(
+                'input',
+                {
+                  bubbles: false
+                }
+              )
+            );
+
+            this.updateSecureInputCounter(
+              active,
+              active.shadowInput
+            );
+
+            this.syncSecureInputHeight(
+              active,
+              active.shadowInput
+            );
+
             active.shadowInput.focus();
           } else if (
             command === 'seed' &&
@@ -17526,20 +22164,16 @@ self.onmessage = async (event) => {
 
     getTheme(editor, placeholder = null) {
       const style = getComputedStyle(editor);
-      const placeholderStyle =
-        placeholder
-          ? getComputedStyle(placeholder)
-          : null;
-
       const color =
         this.isVisibleCssColor(style.color)
           ? style.color
           : 'rgb(219, 222, 225)';
 
+      // Discord changes its native placeholder appearance during focus /
+      // activation transitions. Secure Input deliberately uses one fixed
+      // semi-transparent hint color instead of mirroring that transient state.
       const placeholderColor =
-        this.isVisibleCssColor(placeholderStyle?.color)
-          ? placeholderStyle.color
-          : 'rgb(148, 155, 164)';
+        SECURE_COMPOSER_PLACEHOLDER_COLOR;
 
       return {
         color,
@@ -17624,6 +22258,13 @@ self.onmessage = async (event) => {
         height: `${Math.max(22, rect.height)}px`,
       };
 
+      // Re-evaluate Discord top layers on every layout refresh. The global DOM
+      // observer already calls RefreshSoon when media viewers/pickers open or
+      // close, so this restores visibility without a 60fps polling loop.
+      this.applySecureSurfaceVisibility(
+        surface
+      );
+
       for (const [key, value] of Object.entries(values)) {
         if (surface.style[key] !== value) {
           surface.style[key] = value;
@@ -17666,6 +22307,19 @@ self.onmessage = async (event) => {
       if (!active.layoutWindowListener) {
         active.layoutWindowListener = () => {
           if (this.active === active) {
+            this.applySecureInputMaxHeight(
+              active
+            );
+
+            if (
+              active.shadowInput
+            ) {
+              this.syncSecureInputHeight(
+                active,
+                active.shadowInput
+              );
+            }
+
             this.positionFrame();
           }
         };
@@ -17809,6 +22463,26 @@ self.onmessage = async (event) => {
           composerRoot,
           nativeState,
           initialNativeDraft,
+
+          // Permanent bottom composer target. active.editor may temporarily
+          // become Discord's inline message editor while editing.
+          mainEditor:
+            editor,
+          mainComposerRoot:
+            composerRoot,
+          mainNativeState:
+            nativeState,
+          mainPlaceholder:
+            nativePlaceholder,
+          mainPlaceholderState:
+            nativePlaceholderState,
+          mainTheme:
+            secureTheme,
+          mainNativeTextGeometry:
+            nativeTextGeometry,
+          editTarget:
+            null,
+
           placeholder:
             nativePlaceholder,
           placeholderState:
@@ -17818,6 +22492,8 @@ self.onmessage = async (event) => {
           nativeTextGeometry,
           secureInputHeight:
             22,
+          secureInputMaxHeight:
+            this.getSecureInputMaxHeight(),
           nativeEditorTargetHeight:
             nativeTextGeometry.baseEditorHeight,
           layoutObserver:
@@ -17835,6 +22511,16 @@ self.onmessage = async (event) => {
           keyReady: false,
 
           inputBlocker: null,
+          nativeEmojiObserver: null,
+          nativeEmojiEvacuationScheduled: false,
+
+          // Discord edit mode is native composer state. Secure Input keeps the
+          // plaintext outside Slate but must remember that the next submit is
+          // an edit rather than a new message.
+          nativeEditModeArmed: false,
+          nativeEditMessageCapturedAt: 0,
+          nativeShortcutInProgress: false,
+          nativeEditSubmissionPending: false,
 
           shadowHost: null,
           shadowInput: null,
@@ -17903,52 +22589,11 @@ self.onmessage = async (event) => {
           nativePlaceholder
         );
 
-        const inputBlocker = (event) => {
-          if (this.internalNativeWrite) return;
-
-          if (
-            !this.active ||
-            this.active.editor !== editor
-          ) {
-            return;
-          }
-
-          // If focus somehow reaches Discord's hidden editor while Secure Input
-          // is active, block the mutation BEFORE Slate changes its state.
-          if (event?.type === 'beforeinput') {
-            try {
-              event.preventDefault();
-              event.stopPropagation();
-              event.stopImmediatePropagation?.();
-            } catch (_) {}
-          }
-
-          const now = Date.now();
-          if (
-            !this.lastNativeInputBlockedAt ||
-            now - this.lastNativeInputBlockedAt > 1000
-          ) {
-            this.lastNativeInputBlockedAt = now;
-            this.warn('native-input-prevented', {
-              channelId: config.channelId,
-              eventType: event?.type || null,
-            });
-          }
-
-          queueMicrotask(() => {
-            if (this.active?.editor === editor) {
-              this.frameCommand('focus');
-            }
-          });
-        };
-
-        this.active.inputBlocker = inputBlocker;
-
-        // beforeinput is the important guard: it prevents DOM/Slate mutation.
-        editor.addEventListener(
-          'beforeinput',
-          inputBlocker,
-          true
+        // Bind plaintext protection to Discord's current editor. v54 reuses
+        // this same helper when ArrowUp opens the inline message editor.
+        this.bindNativeEditorProtection(
+          this.active,
+          editor
         );
 
         // Register BEFORE iframe navigation so a fast blob load cannot be lost.
@@ -17988,6 +22633,9 @@ self.onmessage = async (event) => {
 
                   theme:
                     current.theme,
+
+                  maxInputHeight:
+                    this.getSecureInputMaxHeight(),
 
                   seedText:
                     current.initialNativeDraft !==
@@ -18081,6 +22729,12 @@ self.onmessage = async (event) => {
           iframe
         );
 
+        this.applySecureSurfaceVisibility(
+          iframe
+        );
+
+        this.installComponentDispatchBridge();
+        this.installDiscordEmojiPickerClickObserver();
         this.positionFrame();
         this.startPositionLoop();
 
@@ -18217,6 +22871,25 @@ self.onmessage = async (event) => {
         );
       } catch (_) {}
 
+      try {
+        active.nativeEmojiObserver?.disconnect?.();
+      } catch (_) {}
+
+      active.nativeEmojiObserver =
+        null;
+
+      active.nativeEmojiEvacuationScheduled =
+        false;
+
+      active.nativeEditModeArmed =
+        false;
+
+      active.nativeEditMessageCapturedAt =
+        0;
+
+      active.nativeShortcutInProgress =
+        false;
+
       // IMPORTANT: never mutate/delete Discord's Slate DOM during unmount.
       // If Secure Input worked correctly, the native editor was never changed.
       // Direct execCommand/delete here was the cause of the "can type but Enter
@@ -18234,6 +22907,28 @@ self.onmessage = async (event) => {
           active.placeholderState
         );
       } catch (_) {}
+
+      // If Secure Input was following an inline edit editor, the permanent
+      // bottom composer also still has SDC's protection styles applied.
+      if (
+        active.mainEditor &&
+        active.mainEditor !==
+          active.editor
+      ) {
+        try {
+          this.restoreNativeEditorState(
+            active.mainEditor,
+            active.mainNativeState
+          );
+        } catch (_) {}
+
+        try {
+          this.restoreNativePlaceholderState(
+            active.mainPlaceholder,
+            active.mainPlaceholderState
+          );
+        } catch (_) {}
+      }
 
       try {
         active.layoutObserver?.disconnect?.();
@@ -18374,6 +23069,182 @@ self.onmessage = async (event) => {
       }
 
       const active = this.active;
+
+      if (
+        active &&
+        active.nativeEditModeArmed &&
+        active.channelId ===
+          config.channelId &&
+        active.keyHash ===
+          config.keyHash &&
+        active.cryptoProtocol ===
+          config.cryptoProtocol
+      ) {
+        if (
+          active.editTarget &&
+          !active.nativeEditSubmissionPending &&
+          !this.isNativeInlineEditTargetValid(
+            active
+          )
+        ) {
+          const messageContainer =
+            active.editTarget
+              .messageContainer;
+
+          const replacementEditEditor =
+            messageContainer
+              ?.isConnected
+              ? this.findNativeInlineEditEditor(
+                  active.mainEditor,
+                  messageContainer
+                )
+              : null;
+
+          if (
+            replacementEditEditor
+          ) {
+            this.retargetSecureInputToInlineEdit(
+              active,
+              replacementEditEditor,
+              messageContainer
+            );
+          } else {
+            this.clearNativeEditMode(
+              'inline-editor-cancelled'
+            );
+
+            this.frameCommand(
+              'focus'
+            );
+
+            this.RefreshSoon();
+
+            return;
+          }
+        }
+
+        if (
+          active.nativeEditModeArmed &&
+          active.mainEditor !==
+            editor &&
+          editor !==
+            active.editTarget?.editor
+        ) {
+          try {
+            if (
+              active.mainEditor?.isConnected
+            ) {
+              this.restoreNativeEditorState(
+                active.mainEditor,
+                active.mainNativeState
+              );
+
+              this.restoreNativePlaceholderState(
+                active.mainPlaceholder,
+                active.mainPlaceholderState
+              );
+            }
+          } catch (_) {}
+
+          const replacementMainPlaceholder =
+            this.findNativePlaceholder(
+              editor
+            );
+
+          const replacementMainRoot =
+            this.getComposerRoot(
+              editor
+            );
+
+          const replacementMainState =
+            this.saveNativeEditorState(
+              editor
+            );
+
+          const replacementPlaceholderState =
+            this.saveNativePlaceholderState(
+              replacementMainPlaceholder
+            );
+
+          const replacementMainTheme =
+            this.getTheme(
+              editor,
+              replacementMainPlaceholder
+            );
+
+          const replacementMainGeometry =
+            this.captureNativeTextGeometry(
+              editor,
+              replacementMainPlaceholder,
+              replacementMainTheme,
+              replacementMainRoot
+            );
+
+          active.mainEditor =
+            editor;
+
+          active.mainComposerRoot =
+            replacementMainRoot;
+
+          active.mainNativeState =
+            replacementMainState;
+
+          active.mainPlaceholder =
+            replacementMainPlaceholder;
+
+          active.mainPlaceholderState =
+            replacementPlaceholderState;
+
+          active.mainTheme =
+            replacementMainTheme;
+
+          active.mainNativeTextGeometry =
+            replacementMainGeometry;
+
+          this.protectNativeEditor(
+            editor
+          );
+
+          this.protectNativePlaceholder(
+            replacementMainPlaceholder
+          );
+        }
+
+        if (
+          active.nativeEditModeArmed &&
+          (
+            active.nativeEditSubmissionPending ||
+            this.isNativeInlineEditTargetValid(
+              active
+            ) ||
+            (
+              !active.editTarget &&
+              active.editor?.isConnected
+            )
+          )
+        ) {
+          this.protectNativeEditor(
+            active.editor
+          );
+
+          this.protectNativePlaceholder(
+            active.placeholder
+          );
+
+          this.installComponentDispatchBridge();
+
+          this.installDiscordEmojiPickerClickObserver();
+
+          this.installNativeEditorEvacuationObserver(
+            active
+          );
+
+          this.positionFrame();
+
+          return;
+        }
+      }
+
       if (
         active &&
         active.channelId === config.channelId &&
@@ -18382,6 +23253,11 @@ self.onmessage = async (event) => {
         active.editor === editor
       ) {
         this.protectNativeEditor(editor);
+        this.installComponentDispatchBridge();
+        this.installDiscordEmojiPickerClickObserver();
+        this.installNativeEditorEvacuationObserver(
+          active
+        );
         this.positionFrame();
         return;
       }
@@ -18512,6 +23388,10 @@ self.onmessage = async (event) => {
             }
           );
 
+          this.applySecureInputMaxHeight(
+            active
+          );
+
           this.frameCommand(
             'focus'
           );
@@ -18521,13 +23401,126 @@ self.onmessage = async (event) => {
 
         if (
           data.type ===
+            'sdc-secure-native-cancel-edit'
+        ) {
+          try {
+            await this.cancelNativeEditMode(
+              active,
+              'sandbox-iframe-escape'
+            );
+          } catch (error) {
+            this.warn(
+              'native-edit-cancel-failed',
+              {
+                channelId:
+                  active.channelId,
+                reason:
+                  error?.message ||
+                  String(error),
+              }
+            );
+          }
+
+          return;
+        }
+
+        if (
+          data.type ===
+            'sdc-secure-native-arrow-up-edit'
+        ) {
+          try {
+            await this.triggerNativeArrowUpEdit(
+              active
+            );
+          } catch (error) {
+            this.warn(
+              'native-edit-arrowup-failed',
+              {
+                channelId:
+                  active.channelId,
+                reason:
+                  error?.message ||
+                  String(error),
+                isolation:
+                  'sandbox-iframe-self-crypto',
+              }
+            );
+
+            this.frameCommand(
+              'focus'
+            );
+          }
+
+          return;
+        }
+
+        if (
+          data.type ===
+            'sdc-secure-paste-files'
+        ) {
+          try {
+            const files =
+              Array.isArray(
+                data.files
+              )
+                ? data.files.filter(
+                    (file) =>
+                      file instanceof File
+                  )
+                : [];
+
+            if (files.length) {
+              await this.queueSecureClipboardFiles(
+                active.channelId,
+                files,
+                'sandbox-iframe-paste'
+              );
+            }
+
+            this.frameCommand(
+              'focus'
+            );
+          } catch (error) {
+            this.warn(
+              'clipboard-files-paste-failed',
+              {
+                channelId:
+                  active.channelId,
+                reason:
+                  error?.message ||
+                  String(error),
+                isolation:
+                  'sandbox-iframe-self-crypto',
+              }
+            );
+
+            this.toast(
+              'SDC Secure Input : collage de l’image/fichier impossible.',
+              'error'
+            );
+
+            this.frameCommand(
+              'focus'
+            );
+          }
+
+          return;
+        }
+
+        if (
+          data.type ===
             'sdc-secure-layout'
         ) {
+          const maxHeight =
+            this.applySecureInputMaxHeight(
+              active
+            );
+
           const requestedHeight =
             Math.max(
               22,
               Math.min(
-                176,
+                maxHeight,
                 Number(data.height || 22)
               )
             );
@@ -18548,7 +23541,7 @@ self.onmessage = async (event) => {
             );
             active.editor.style.setProperty(
               'max-height',
-              '176px',
+              `${maxHeight}px`,
               'important'
             );
           } catch (_) {}
@@ -18683,6 +23676,34 @@ self.onmessage = async (event) => {
           data.type ===
             'sdc-secure-send-ciphertext'
         ) {
+          if (
+            Number(
+              data.plainLength ||
+              0
+            ) === 0 &&
+            !this.hasPendingNativeAttachmentState()
+          ) {
+            this.log(
+              'empty-send-blocked',
+              {
+                channelId:
+                  active.channelId,
+                isolation:
+                  'sandbox-iframe-self-crypto',
+              }
+            );
+
+            this.frameCommand(
+              'failed'
+            );
+
+            this.frameCommand(
+              'focus'
+            );
+
+            return;
+          }
+
           try {
             this.log(
               'ciphertext-ready',
@@ -18869,8 +23890,30 @@ self.onmessage = async (event) => {
           'never-delete-slate-dom; beforeinput-prevented while secure',
         secureSurfaceZIndex:
           this.active ? 2147483000 : null,
+        secureSurfaceHiddenByDiscordOverlay:
+          this.active
+            ? this.hasBlockingDiscordOverlay()
+            : false,
+        nativeEmojiEvacuationObserver:
+          !!this.active?.nativeEmojiObserver,
+        nativeReplyPending:
+          this.active
+            ? this.hasPendingNativeReplyState()
+            : false,
+        nativeEditModeArmed:
+          !!this.active?.nativeEditModeArmed,
+        nativeEditInlineTarget:
+          !!this.active?.editTarget,
+        nativeTarget:
+          this.active?.editTarget
+            ? 'inline-edit'
+            : 'main-composer',
         secureInputHeight:
           this.active?.secureInputHeight || null,
+        secureInputMaxHeight:
+          this.active
+            ? this.getSecureInputMaxHeight()
+            : null,
         layoutMode:
           this.active
             ? 'discord-editor-driven-autosize'
@@ -19032,7 +24075,12 @@ self.onmessage = async (event) => {
       this.encryptedDrafts.clear();
       this.sendTokens.clear();
       this.secureQueuedAttachments.clear();
+
+      this.removeComponentDispatchBridge();
+      this.removeDiscordEmojiPickerClickObserver();
+
       this.componentDispatchCache = null;
+      this.visualSuppressed = false;
       this.deferredNativeDraft = null;
 
       try {
@@ -19717,6 +24765,7 @@ self.onmessage = async (event) => {
           let contentContainer = null;
           let contentIndex = -1;
           let contentWasString = false;
+          let secureEditToken = null;
 
           // Known Discord shapes include:
           //   editMessage(channelId, messageId, contentString)
@@ -19746,17 +24795,84 @@ self.onmessage = async (event) => {
           }
 
           if (channelId && contentContainer) {
-            await handleSend(channelId, contentContainer, true);
+            const secureOutgoing =
+              SecureComposer.ObserveOutgoing(
+                channelId,
+                contentContainer
+              );
 
-            if (contentWasString) args[contentIndex] = contentContainer.content;
-            else args[contentIndex] = contentContainer;
+            if (
+              secureOutgoing?.suppress
+            ) {
+              return null;
+            }
+
+            if (
+              secureOutgoing?.transport != null
+            ) {
+              // editMessage is already the terminal Discord operation. Unlike
+              // sendMessage, there is no second handleSend() stage that would
+              // remove a NOENC prefix. Pass the encrypted transport itself.
+              contentContainer.content =
+                String(
+                  secureOutgoing.transport
+                );
+
+              secureEditToken =
+                secureOutgoing.token ||
+                null;
+            } else if (
+              secureOutgoing?.normalizedContent != null
+            ) {
+              contentContainer.content =
+                secureOutgoing.normalizedContent;
+            } else {
+              await handleSend(
+                channelId,
+                contentContainer,
+                true
+              );
+            }
+
+            if (contentWasString)
+              args[contentIndex] =
+                contentContainer.content;
+            else
+              args[contentIndex] =
+                contentContainer;
           }
 
-          return Reflect.apply(
-            Discord.original_editMessage,
-            Discord.editMessageTarget,
-            args
-          );
+          try {
+            const result =
+              await Reflect.apply(
+                Discord.original_editMessage,
+                Discord.editMessageTarget,
+                args
+              );
+
+            if (
+              secureEditToken
+            ) {
+              SecureComposer.CompleteNativeEditSubmission(
+                secureEditToken,
+                true
+              );
+            }
+
+            return result;
+          } catch (error) {
+            if (
+              secureEditToken
+            ) {
+              SecureComposer.CompleteNativeEditSubmission(
+                secureEditToken,
+                false,
+                error
+              );
+            }
+
+            throw error;
+          }
         })();
       };
     }
