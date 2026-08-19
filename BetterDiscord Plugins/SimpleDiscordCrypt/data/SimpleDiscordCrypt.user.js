@@ -1,15 +1,13 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.5.7
+// @version      1.7.5.8
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
 // @downloadURL  https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // @updateURL    https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // ==/UserScript==
-
-// Credits for inspiration to the original DiscordCrypt
 
 (function () {
   'use strict';
@@ -18,12 +16,12 @@
   // from Discord history replayed after a reload. A short grace window below
   // still accepts controls received while the plugin/database is starting.
   const SDC_RUNTIME_STARTED_AT = Date.now();
-  // v68.6: freeze-gate metadata only. This flag is deliberately false in the
-  // candidate build and becomes true only after the full live regression passes.
+  // v69.0: the full Alice-A1/Alice-A2/Bob/Charlie classical campaign passed live.
+  // The classical protocol stack is now immutable except for security/compatibility correctives.
   const SDC_CLASSICAL_FREEZE_PHASE = 'V68_6_CLASSICAL_SECURITY_FREEZE';
-  const SDC_CLASSICAL_FREEZE_BASELINE = 'v68.5.5';
+  const SDC_CLASSICAL_FREEZE_BASELINE = 'v68.6.18';
   const SDC_CLASSICAL_FREEZE_BUILD = 'v68.6.18';
-  const SDC_CLASSICAL_STACK_FROZEN = false;
+  const SDC_CLASSICAL_STACK_FROZEN = true;
 
   // ============================================================================
   // SECTION 1: CONSTANTS & CONFIGURATION
@@ -1792,14 +1790,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           const report = await Discord.window.SdcCheck();
           const safeJson = JSON.stringify(report, null, 2);
           MenuBar.ShowInfoDialog(
-            'SDC Security diagnostics — v68.6.6',
+            'SDC Security diagnostics — v69.0.1',
             'One-command security / readiness report',
             `<div class="SDC_EXPERT_INFO">
               <p><strong>Overall:</strong> ${HtmlEscape(report.overall)} &nbsp; <strong>Warnings:</strong> ${HtmlEscape((report.warnings || []).join(', ') || 'NONE')}</p>
               <p><strong>Async/offline:</strong> ${HtmlEscape(report.asyncBootstrap?.actionNeeded || 'n/a')}<br>
               <strong>Vault:</strong> ${HtmlEscape(report.vault?.kdfProfile || 'n/a')} · password policy v${HtmlEscape(String(report.vault?.passwordPolicyVersion || '?'))}<br>
               <strong>Classical freeze:</strong> ${HtmlEscape(report.classicalFreeze?.status || 'n/a')} · frozen=${HtmlEscape(String(report.classicalFreeze?.CLASSICAL_STACK_FROZEN ?? false))}<br>
-              <strong>Quantum-resistant:</strong> ${HtmlEscape(report.quantumResistance?.status || 'NOT_STARTED')} · future slot ${HtmlEscape(report.quantumResistance?.futureHybridSlot || 'ML-KEM')}</p>
+              <strong>Quantum-resistant:</strong> ${HtmlEscape(report.quantumResistance?.status || 'NOT_STARTED')} · ${HtmlEscape(report.quantumResistance?.kem || 'ML-KEM-768')} · backend ${HtmlEscape(report.quantumResistance?.selectedBackend || 'n/a')}</p>
               <p><button type="button" class="sdc-btn SDC_DIAGNOSTICS_COPY">Copy diagnostic report</button></p>
               <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;max-height:46vh;overflow:auto;user-select:text">${HtmlEscape(safeJson)}</pre>
             </div>`,
@@ -9886,17 +9884,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         secretAnswersNeverPersistedOrTransmitted: true,
       };
       const nextTrustValidation = {
-        phase: SDC_CLASSICAL_FREEZE_PHASE,
+        phase: SDC_PQ_PHASE,
         oneCommand: 'await window.SdcCheck()',
         checks: [
-          'campaign A: plaintext / encrypted-native / ChatControl across text, image, captioned image and file',
-          'campaign B: KEX v3, identity/SMP positive+negative, Trust/CHANGED, GROUP distribution and fail-closed rotation',
-          'campaign C: Alice-A1/Alice-A2 multi-device fan-out, offline Bob bootstrap, self-history continuity, restart and portable DB import',
-          'campaign D: Plausible Deniability multi-contact alert, encrypted decoy transport, fail-closed alert barrier and mandatory re-verification clear',
-          'campaign E: replay/tamper/corruption/missing-key/stale-control/downgrade negative paths remain fail-closed',
+          'classical live campaign A-E already passed and remains frozen',
+          'v69.0 PQ foundation must not alter SDC3/SDC4/HE/Trust/GROUP/Duress classical semantics',
+          'ML-KEM backend + deterministic self-tests must pass before any later hybrid network activation',
         ],
-        afterPass: 'CLASSICAL_STACK_FROZEN=true',
-        postQuantumPhase: 'V69_0_HYBRID_ML_KEM_FOUNDATION',
+        afterPass: 'CLASSICAL_STACK_ALREADY_FROZEN',
+        postQuantumPhase: SDC_PQ_PHASE,
       };
       const privateRecoveryPolicyOk =
         privateRecoveryPolicy.publicDeviceSyncAllowed === false &&
@@ -9909,7 +9905,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const identityHardeningOk = Object.values(identityHardening).every((value) => value === true);
       const groupLifecycleOk = !!groupLifecycle.ok;
       const result = {
-        version: 'v68.6.18',
+        version: 'v69.0.5',
         identityMath,
         identityTransport,
         groupLifecycle,
@@ -9934,7 +9930,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           groupDistributionUxOk &&
           identityHardeningOk,
       };
-      console.log('[SDC][v68.6.17] Trust & Key Distribution self-test', result);
+      console.log('[SDC][v69.0.5] Trust & Key Distribution self-test', result);
       return result;
     };
 
@@ -9946,7 +9942,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let ratchet = null;
       try { ratchet = await Discord.window.SdcRatchetStatus?.(); } catch (_) {}
       return {
-        build: 'v68.6.18',
+        build: 'v69.0.5',
         overall: trustSelfTest.ok && cryptoStatus?.selfTest?.ok !== false ? 'PASS' : 'WARN',
         warnings: [
           ...(!trustSelfTest.identityMath?.ok ? ['IDENTITY_VERIFY_MATH_SELFTEST'] : []),
@@ -10020,7 +10016,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       const verify = Discord.window.SdcIdentityVerificationStatus();
       return {
-        build: 'v68.6.18',
+        build: 'v69.0.5',
         context: {
           channelId: channelId || null,
           type: !channel ? 'NONE' : isDm ? 'DM' : 'PUBLIC_OR_GROUP',
@@ -10066,7 +10062,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // privileged forensic/DevTools inspection of the renderer process.
       if (DuressRuntime.active) {
         return {
-          build: 'v68.6.18',
+          build: 'v69.0.5',
           overall: 'PASS',
           warnings: [],
           selfTests: {
@@ -10103,6 +10099,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let deviceFoundation = null;
       let asyncFoundation = null;
       let pdFoundation = null;
+      let pqFoundation = null;
+      let localPqPrekey = null;
       let deviceStatus = null;
       let accountBinding = null;
       let ratchet = full.ratchet || null;
@@ -10116,6 +10114,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       catch (error) { diagnosticErrors.push(`async-v68.4:${error?.message || error}`); }
       try { pdFoundation = await runPlausibleDeniabilityV685SelfTest(); }
       catch (error) { diagnosticErrors.push(`plausible-deniability-v68.5:${error?.message || error}`); }
+      try { pqFoundation = await runPqV690FoundationSelfTest(); }
+      catch (error) { diagnosticErrors.push(`pq-foundation-v69.0:${error?.message || error}`); }
+      try { localPqPrekey = await ensureLocalPqPrekey(false); }
+      catch (error) { diagnosticErrors.push(`pq-local-prekey:${error?.message || error}`); }
       try { deviceStatus = await Discord.window.SdcDeviceStatus?.(); }
       catch (error) { diagnosticErrors.push(`device-status:${error?.message || error}`); }
       try { accountBinding = await Discord.window.SdcAccountBindingStatus?.(); }
@@ -10299,12 +10301,49 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       })();
 
+      let pqCurrentDmCoverage = {
+        peerId: null,
+        activeDeviceCount: 0,
+        hybridCapableDeviceCount: 0,
+        usableHybridPrekeyDeviceCount: 0,
+        allActiveDevicesHybridCapable: true,
+        allActiveDevicesUsableHybridPrekey: true,
+        missingHybridDeviceIds: [],
+      };
+      if (currentChannel.isDm) {
+        try {
+          const peerId = ratchetPeerAccountId(currentChannel.channelId);
+          const peerRegistry = getDeviceAccountRegistry(peerId, false);
+          const activeRecords = Object.values(peerRegistry?.devices || {})
+            .filter((record) => record && !record.revokedAt && isValidRatchetDeviceId(String(record.deviceId || '')));
+          const summaries = activeRecords.map((record) => pqPeerDeviceSummary(peerId, record.deviceId));
+          const hybrid = summaries.filter((entry) => entry.everHybrid);
+          const usable = summaries.filter((entry) => entry.usableNow);
+          pqCurrentDmCoverage = {
+            peerId,
+            activeDeviceCount: summaries.length,
+            hybridCapableDeviceCount: hybrid.length,
+            usableHybridPrekeyDeviceCount: usable.length,
+            allActiveDevicesHybridCapable: summaries.every((entry) => entry.everHybrid),
+            allActiveDevicesUsableHybridPrekey: summaries.every((entry) => entry.usableNow),
+            missingHybridDeviceIds: summaries.filter((entry) => !entry.everHybrid).map((entry) => entry.deviceId),
+          };
+        } catch (error) {
+          diagnosticErrors.push(`pq-current-dm-coverage:${error?.message || error}`);
+        }
+      }
+
       const warnings = Array.from(new Set([
         ...(full.warnings || []),
         ...(classical?.ok === false ? ['CLASSICAL_CRYPTO_RATCHET_SELFTEST'] : []),
         ...(deviceFoundation?.ok === false ? ['DEVICE_FOUNDATION_SELFTEST'] : []),
         ...(asyncFoundation?.ok === false ? ['ASYNC_PREKEY_SELFTEST'] : []),
         ...(pdFoundation?.ok === false ? ['PLAUSIBLE_DENIABILITY_SELFTEST'] : []),
+        ...(pqFoundation?.supported === false ? ['PQ_ML_KEM_BACKEND_UNAVAILABLE'] : []),
+        ...(pqFoundation?.ok === false ? ['PQ_FOUNDATION_SELFTEST'] : []),
+        ...(!localPqPrekey ? ['PQ_LOCAL_PREKEY_UNAVAILABLE'] : []),
+        ...(pqCurrentDmCoverage.activeDeviceCount > 0 && !pqCurrentDmCoverage.allActiveDevicesHybridCapable
+          ? ['PQ_CURRENT_DM_DEVICE_COVERAGE_INCOMPLETE'] : []),
         ...(!hardeningOk ? ['MULTI_DEVICE_FINAL_HARDENING'] : []),
         ...(!messageModePolicyOk ? ['APPLICATION_MESSAGE_MODE_POLICY'] : []),
         ...(DataBase?.isEncrypted !== true ? ['DATABASE_UNENCRYPTED_LEGACY'] : []),
@@ -10314,15 +10353,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ...(diagnosticErrors.length ? ['DIAGNOSTIC_EXCEPTION'] : []),
       ]));
       const overall = full.overall === 'PASS' && classical?.ok === true &&
-        deviceFoundation?.ok === true && asyncFoundation?.ok === true && pdFoundation?.ok === true && hardeningOk &&
+        deviceFoundation?.ok === true && asyncFoundation?.ok === true && pdFoundation?.ok === true &&
+        pqFoundation?.ok === true && !!localPqPrekey && hardeningOk &&
         diagnosticErrors.length === 0 && DataBase?.isEncrypted === true && vault.meetsV68_4Profile &&
         warnings.length === 0
         ? 'PASS'
         : 'WARN';
 
-      // v68.6: consolidated synthetic gate. These checks are intentionally read-only;
-      // the final frozen flag remains false until the live Alice/Bob/Charlie campaign
-      // below has been executed successfully on real Discord clients.
+      // v69.0: consolidated read-only regression gate for the frozen classical baseline.
+      // The live campaign already passed; a PQ failure may WARN the v69 build but must never
+      // mutate or un-freeze any classical protocol state.
       const classicalCapability = (() => { try { return localAsyncPrekeyCapability(); } catch (_) { return null; } })();
       const classicalFreezeSyntheticTests = {
         classicalCryptoAndRatchet: classical?.ok === true,
@@ -10339,7 +10379,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         argon2ProfileMeetsV684Floor: vault.meetsV68_4Profile === true,
         localDeviceBoundToCurrentAccount: accountBinding?.localDeviceAccountBindingOk === true,
         noForeignAccountRatchetSessions: Number(accountBinding?.foreignAccountRatchetSessions || 0) === 0,
-        postQuantumStillDisabled: classicalCapability?.postQuantum === 'NONE',
+        classicalAsyncWireStillFrozen: classicalCapability?.postQuantum === 'NONE',
+        classicalStackFrozenFlag: SDC_CLASSICAL_STACK_FROZEN === true,
         classicalAsyncPrekeyStillP521: classicalCapability?.classical === 'P-521',
         futureHybridSlotStillMlKem: classicalCapability?.futureHybridSlot === 'ML-KEM',
         noNewClassicalProtocolFeaturesInFreezeCandidate: true,
@@ -10350,12 +10391,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         baseline: SDC_CLASSICAL_FREEZE_BASELINE,
         candidateBuild: SDC_CLASSICAL_FREEZE_BUILD,
         CLASSICAL_STACK_FROZEN: SDC_CLASSICAL_STACK_FROZEN,
-        status: classicalFreezeSyntheticOk ? 'READY_FOR_LIVE_CAMPAIGN' : 'BLOCKED_BY_SYNTHETIC_CHECK',
+        status: classicalFreezeSyntheticOk && SDC_CLASSICAL_STACK_FROZEN ? 'FROZEN' : 'BLOCKED_BY_SYNTHETIC_CHECK',
         syntheticOk: classicalFreezeSyntheticOk,
         syntheticTests: classicalFreezeSyntheticTests,
-        protocolChangePolicy: 'NO_NEW_CLASSICAL_FEATURES; SECURITY_CORRECTIVES_ONLY_UNTIL_FREEZE',
-        liveCampaignRequired: true,
-        liveCampaignStatus: 'PENDING_USER_VALIDATION',
+        protocolChangePolicy: 'CLASSICAL_STACK_IMMUTABLE; SECURITY_OR_COMPATIBILITY_CORRECTIVES_ONLY',
+        liveCampaignRequired: false,
+        liveCampaignStatus: 'PASSED_USER_VALIDATION',
         campaigns: {
           A_MESSAGING_CONTENT: '3 modes × text/image/captioned-image/file; one user action = one Discord user message; no ANNOUNCE spam',
           B_IDENTITY_TRUST_GROUP: 'KEX v3 + SMP good/bad + VERIFIED/CHANGED + GROUP distribution/rotation/rollback',
@@ -10367,13 +10408,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           allFiveCampaignsPass: true,
           finalSdcCheckOnAliceA2AndBobOverallPass: true,
           noUnexpectedWarnings: true,
-          thenSetClassicalStackFrozenTrueInFinalFreezeBuild: true,
+          classicalStackFrozenInThisBuild: SDC_CLASSICAL_STACK_FROZEN === true,
         },
-        postFreezeNext: 'v69.0 HYBRID ML-KEM FOUNDATION',
+        postFreezeNext: 'v69.0 HYBRID ML-KEM FOUNDATION — ACTIVE',
       };
 
       return {
-        build: 'v68.6.18',
+        build: 'v69.0.5',
         overall,
         warnings,
         classicalFreeze,
@@ -10385,6 +10426,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           asyncDetails: asyncFoundation?.tests || null,
           plausibleDeniability: pdFoundation?.ok === true,
           plausibleDeniabilityDetails: pdFoundation?.tests || null,
+          pqFoundation: pqFoundation?.ok === true,
+          pqFoundationDetails: pqFoundation?.tests || null,
+          pqFoundationBackendAvailable: pqFoundation?.supported === true,
+          pqSelectedBackend: pqFoundation?.selectedBackend || pqFoundation?.backend?.selected || null,
+          pqEmbeddedKnownAnswer: pqFoundation?.backend?.embedded?.knownAnswerTest === true,
+          pqNativeMlKemAvailable: pqFoundation?.backend?.native?.supported === true,
           identityMath: !!trust.identityMath?.ok,
           identityTransport: !!trust.identityTransport?.ok,
           groupLifecycle: !!trust.groupLifecycleOk,
@@ -10505,22 +10552,102 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         },
         plausibleDeniability: await plausibleDeniabilityDiagnosticSummary(),
         quantumResistance: {
-          status: 'NOT_STARTED_CLASSICAL_FREEZE_IN_PROGRESS',
+          phase: SDC_PQ_PHASE,
+          status: pqFoundation?.ok !== true
+            ? (pqFoundation?.supported === false ? 'BLOCKED_ML_KEM_BACKEND_UNAVAILABLE' : 'PQ_FOUNDATION_SELFTEST_FAILED')
+            : (pqCurrentDmCoverage.activeDeviceCount > 0 && !pqCurrentDmCoverage.allActiveDevicesHybridCapable
+                ? 'PQ_FOUNDATION_DEVICE_COVERAGE_INCOMPLETE'
+                : 'PQ_FOUNDATION_READY'),
+          classicalStackFrozen: SDC_CLASSICAL_STACK_FROZEN === true,
           currentClassicalPrekey: 'P-521',
           currentRatchetDh: 'X25519',
-          futureHybridSlot: 'ML-KEM',
-          plannedFirstHybridLot: 'v69.0 hybrid async prekeys after classical freeze',
-          antiDowngradeArchitecturePlanned: true,
-          gate: 'CLASSICAL_STACK_FROZEN=true',
+          kem: SDC_PQ_KEM,
+          profile: SDC_PQ_PROFILE,
+          fips: 'FIPS-203',
+          implementation: pqFoundationCapability().implementation,
+          selectedBackend: pqFoundation?.selectedBackend || pqFoundation?.backend?.selected || null,
+          backend: pqFoundation?.backend || null,
+          nativeSupport: pqFoundation?.backend?.native || null,
+          embeddedSupport: pqFoundation?.backend?.embedded || null,
+          embeddedFallbackSideChannelClaim: 'NO_FORMAL_CONSTANT_TIME_GUARANTEE_IN_JAVASCRIPT',
+          selfTest: pqFoundation || null,
+          currentDmCoverage: pqCurrentDmCoverage,
+          localPqPrekey: localPqPrekey ? {
+            keyId: localPqPrekey.keyId,
+            boundClassicalPrekeyId: localPqPrekey.boundClassicalPrekeyId,
+            createdAt: localPqPrekey.createdAt,
+            expiresAt: localPqPrekey.expiresAt,
+            algorithm: localPqPrekey.algorithm,
+            backendGeneratedBy: localPqPrekey.backendGeneratedBy || 'UNKNOWN',
+          } : null,
+          stickyPerDeviceAntiDowngrade: true,
+          applicationNetworkActivated: SDC_PQ_NETWORK_APPLICATION_ACTIVATED,
+          pqRatchetActivated: SDC_PQ_RATCHET_ACTIVATED,
+          frozenClassicalWireChanged: false,
+          nextLot: 'V69_1_PQ_IDENTITY_AND_RATCHET',
         },
         diagnosticErrors,
         ...live,
         next: {
-          current: SDC_CLASSICAL_FREEZE_PHASE,
-          afterPass: 'CLASSICAL_STACK_FROZEN=true',
-          classicalFreezeAfter: 'THIS_LIVE_CAMPAIGN',
+          current: SDC_PQ_PHASE,
+          classicalFreeze: 'COMPLETE',
+          classicalStackFrozen: true,
           postQuantum: 'V69_0_HYBRID_ML_KEM_FOUNDATION',
+          afterFoundation: 'V69_1_PQ_IDENTITY_AND_RATCHET',
         },
+      };
+    };
+
+    Discord.window.SdcPqStatus = async () => {
+      const backend = await pqMlKemBackendStatus();
+      let selfTest = null;
+      let localPqPrekey = null;
+      try { selfTest = await runPqV690FoundationSelfTest(); } catch (error) { selfTest = { ok: false, error: error?.message || String(error) }; }
+      try { localPqPrekey = await ensureLocalPqPrekey(false); } catch (error) { localPqPrekey = { error: error?.message || String(error) }; }
+      const ownId = String(Discord.getCurrentUser?.()?.id || '');
+      const peerId = Utils.GetCurrentDmUserId();
+      const peerRegistry = peerId ? getDeviceAccountRegistry(peerId, false) : null;
+      const peerDevices = Object.values(peerRegistry?.devices || {}).map((record) => pqPeerDeviceSummary(peerId, record.deviceId));
+      return {
+        build: 'v69.0.5',
+        phase: SDC_PQ_PHASE,
+        classicalStackFrozen: SDC_CLASSICAL_STACK_FROZEN === true,
+        capability: pqFoundationCapability(),
+        selectedBackend: backend.selected,
+        backend,
+        nativeSupport: backend.native,
+        embeddedSupport: backend.embedded,
+        selfTest,
+        local: {
+          accountId: ownId,
+          prekey: localPqPrekey && !localPqPrekey.error ? {
+            keyId: localPqPrekey.keyId, boundClassicalPrekeyId: localPqPrekey.boundClassicalPrekeyId,
+            createdAt: localPqPrekey.createdAt, expiresAt: localPqPrekey.expiresAt, algorithm: localPqPrekey.algorithm,
+            backendGeneratedBy: localPqPrekey.backendGeneratedBy || 'UNKNOWN',
+          } : localPqPrekey,
+        },
+        currentDm: peerId ? (() => {
+          const active = peerDevices.filter((d) => !d.revoked);
+          const hybrid = active.filter((d) => d.everHybrid);
+          const usable = active.filter((d) => d.usableNow);
+          return {
+            peerId,
+            devices: peerDevices,
+            activeDeviceCount: active.length,
+            hybridCapableDeviceCount: hybrid.length,
+            usableHybridPrekeyDeviceCount: usable.length,
+            allActiveDevicesHybridCapable: active.every((d) => d.everHybrid),
+            allActiveDevicesUsableHybridPrekey: active.every((d) => d.usableNow),
+            missingHybridDeviceIds: active.filter((d) => !d.everHybrid).map((d) => d.deviceId),
+            stickyDowngradeBlockedDeviceIds: peerDevices.filter((d) => d.everHybrid).map((d) => d.deviceId),
+          };
+        })() : null,
+        networkActivation: {
+          hybridAsyncApplicationMessages: SDC_PQ_NETWORK_APPLICATION_ACTIVATED,
+          pqRatchet: SDC_PQ_RATCHET_ACTIVATED,
+          frozenClassicalSdc4Changed: false,
+        },
+        next: 'V69_1_PQ_IDENTITY_AND_RATCHET',
       };
     };
 
@@ -10539,6 +10666,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           rootFingerprint: local.rootFingerprint,
           revoked: isDeviceRevoked(ownId, local.deviceId),
           privateStatePortableWithDatabase: false,
+          pqPrivateSeedPortableWithDatabase: false,
         },
         registryLimitPerAccount: CONFIG.limits.deviceRegistryPerAccount,
         registry: deviceRegistrySummary(resolved),
@@ -22201,6 +22329,1033 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
 
+
+  // ============================================================================
+  // v69.0 QUANTUM-RESISTANT FOUNDATION (NO APPLICATION/RATCHET ACTIVATION YET)
+  // ============================================================================
+  // The classical stack is frozen at v68.6.18. v69.0 adds a separate, device-local
+  // v69.0: FIPS 203 ML-KEM-768 foundation. Native WebCrypto is preferred when
+  // Chromium enables the modern KEM API for discord.com. Because that API can be
+  // origin-trial gated, SDC also ships a self-contained FIPS-203 fallback. The
+  // fallback is intentionally isolated here, uses only integer arithmetic and the
+  // platform CSPRNG, and is not wired into the SDC4 application ratchet in v69.0.
+  const SDC_PQ_FOUNDATION_VERSION = 1;
+  const SDC_PQ_PHASE = 'V69_0_HYBRID_ML_KEM_FOUNDATION';
+  const SDC_PQ_KEM = 'ML-KEM-768';
+  const SDC_PQ_PROFILE = 'P-521+ML-KEM-768+HKDF-SHA-256';
+  const SDC_PQ_PUBLIC_KEY_BYTES = 1184;
+  const SDC_PQ_SECRET_KEY_BYTES = 2400;
+  const SDC_PQ_CIPHERTEXT_BYTES = 1088;
+  const SDC_PQ_SHARED_SECRET_BYTES = 32;
+  const SDC_PQ_PRIVATE_SEED_BYTES = 64;
+  const SDC_PQ_PREKEY_LIFETIME_MS = SDC_ASYNC_PREKEY_LIFETIME_MS;
+  const SDC_PQ_PREKEY_ROTATE_BEFORE_MS = SDC_ASYNC_PREKEY_ROTATE_BEFORE_MS;
+  const SDC_PQ_PREKEY_RETENTION_MS = SDC_ASYNC_PREKEY_RETENTION_MS;
+  const SDC_PQ_PREKEY_MAX_PREVIOUS = SDC_ASYNC_PREKEY_MAX_PREVIOUS;
+  const SDC_PQ_ANNOUNCE_MAGIC = Uint8Array.from([0x53, 0x44, 0x51, 0x01]); // SDQ1
+  const SDC_PQ_ANNOUNCE_MAX_WIRE_CHARS = 1950;
+  const SDC_PQ_NETWORK_APPLICATION_ACTIVATED = false;
+  const SDC_PQ_RATCHET_ACTIVATED = false;
+  const SDC_PQ_EMBEDDED_KAT_PUBLIC_SHA256 = '0b7934c83125c788995e2ba6bd761e33046b3e40571be53e023309a29f398cc9';
+  const SDC_PQ_EMBEDDED_KAT_CIPHERTEXT_SHA256 = '090f7fa36cc47927b54f906d60ae5adb6b1b6a033b566ec9cb866edba8dfc9a1';
+  const SDC_PQ_EMBEDDED_KAT_SHARED_SECRET = 'f2c2678a3be8ba85e9053a0eaffc557661d15f2742caaf272cd93770062b53ca';
+  let NativeMlKemSupportCache = null;
+  let EmbeddedMlKemSupportCache = null;
+  let PqMlKemBackendCache = null;
+
+  const EmbeddedMlKem768 = (() => {
+    const Q = 3329, N = 256, K = 3, ETA1 = 2, ETA2 = 2, DU = 10, DV = 4;
+    const MASK64 = (1n << 64n) - 1n;
+    const RC = [
+      0x0000000000000001n,0x0000000000008082n,0x800000000000808an,0x8000000080008000n,
+      0x000000000000808bn,0x0000000080000001n,0x8000000080008081n,0x8000000000008009n,
+      0x000000000000008an,0x0000000000000088n,0x0000000080008009n,0x000000008000000an,
+      0x000000008000808bn,0x800000000000008bn,0x8000000000008089n,0x8000000000008003n,
+      0x8000000000008002n,0x8000000000000080n,0x000000000000800an,0x800000008000000an,
+      0x8000000080008081n,0x8000000000008080n,0x0000000080000001n,0x8000000080008008n,
+    ];
+    const ROT = [0,1,62,28,27,36,44,6,55,20,3,10,43,25,39,41,45,15,21,8,18,2,61,56,14];
+    const rotl64 = (x, n) => {
+      n = BigInt(n);
+      return n === 0n ? (x & MASK64) : (((x << n) | (x >> (64n - n))) & MASK64);
+    };
+    function keccakF(s) {
+      for (let round = 0; round < 24; round++) {
+        const C = new Array(5), D = new Array(5), B = new Array(25);
+        for (let x = 0; x < 5; x++) C[x] = (s[x] ^ s[x+5] ^ s[x+10] ^ s[x+15] ^ s[x+20]) & MASK64;
+        for (let x = 0; x < 5; x++) D[x] = (C[(x+4)%5] ^ rotl64(C[(x+1)%5], 1)) & MASK64;
+        for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) s[x+5*y] = (s[x+5*y] ^ D[x]) & MASK64;
+        for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) B[y+5*((2*x+3*y)%5)] = rotl64(s[x+5*y], ROT[x+5*y]);
+        for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) {
+          s[x+5*y] = (B[x+5*y] ^ ((~B[((x+1)%5)+5*y]) & B[((x+2)%5)+5*y])) & MASK64;
+        }
+        s[0] = (s[0] ^ RC[round]) & MASK64;
+      }
+    }
+    function keccak(dataLike, rate, suffix, outputLength) {
+      const data = new Uint8Array(dataLike || []);
+      const state = Array(25).fill(0n);
+      let offset = 0;
+      while (offset + rate <= data.length) {
+        for (let i = 0; i < rate; i++) state[(i/8)|0] ^= BigInt(data[offset+i]) << BigInt(8*(i&7));
+        keccakF(state);
+        offset += rate;
+      }
+      const block = new Uint8Array(rate);
+      block.set(data.subarray(offset));
+      block[data.length-offset] ^= suffix;
+      block[rate-1] ^= 0x80;
+      for (let i = 0; i < rate; i++) state[(i/8)|0] ^= BigInt(block[i]) << BigInt(8*(i&7));
+      keccakF(state);
+      const out = new Uint8Array(outputLength);
+      let pos = 0;
+      while (pos < outputLength) {
+        const take = Math.min(rate, outputLength-pos);
+        for (let i = 0; i < take; i++) out[pos+i] = Number((state[(i/8)|0] >> BigInt(8*(i&7))) & 0xffn);
+        pos += take;
+        if (pos < outputLength) keccakF(state);
+      }
+      try { block.fill(0); state.fill(0n); } catch (_) {}
+      return out;
+    }
+    const sha3_256 = data => keccak(data, 136, 0x06, 32);
+    const sha3_512 = data => keccak(data, 72, 0x06, 64);
+    const shake128 = (data, len) => keccak(data, 168, 0x1f, len);
+    const shake256 = (data, len) => keccak(data, 136, 0x1f, len);
+    function concat(...parts) {
+      let length = 0;
+      for (const part of parts) length += part.byteLength;
+      const out = new Uint8Array(length);
+      let offset = 0;
+      for (const part of parts) { out.set(part, offset); offset += part.byteLength; }
+      return out;
+    }
+    function mod(value) { value %= Q; return value < 0 ? value + Q : value; }
+    function powmod(base, exp) {
+      let result = 1;
+      base = mod(base);
+      while (exp > 0) {
+        if (exp & 1) result = (result * base) % Q;
+        base = (base * base) % Q;
+        exp >>= 1;
+      }
+      return result;
+    }
+    function bitrev7(value) {
+      let result = 0;
+      for (let i = 0; i < 7; i++) result = (result << 1) | ((value >> i) & 1);
+      return result;
+    }
+    function ntt(poly) {
+      const out = poly.slice();
+      let zetaIndex = 1;
+      for (let len = 128; len >= 2; len >>= 1) {
+        for (let start = 0; start < N; start += 2 * len) {
+          const zeta = powmod(17, bitrev7(zetaIndex++));
+          for (let j = start; j < start + len; j++) {
+            const t = mod(zeta * out[j+len]);
+            out[j+len] = mod(out[j] - t);
+            out[j] = mod(out[j] + t);
+          }
+        }
+      }
+      return out;
+    }
+    function inverseNtt(poly) {
+      const out = poly.slice();
+      let zetaIndex = 127;
+      for (let len = 2; len <= 128; len <<= 1) {
+        for (let start = 0; start < N; start += 2 * len) {
+          const zeta = powmod(17, bitrev7(zetaIndex--));
+          for (let j = start; j < start + len; j++) {
+            const t = out[j];
+            out[j] = mod(t + out[j+len]);
+            out[j+len] = mod(zeta * (out[j+len] - t));
+          }
+        }
+      }
+      for (let j = 0; j < N; j++) out[j] = mod(out[j] * 3303);
+      return out;
+    }
+    function multiplyNtts(a, b) {
+      const out = new Array(N);
+      for (let i = 0; i < 128; i++) {
+        const a0 = a[2*i], a1 = a[2*i+1], b0 = b[2*i], b1 = b[2*i+1];
+        const gamma = powmod(17, 2 * bitrev7(i) + 1);
+        out[2*i] = mod(a0*b0 + a1*b1*gamma);
+        out[2*i+1] = mod(a0*b1 + a1*b0);
+      }
+      return out;
+    }
+    function addPoly(a, b) {
+      const out = new Array(N);
+      for (let i = 0; i < N; i++) out[i] = mod(a[i] + b[i]);
+      return out;
+    }
+    function subtractPoly(a, b) {
+      const out = new Array(N);
+      for (let i = 0; i < N; i++) out[i] = mod(a[i] - b[i]);
+      return out;
+    }
+    function dotNtt(a, b) {
+      let out = Array(N).fill(0);
+      for (let i = 0; i < K; i++) out = addPoly(out, multiplyNtts(a[i], b[i]));
+      return out;
+    }
+    function sampleNtt(seed) {
+      let outputLength = 840;
+      let source = shake128(seed, outputLength);
+      const out = [];
+      let pos = 0;
+      while (out.length < N) {
+        if (pos + 3 > source.length) {
+          outputLength *= 2;
+          source = shake128(seed, outputLength);
+        }
+        const b0 = source[pos++], b1 = source[pos++], b2 = source[pos++];
+        const d1 = b0 + 256 * (b1 & 15);
+        const d2 = (b1 >> 4) + 16 * b2;
+        if (d1 < Q) out.push(d1);
+        if (out.length < N && d2 < Q) out.push(d2);
+      }
+      try { source.fill(0); } catch (_) {}
+      return out;
+    }
+    function cbd(bytes, eta) {
+      const out = new Array(N);
+      for (let i = 0; i < N; i++) {
+        let x = 0, y = 0;
+        for (let j = 0; j < eta; j++) {
+          const bit = i * 2 * eta + j;
+          x += (bytes[bit >> 3] >> (bit & 7)) & 1;
+        }
+        for (let j = 0; j < eta; j++) {
+          const bit = i * 2 * eta + eta + j;
+          y += (bytes[bit >> 3] >> (bit & 7)) & 1;
+        }
+        out[i] = mod(x-y);
+      }
+      return out;
+    }
+    function prf(seed, nonce, eta) { return shake256(concat(seed, Uint8Array.of(nonce)), 64 * eta); }
+    function byteEncode(values, bits) {
+      const out = new Uint8Array((N * bits) >> 3);
+      let accumulator = 0, available = 0, pos = 0;
+      const mask = (1 << bits) - 1;
+      for (let i = 0; i < N; i++) {
+        accumulator |= (values[i] & mask) << available;
+        available += bits;
+        while (available >= 8) {
+          out[pos++] = accumulator & 255;
+          accumulator >>>= 8;
+          available -= 8;
+        }
+      }
+      return out;
+    }
+    function byteDecode(bytes, bits) {
+      const out = new Array(N);
+      let accumulator = 0, available = 0, pos = 0;
+      const mask = (1 << bits) - 1;
+      for (let i = 0; i < N; i++) {
+        while (available < bits) {
+          accumulator |= bytes[pos++] << available;
+          available += 8;
+        }
+        out[i] = accumulator & mask;
+        accumulator >>>= bits;
+        available -= bits;
+      }
+      return out;
+    }
+    function encodeVector(vector, bits) { return concat(...vector.map(poly => byteEncode(poly, bits))); }
+    function decodeVector(bytes, bits, count = K) {
+      const polySize = N * bits / 8;
+      const out = [];
+      for (let i = 0; i < count; i++) out.push(byteDecode(bytes.subarray(i*polySize, (i+1)*polySize), bits));
+      return out;
+    }
+    function compressPoly(poly, bits) {
+      const mask = (1 << bits) - 1;
+      return poly.map(value => Math.floor((mod(value) * (1 << bits) + Q / 2) / Q) & mask);
+    }
+    function decompressPoly(poly, bits) {
+      return poly.map(value => Math.floor((Q * value + (1 << (bits-1))) / (1 << bits)));
+    }
+    function matrixFromRho(rho) {
+      const matrix = [];
+      for (let i = 0; i < K; i++) {
+        matrix[i] = [];
+        for (let j = 0; j < K; j++) matrix[i][j] = sampleNtt(concat(rho, Uint8Array.of(j, i)));
+      }
+      return matrix;
+    }
+    function kpkeKeygen(d) {
+      const expanded = sha3_512(concat(d, Uint8Array.of(K)));
+      const rho = expanded.slice(0, 32), sigma = expanded.slice(32);
+      const matrix = matrixFromRho(rho);
+      let nonce = 0;
+      const s = [], e = [];
+      for (let i = 0; i < K; i++) s.push(cbd(prf(sigma, nonce++, ETA1), ETA1));
+      for (let i = 0; i < K; i++) e.push(cbd(prf(sigma, nonce++, ETA1), ETA1));
+      const shat = s.map(ntt), ehat = e.map(ntt), that = [];
+      for (let i = 0; i < K; i++) that.push(addPoly(dotNtt(matrix[i], shat), ehat[i]));
+      const ek = concat(encodeVector(that, 12), rho);
+      const dk = encodeVector(shat, 12);
+      try { expanded.fill(0); sigma.fill(0); } catch (_) {}
+      return { ek, dk };
+    }
+    function decodeAndCheckPublicKey(ekLike) {
+      const ek = new Uint8Array(ekLike || []);
+      if (ek.byteLength !== SDC_PQ_PUBLIC_KEY_BYTES) throw new Error('Invalid ML-KEM-768 encapsulation key length');
+      const encoded = ek.subarray(0, 1152);
+      const decoded = decodeVector(encoded, 12);
+      for (const poly of decoded) for (const value of poly) {
+        if (value >= Q) throw new Error('Non-canonical ML-KEM-768 encapsulation key');
+      }
+      return decoded;
+    }
+    function kpkeEncrypt(ekLike, message, randomness) {
+      const ek = new Uint8Array(ekLike || []);
+      const that = decodeAndCheckPublicKey(ek);
+      const rho = ek.subarray(1152);
+      const matrix = matrixFromRho(rho);
+      let nonce = 0;
+      const y = [], e1 = [];
+      for (let i = 0; i < K; i++) y.push(cbd(prf(randomness, nonce++, ETA1), ETA1));
+      for (let i = 0; i < K; i++) e1.push(cbd(prf(randomness, nonce++, ETA2), ETA2));
+      const e2 = cbd(prf(randomness, nonce++, ETA2), ETA2);
+      const yhat = y.map(ntt), u = [];
+      for (let i = 0; i < K; i++) {
+        const column = [];
+        for (let j = 0; j < K; j++) column.push(matrix[j][i]);
+        u.push(addPoly(inverseNtt(dotNtt(column, yhat)), e1[i]));
+      }
+      const mu = decompressPoly(byteDecode(message, 1), 1);
+      let v = addPoly(inverseNtt(dotNtt(that, yhat)), e2);
+      v = addPoly(v, mu);
+      return concat(
+        encodeVector(u.map(poly => compressPoly(poly, DU)), DU),
+        byteEncode(compressPoly(v, DV), DV)
+      );
+    }
+    function kpkeDecrypt(dk, ciphertext) {
+      if (ciphertext.byteLength !== SDC_PQ_CIPHERTEXT_BYTES) throw new Error('Invalid ML-KEM-768 ciphertext length');
+      const u = decodeVector(ciphertext.subarray(0, 960), DU).map(poly => decompressPoly(poly, DU));
+      const v = decompressPoly(byteDecode(ciphertext.subarray(960), DV), DV);
+      const shat = decodeVector(dk, 12);
+      const w = subtractPoly(v, inverseNtt(dotNtt(shat, u.map(ntt))));
+      return byteEncode(compressPoly(w, 1), 1);
+    }
+    function keygen(seedLike = null) {
+      let seed;
+      if (seedLike == null) {
+        seed = new Uint8Array(SDC_PQ_PRIVATE_SEED_BYTES);
+        globalThis.crypto.getRandomValues(seed);
+      } else {
+        seed = new Uint8Array(seedLike);
+      }
+      if (seed.byteLength !== SDC_PQ_PRIVATE_SEED_BYTES) throw new Error('ML-KEM-768 key seed must be 64 bytes');
+      const d = seed.slice(0, 32), z = seed.slice(32);
+      const { ek, dk } = kpkeKeygen(d);
+      const h = sha3_256(ek);
+      const secretKey = concat(dk, ek, h, z);
+      try { d.fill(0); z.fill(0); h.fill(0); } catch (_) {}
+      return { publicKey: ek, secretKey, seed: new Uint8Array(seed) };
+    }
+    function encapsulate(publicKeyLike, randomnessLike = null) {
+      const publicKey = new Uint8Array(publicKeyLike || []);
+      decodeAndCheckPublicKey(publicKey);
+      let randomness;
+      if (randomnessLike == null) {
+        randomness = new Uint8Array(32);
+        globalThis.crypto.getRandomValues(randomness);
+      } else randomness = new Uint8Array(randomnessLike);
+      if (randomness.byteLength !== 32) throw new Error('ML-KEM-768 encapsulation randomness must be 32 bytes');
+      const expanded = sha3_512(concat(randomness, sha3_256(publicKey)));
+      const sharedSecret = expanded.slice(0, 32);
+      const r = expanded.slice(32);
+      const cipherText = kpkeEncrypt(publicKey, randomness, r);
+      try { expanded.fill(0); r.fill(0); if (randomnessLike == null) randomness.fill(0); } catch (_) {}
+      return { cipherText, sharedSecret };
+    }
+    function decapsulate(ciphertextLike, secretKeyLike) {
+      const ciphertext = new Uint8Array(ciphertextLike || []);
+      const secretKey = new Uint8Array(secretKeyLike || []);
+      if (secretKey.byteLength !== SDC_PQ_SECRET_KEY_BYTES) throw new Error('Invalid ML-KEM-768 decapsulation key length');
+      if (ciphertext.byteLength !== SDC_PQ_CIPHERTEXT_BYTES) throw new Error('Invalid ML-KEM-768 ciphertext length');
+      const dkPke = secretKey.subarray(0, 1152);
+      const ek = secretKey.subarray(1152, 2336);
+      const h = secretKey.subarray(2336, 2368);
+      const z = secretKey.subarray(2368, 2400);
+      const message = kpkeDecrypt(dkPke, ciphertext);
+      const expanded = sha3_512(concat(message, h));
+      const candidate = expanded.slice(0, 32), r = expanded.slice(32);
+      const reencryption = kpkeEncrypt(ek, message, r);
+      let difference = 0;
+      for (let i = 0; i < ciphertext.length; i++) difference |= ciphertext[i] ^ reencryption[i];
+      const rejection = shake256(concat(z, ciphertext), 32);
+      const mask = ((difference | -difference) >>> 31) * 255;
+      const out = new Uint8Array(32);
+      for (let i = 0; i < out.length; i++) out[i] = (candidate[i] & (~mask & 255)) | (rejection[i] & mask);
+      try { message.fill(0); expanded.fill(0); candidate.fill(0); r.fill(0); reencryption.fill(0); rejection.fill(0); } catch (_) {}
+      return out;
+    }
+    return {
+      keygen,
+      encapsulate,
+      decapsulate,
+      validatePublicKey(publicKey) { decodeAndCheckPublicKey(publicKey); return true; },
+      hashSha3_256: sha3_256,
+      shake128,
+    };
+  })();
+
+  function pqFoundationCapability() {
+    return {
+      version: SDC_PQ_FOUNDATION_VERSION,
+      profile: SDC_PQ_PROFILE,
+      kem: SDC_PQ_KEM,
+      fips: 'FIPS-203',
+      implementation: 'NATIVE_WEBCRYPTO_PREFERRED_WITH_EMBEDDED_FIPS203_FALLBACK',
+      publicKeyBytes: SDC_PQ_PUBLIC_KEY_BYTES,
+      ciphertextBytes: SDC_PQ_CIPHERTEXT_BYTES,
+      sharedSecretBytes: SDC_PQ_SHARED_SECRET_BYTES,
+      deviceScoped: true,
+      privateSeedPortableWithDatabase: false,
+      identitySignedAnnouncement: true,
+      stickyPerDeviceAntiDowngrade: true,
+      hybridCombiner: 'HKDF-SHA-256(domain-separated classical32 || mlkem32)',
+      applicationNetworkActivated: SDC_PQ_NETWORK_APPLICATION_ACTIVATED,
+      pqRatchetActivated: SDC_PQ_RATCHET_ACTIVATED,
+      embeddedFallbackSideChannelClaim: 'NO_FORMAL_CONSTANT_TIME_GUARANTEE_IN_JAVASCRIPT',
+    };
+  }
+
+  function pqBytesEqual(a, b) {
+    const aa = new Uint8Array(a || []);
+    const bb = new Uint8Array(b || []);
+    return aa.byteLength === bb.byteLength && constantTimeBytesEqual(aa, bb);
+  }
+
+  function pqHex(bytes) {
+    return Array.from(new Uint8Array(bytes || []), byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function detectNativeMlKemSupport(force = false) {
+    if (!force && NativeMlKemSupportCache) return { ...NativeMlKemSupportCache };
+    const subtle = globalThis.crypto?.subtle;
+    const result = {
+      supported: false,
+      algorithm: SDC_PQ_KEM,
+      implementation: 'NATIVE_WEBCRYPTO',
+      hasEncapsulateBits: typeof subtle?.encapsulateBits === 'function',
+      hasDecapsulateBits: typeof subtle?.decapsulateBits === 'function',
+      supportsApi: typeof subtle?.supports === 'function',
+      reason: null,
+    };
+    if (!subtle || !result.hasEncapsulateBits || !result.hasDecapsulateBits) {
+      result.reason = 'WebCrypto ML-KEM encapsulateBits/decapsulateBits unavailable or origin-trial gated';
+      NativeMlKemSupportCache = result;
+      return { ...result };
+    }
+    try {
+      if (typeof subtle.supports === 'function' && subtle.supports('generateKey', { name: SDC_PQ_KEM }) === false) {
+        result.reason = `${SDC_PQ_KEM} is not enabled by this browser/origin`;
+        NativeMlKemSupportCache = result;
+        return { ...result };
+      }
+      const pair = await subtle.generateKey({ name: SDC_PQ_KEM }, true, ['encapsulateBits', 'decapsulateBits']);
+      const publicBytes = new Uint8Array(await subtle.exportKey('raw-public', pair.publicKey));
+      const seedBytes = new Uint8Array(await subtle.exportKey('raw-seed', pair.privateKey));
+      const encapsulated = await subtle.encapsulateBits({ name: SDC_PQ_KEM }, pair.publicKey);
+      const sharedA = new Uint8Array(encapsulated.sharedKey);
+      const ciphertext = new Uint8Array(encapsulated.ciphertext);
+      const sharedB = new Uint8Array(await subtle.decapsulateBits({ name: SDC_PQ_KEM }, pair.privateKey, ciphertext));
+      result.publicKeyBytes = publicBytes.byteLength;
+      result.privateSeedBytes = seedBytes.byteLength;
+      result.ciphertextBytes = ciphertext.byteLength;
+      result.sharedSecretBytes = sharedA.byteLength;
+      result.supported =
+        publicBytes.byteLength === SDC_PQ_PUBLIC_KEY_BYTES &&
+        seedBytes.byteLength === SDC_PQ_PRIVATE_SEED_BYTES &&
+        ciphertext.byteLength === SDC_PQ_CIPHERTEXT_BYTES &&
+        sharedA.byteLength === SDC_PQ_SHARED_SECRET_BYTES &&
+        pqBytesEqual(sharedA, sharedB);
+      if (!result.supported) result.reason = 'Native ML-KEM shape/roundtrip did not match the v69.0 profile';
+      try { publicBytes.fill(0); seedBytes.fill(0); sharedA.fill(0); sharedB.fill(0); ciphertext.fill(0); } catch (_) {}
+    } catch (error) {
+      result.reason = error?.message || String(error);
+    }
+    NativeMlKemSupportCache = result;
+    return { ...result };
+  }
+
+  async function detectEmbeddedMlKemSupport(force = false) {
+    if (!force && EmbeddedMlKemSupportCache) return { ...EmbeddedMlKemSupportCache };
+    const result = {
+      supported: false,
+      algorithm: SDC_PQ_KEM,
+      implementation: 'EMBEDDED_FIPS203_JS',
+      knownAnswerTest: false,
+      roundtrip: false,
+      reason: null,
+    };
+    let pair = null, encapsulated = null, recovered = null;
+    try {
+      const seed = Uint8Array.from({ length: 64 }, (_, i) => i);
+      const randomness = Uint8Array.from({ length: 32 }, (_, i) => 255 - i);
+      pair = EmbeddedMlKem768.keygen(seed);
+      encapsulated = EmbeddedMlKem768.encapsulate(pair.publicKey, randomness);
+      recovered = EmbeddedMlKem768.decapsulate(encapsulated.cipherText, pair.secretKey);
+      const publicDigest = new Uint8Array(await Utils.Sha256(pair.publicKey));
+      const ciphertextDigest = new Uint8Array(await Utils.Sha256(encapsulated.cipherText));
+      result.knownAnswerTest =
+        pqHex(publicDigest) === SDC_PQ_EMBEDDED_KAT_PUBLIC_SHA256 &&
+        pqHex(ciphertextDigest) === SDC_PQ_EMBEDDED_KAT_CIPHERTEXT_SHA256 &&
+        pqHex(encapsulated.sharedSecret) === SDC_PQ_EMBEDDED_KAT_SHARED_SECRET;
+      result.roundtrip = pqBytesEqual(encapsulated.sharedSecret, recovered);
+      result.publicKeyBytes = pair.publicKey.byteLength;
+      result.privateSeedBytes = pair.seed.byteLength;
+      result.ciphertextBytes = encapsulated.cipherText.byteLength;
+      result.sharedSecretBytes = encapsulated.sharedSecret.byteLength;
+      result.supported = result.knownAnswerTest && result.roundtrip &&
+        pair.publicKey.byteLength === SDC_PQ_PUBLIC_KEY_BYTES &&
+        pair.secretKey.byteLength === SDC_PQ_SECRET_KEY_BYTES &&
+        pair.seed.byteLength === SDC_PQ_PRIVATE_SEED_BYTES &&
+        encapsulated.cipherText.byteLength === SDC_PQ_CIPHERTEXT_BYTES &&
+        encapsulated.sharedSecret.byteLength === SDC_PQ_SHARED_SECRET_BYTES;
+      if (!result.supported) result.reason = 'Embedded FIPS-203 ML-KEM-768 known-answer/roundtrip check failed';
+      try { publicDigest.fill(0); ciphertextDigest.fill(0); seed.fill(0); randomness.fill(0); } catch (_) {}
+    } catch (error) {
+      result.reason = error?.message || String(error);
+    } finally {
+      try {
+        pair?.publicKey?.fill?.(0); pair?.secretKey?.fill?.(0); pair?.seed?.fill?.(0);
+        encapsulated?.cipherText?.fill?.(0); encapsulated?.sharedSecret?.fill?.(0); recovered?.fill?.(0);
+      } catch (_) {}
+    }
+    EmbeddedMlKemSupportCache = result;
+    return { ...result };
+  }
+
+  async function pqMlKemBackendStatus(force = false) {
+    if (!force && PqMlKemBackendCache) return {
+      ...PqMlKemBackendCache,
+      native: { ...PqMlKemBackendCache.native },
+      embedded: { ...PqMlKemBackendCache.embedded },
+    };
+    const native = await detectNativeMlKemSupport(force);
+    const embedded = await detectEmbeddedMlKemSupport(force);
+    const selected = native.supported ? 'NATIVE_WEBCRYPTO' : embedded.supported ? 'EMBEDDED_FIPS203_JS' : null;
+    const result = {
+      supported: !!selected,
+      selected,
+      algorithm: SDC_PQ_KEM,
+      native,
+      embedded,
+      nativePreferred: true,
+      originTrialIndependent: embedded.supported === true,
+      fallbackSideChannelClaim: 'NO_FORMAL_CONSTANT_TIME_GUARANTEE_IN_JAVASCRIPT',
+      reason: selected ? null : `No usable ML-KEM backend (native: ${native.reason || 'unavailable'}; embedded: ${embedded.reason || 'failed'})`,
+    };
+    PqMlKemBackendCache = result;
+    return { ...result, native: { ...native }, embedded: { ...embedded } };
+  }
+
+  async function pqPrekeyIdFromPublicKey(publicBytes) {
+    const bytes = new Uint8Array(publicBytes || []);
+    if (bytes.byteLength !== SDC_PQ_PUBLIC_KEY_BYTES) throw new Error('Invalid ML-KEM-768 public-key length');
+    const digest = new Uint8Array(await Utils.Sha256(bytes));
+    return Utils.BytesToBase64url(digest.slice(0, 16));
+  }
+
+  async function nativeMlKemGenerateKeyMaterial() {
+    const support = await detectNativeMlKemSupport();
+    if (!support.supported) throw new Error(`Native ${SDC_PQ_KEM} unavailable: ${support.reason || 'unsupported'}`);
+    const pair = await crypto.subtle.generateKey({ name: SDC_PQ_KEM }, true, ['encapsulateBits', 'decapsulateBits']);
+    const publicBytes = new Uint8Array(await crypto.subtle.exportKey('raw-public', pair.publicKey));
+    const seedBytes = new Uint8Array(await crypto.subtle.exportKey('raw-seed', pair.privateKey));
+    if (publicBytes.byteLength !== SDC_PQ_PUBLIC_KEY_BYTES || seedBytes.byteLength !== SDC_PQ_PRIVATE_SEED_BYTES)
+      throw new Error('Native ML-KEM key material length mismatch');
+    return { pair, publicBytes, seedBytes, backend: 'NATIVE_WEBCRYPTO' };
+  }
+
+  async function nativeMlKemImportPublic(publicBytes) {
+    const bytes = new Uint8Array(publicBytes || []);
+    if (bytes.byteLength !== SDC_PQ_PUBLIC_KEY_BYTES) throw new Error('Invalid ML-KEM public key');
+    return await crypto.subtle.importKey('raw-public', bytes, { name: SDC_PQ_KEM }, false, ['encapsulateBits']);
+  }
+
+  async function nativeMlKemImportPrivateSeed(seedBytes) {
+    const bytes = new Uint8Array(seedBytes || []);
+    if (bytes.byteLength !== SDC_PQ_PRIVATE_SEED_BYTES) throw new Error('Invalid ML-KEM private seed');
+    return await crypto.subtle.importKey('raw-seed', bytes, { name: SDC_PQ_KEM }, false, ['decapsulateBits']);
+  }
+
+  async function nativeMlKemEncapsulate(publicBytes) {
+    const key = await nativeMlKemImportPublic(publicBytes);
+    const result = await crypto.subtle.encapsulateBits({ name: SDC_PQ_KEM }, key);
+    const sharedSecret = new Uint8Array(result.sharedKey);
+    const ciphertext = new Uint8Array(result.ciphertext);
+    if (sharedSecret.byteLength !== SDC_PQ_SHARED_SECRET_BYTES || ciphertext.byteLength !== SDC_PQ_CIPHERTEXT_BYTES)
+      throw new Error('Invalid native ML-KEM encapsulation result');
+    return { sharedSecret, ciphertext, backend: 'NATIVE_WEBCRYPTO' };
+  }
+
+  async function nativeMlKemDecapsulate(seedBytes, ciphertextBytes) {
+    const ciphertext = new Uint8Array(ciphertextBytes || []);
+    if (ciphertext.byteLength !== SDC_PQ_CIPHERTEXT_BYTES) throw new Error('Invalid ML-KEM ciphertext');
+    const key = await nativeMlKemImportPrivateSeed(seedBytes);
+    const sharedSecret = new Uint8Array(await crypto.subtle.decapsulateBits({ name: SDC_PQ_KEM }, key, ciphertext));
+    if (sharedSecret.byteLength !== SDC_PQ_SHARED_SECRET_BYTES) throw new Error('Invalid ML-KEM shared secret');
+    return sharedSecret;
+  }
+
+  function embeddedMlKemGenerateKeyMaterial(seedOverride = null) {
+    const seedBytes = seedOverride == null ? Utils.GetRandomBytes(SDC_PQ_PRIVATE_SEED_BYTES) : new Uint8Array(seedOverride);
+    const pair = EmbeddedMlKem768.keygen(seedBytes);
+    const publicBytes = new Uint8Array(pair.publicKey);
+    try { pair.secretKey.fill(0); pair.seed.fill(0); } catch (_) {}
+    return { publicBytes, seedBytes: new Uint8Array(seedBytes), backend: 'EMBEDDED_FIPS203_JS' };
+  }
+
+  function embeddedMlKemEncapsulate(publicBytes) {
+    const result = EmbeddedMlKem768.encapsulate(new Uint8Array(publicBytes || []));
+    return { sharedSecret: result.sharedSecret, ciphertext: result.cipherText, backend: 'EMBEDDED_FIPS203_JS' };
+  }
+
+  function embeddedMlKemDecapsulate(seedBytes, ciphertextBytes) {
+    const pair = EmbeddedMlKem768.keygen(new Uint8Array(seedBytes || []));
+    try {
+      return EmbeddedMlKem768.decapsulate(new Uint8Array(ciphertextBytes || []), pair.secretKey);
+    } finally {
+      try { pair.publicKey.fill(0); pair.secretKey.fill(0); pair.seed.fill(0); } catch (_) {}
+    }
+  }
+
+  async function pqMlKemGenerateKeyMaterial() {
+    const status = await pqMlKemBackendStatus();
+    if (status.selected === 'NATIVE_WEBCRYPTO') return await nativeMlKemGenerateKeyMaterial();
+    if (status.selected === 'EMBEDDED_FIPS203_JS') return embeddedMlKemGenerateKeyMaterial();
+    throw new Error(status.reason || 'No usable ML-KEM-768 backend');
+  }
+
+  async function pqMlKemValidatePublic(publicBytes) {
+    const bytes = new Uint8Array(publicBytes || []);
+    if (bytes.byteLength !== SDC_PQ_PUBLIC_KEY_BYTES) throw new Error('Invalid ML-KEM-768 public-key length');
+    const status = await pqMlKemBackendStatus();
+    if (status.selected === 'NATIVE_WEBCRYPTO') {
+      await nativeMlKemImportPublic(bytes);
+      return true;
+    }
+    EmbeddedMlKem768.validatePublicKey(bytes);
+    return true;
+  }
+
+  async function pqMlKemEncapsulate(publicBytes) {
+    const status = await pqMlKemBackendStatus();
+    if (status.selected === 'NATIVE_WEBCRYPTO') return await nativeMlKemEncapsulate(publicBytes);
+    if (status.selected === 'EMBEDDED_FIPS203_JS') return embeddedMlKemEncapsulate(publicBytes);
+    throw new Error(status.reason || 'No usable ML-KEM-768 backend');
+  }
+
+  async function pqMlKemDecapsulate(seedBytes, ciphertextBytes) {
+    const status = await pqMlKemBackendStatus();
+    if (status.selected === 'NATIVE_WEBCRYPTO') return await nativeMlKemDecapsulate(seedBytes, ciphertextBytes);
+    if (status.selected === 'EMBEDDED_FIPS203_JS') return embeddedMlKemDecapsulate(seedBytes, ciphertextBytes);
+    throw new Error(status.reason || 'No usable ML-KEM-768 backend');
+  }
+
+
+  async function deriveV69HybridFoundationSecret(classicalSecret, pqSecret, context = {}) {
+    const classical = new Uint8Array(classicalSecret || []);
+    const pq = new Uint8Array(pqSecret || []);
+    if (classical.byteLength !== 32 || pq.byteLength !== SDC_PQ_SHARED_SECRET_BYTES)
+      throw new Error('Hybrid combiner requires one 256-bit classical secret and one ML-KEM shared secret');
+    const contextBytes = canonicalJsonBytes({
+      protocol: 'SDC-V69.0-HYBRID-COMBINER',
+      version: SDC_PQ_FOUNDATION_VERSION,
+      profile: SDC_PQ_PROFILE,
+      accountId: String(context.accountId || ''),
+      recipientAccountId: String(context.recipientAccountId || ''),
+      channelId: String(context.channelId || ''),
+      senderDeviceId: String(context.senderDeviceId || ''),
+      recipientDeviceId: String(context.recipientDeviceId || ''),
+      classicalPrekeyId: String(context.classicalPrekeyId || ''),
+      pqPrekeyId: String(context.pqPrekeyId || ''),
+      purpose: String(context.purpose || 'FOUNDATION_SELFTEST'),
+    });
+    const salt = new Uint8Array(await Utils.Sha256(contextBytes));
+    const classicalLabel = Utils.StringToUtf8Bytes('CLASSICAL-256\0');
+    const pqLabel = Utils.StringToUtf8Bytes('POST-QUANTUM-ML-KEM-768\0');
+    const ikm = Utils.ConcatBuffers([classicalLabel, classical, pqLabel, pq]);
+    try {
+      return new Uint8Array(await Utils.HkdfSha256(
+        ikm,
+        salt,
+        Utils.StringToUtf8Bytes('SDC-V69.0|HYBRID-COMBINER|P-521+ML-KEM-768|HKDF-SHA-256|32'),
+        32
+      ));
+    } finally {
+      try { salt.fill(0); ikm.fill(0); } catch (_) {}
+    }
+  }
+
+  async function sealLocalPqPrekeySeed(seedBytes, local, keyId, boundClassicalPrekeyId) {
+    const ownId = String(local?.accountId || Discord.getCurrentUser?.()?.id || '');
+    const wrap = await deriveDeviceLocalWrapKeyBytes(ownId);
+    try {
+      return await rawAesGcmEncrypt(
+        wrap,
+        seedBytes,
+        canonicalJsonBytes({
+          protocol: 'SDC-V69.0-PQ-PREKEY-LOCAL',
+          version: SDC_PQ_FOUNDATION_VERSION,
+          algorithm: SDC_PQ_KEM,
+          accountId: ownId,
+          rootFingerprint: String(local?.rootFingerprint || ''),
+          deviceId: String(local?.deviceId || ''),
+          keyId: String(keyId || ''),
+          boundClassicalPrekeyId: String(boundClassicalPrekeyId || ''),
+        })
+      );
+    } finally {
+      try { wrap.fill(0); } catch (_) {}
+    }
+  }
+
+  async function openLocalPqPrekeySeed(envelopeBytes, local, keyId, boundClassicalPrekeyId) {
+    const ownId = String(local?.accountId || Discord.getCurrentUser?.()?.id || '');
+    const wrap = await deriveDeviceLocalWrapKeyBytes(ownId);
+    try {
+      return await rawAesGcmDecrypt(
+        wrap,
+        envelopeBytes,
+        canonicalJsonBytes({
+          protocol: 'SDC-V69.0-PQ-PREKEY-LOCAL',
+          version: SDC_PQ_FOUNDATION_VERSION,
+          algorithm: SDC_PQ_KEM,
+          accountId: ownId,
+          rootFingerprint: String(local?.rootFingerprint || ''),
+          deviceId: String(local?.deviceId || ''),
+          keyId: String(keyId || ''),
+          boundClassicalPrekeyId: String(boundClassicalPrekeyId || ''),
+        })
+      );
+    } finally {
+      try { wrap.fill(0); } catch (_) {}
+    }
+  }
+
+  function pruneStoredPqPrekeys(container, now = Date.now()) {
+    if (!container || typeof container !== 'object' || Array.isArray(container))
+      return { version: SDC_PQ_FOUNDATION_VERSION, current: null, previous: [] };
+    const previous = Array.isArray(container.previous) ? container.previous : [];
+    container.version = SDC_PQ_FOUNDATION_VERSION;
+    container.previous = previous
+      .filter((entry) => entry && typeof entry === 'object' &&
+        Number(entry.createdAt || 0) > 0 &&
+        now - Number(entry.createdAt || 0) <= SDC_PQ_PREKEY_RETENTION_MS)
+      .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+      .slice(0, SDC_PQ_PREKEY_MAX_PREVIOUS);
+    return container;
+  }
+
+  async function generateLocalPqPrekeyRecord(local, boundClassicalPrekeyId) {
+    const material = await pqMlKemGenerateKeyMaterial();
+    const keyId = await pqPrekeyIdFromPublicKey(material.publicBytes);
+    const createdAt = Date.now();
+    try {
+      const envelope = await sealLocalPqPrekeySeed(
+        material.seedBytes, local, keyId, boundClassicalPrekeyId
+      );
+      return {
+        version: SDC_PQ_FOUNDATION_VERSION,
+        keyId,
+        publicKey: Utils.BytesToBase64url(material.publicBytes),
+        privateEnvelope: Utils.BytesToBase64(envelope),
+        boundClassicalPrekeyId: String(boundClassicalPrekeyId || ''),
+        createdAt,
+        expiresAt: createdAt + SDC_PQ_PREKEY_LIFETIME_MS,
+        algorithm: SDC_PQ_KEM,
+        profile: SDC_PQ_PROFILE,
+        backendGeneratedBy: String(material.backend || 'UNKNOWN'),
+      };
+    } finally {
+      try { material.publicBytes.fill(0); material.seedBytes.fill(0); } catch (_) {}
+    }
+  }
+
+  async function ensureLocalPqPrekey(forceRotate = false, localOverride = null, classicalPrekeyOverride = null) {
+    const support = await pqMlKemBackendStatus();
+    if (!support.supported) return null;
+    const local = localOverride || await ensureLocalDeviceIdentity();
+    const classicalPrekey = classicalPrekeyOverride || await ensureLocalAsyncPrekey(false);
+    const boundClassicalPrekeyId = String(classicalPrekey?.keyId || '');
+    if (!boundClassicalPrekeyId) throw new Error('PQ prekey requires the current classical async-prekey epoch');
+    const ownId = String(local.accountId || Discord.getCurrentUser?.()?.id || '');
+    const storageKey = localDeviceStorageKey(local.rootFingerprint, ownId);
+    const stored = await Utils.StorageLoad(storageKey);
+    if (!stored || stored.deviceId !== local.deviceId) throw new Error('Unable to load local device storage for PQ prekey');
+    const now = Date.now();
+    const pqPrekeys = pruneStoredPqPrekeys(stored.pqPrekeys || {}, now);
+    let current = pqPrekeys.current || null;
+    let currentValid = false;
+    if (current && Number(current.version) === SDC_PQ_FOUNDATION_VERSION &&
+        current.algorithm === SDC_PQ_KEM && typeof current.keyId === 'string' &&
+        typeof current.publicKey === 'string' && typeof current.privateEnvelope === 'string' &&
+        String(current.boundClassicalPrekeyId || '') === boundClassicalPrekeyId) {
+      try {
+        const publicBytes = Utils.Base64urlToBytes(current.publicKey);
+        currentValid = publicBytes.byteLength === SDC_PQ_PUBLIC_KEY_BYTES &&
+          await pqPrekeyIdFromPublicKey(publicBytes) === current.keyId &&
+          Number(current.expiresAt || 0) > now;
+      } catch (_) { currentValid = false; }
+    }
+    const shouldRotate = forceRotate || !currentValid ||
+      Number(current?.expiresAt || 0) - now <= SDC_PQ_PREKEY_ROTATE_BEFORE_MS;
+    if (shouldRotate) {
+      if (currentValid) pqPrekeys.previous.unshift(current);
+      current = await generateLocalPqPrekeyRecord(local, boundClassicalPrekeyId);
+      pqPrekeys.current = current;
+      pruneStoredPqPrekeys(pqPrekeys, now);
+      stored.pqPrekeys = pqPrekeys;
+      local.announcedPqPrekeys = {};
+      stored.announcedPqPrekeys = {};
+      await Utils.StorageSave(storageKey, stored);
+      console.log('[SDC][PQ][v69.0.5] local ML-KEM prekey generated/rotated', {
+        accountId: ownId, deviceId: local.deviceId, pqPrekeyId: current.keyId,
+        boundClassicalPrekeyId, expiresAt: current.expiresAt, algorithm: SDC_PQ_KEM,
+      });
+    }
+    return {
+      version: SDC_PQ_FOUNDATION_VERSION,
+      keyId: String(current.keyId),
+      publicKey: String(current.publicKey),
+      boundClassicalPrekeyId: String(current.boundClassicalPrekeyId),
+      createdAt: Number(current.createdAt),
+      expiresAt: Number(current.expiresAt),
+      algorithm: SDC_PQ_KEM,
+      profile: SDC_PQ_PROFILE,
+      capability: pqFoundationCapability(),
+      backendGeneratedBy: String(current.backendGeneratedBy || 'UNKNOWN'),
+    };
+  }
+
+  async function loadLocalPqPrekeySeed(keyId) {
+    const local = await ensureLocalDeviceIdentity();
+    const ownId = String(local.accountId || Discord.getCurrentUser?.()?.id || '');
+    const stored = await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, ownId));
+    const pqPrekeys = pruneStoredPqPrekeys(stored?.pqPrekeys || {}, Date.now());
+    const candidates = [pqPrekeys.current, ...(pqPrekeys.previous || [])].filter(Boolean);
+    const record = candidates.find((entry) => String(entry.keyId || '') === String(keyId || ''));
+    if (!record) throw new Error('PQ prekey private seed is unavailable/expired on this device');
+    const seedBytes = await openLocalPqPrekeySeed(
+      Utils.Base64ToBytes(record.privateEnvelope), local, record.keyId, record.boundClassicalPrekeyId
+    );
+    if (seedBytes.byteLength !== SDC_PQ_PRIVATE_SEED_BYTES) {
+      try { seedBytes.fill(0); } catch (_) {}
+      throw new Error('PQ prekey private seed has invalid length');
+    }
+    return { local, record, seedBytes };
+  }
+
+  function pqWriteSnowflake(view, offset, value, label) {
+    try {
+      const id = BigInt(String(value || '0'));
+      if (id <= 0n || id > 0xffffffffffffffffn) throw new Error('range');
+      view.setBigUint64(offset, id, false);
+    } catch (_) {
+      throw new Error(`Invalid PQ announcement ${label}`);
+    }
+  }
+
+  function pqReadSnowflake(view, offset) {
+    return view.getBigUint64(offset, false).toString();
+  }
+
+  function pqFixedIdBytes(value, label) {
+    const bytes = Utils.Base64urlToBytes(String(value || ''));
+    if (bytes.byteLength !== 16) throw new Error(`Invalid PQ announcement ${label}`);
+    return bytes;
+  }
+
+  function encodePqPrekeyAnnouncementPayload(info) {
+    const deviceId = pqFixedIdBytes(info.deviceId, 'device id');
+    const classicalPrekeyId = pqFixedIdBytes(info.boundClassicalPrekeyId, 'classical prekey id');
+    const pqKeyId = pqFixedIdBytes(info.pqPrekeyId, 'PQ prekey id');
+    const devicePublicKey = Utils.Base64urlToBytes(String(info.devicePublicKey || ''));
+    const pqPublicKey = Utils.Base64urlToBytes(String(info.pqPublicKey || ''));
+    if (devicePublicKey.byteLength !== 133) throw new Error('Invalid PQ announcement device public key');
+    if (pqPublicKey.byteLength !== SDC_PQ_PUBLIC_KEY_BYTES) throw new Error('Invalid PQ announcement ML-KEM public key');
+    const total = 4 + 1 + 1 + 8 + 8 + 8 + 8 + 16 + 133 + 16 + 16 + SDC_PQ_PUBLIC_KEY_BYTES;
+    const out = new Uint8Array(total);
+    const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+    let offset = 0;
+    out.set(SDC_PQ_ANNOUNCE_MAGIC, offset); offset += 4;
+    out[offset++] = SDC_PQ_FOUNDATION_VERSION;
+    out[offset++] = 1; // KEM code 1 = ML-KEM-768
+    view.setBigUint64(offset, BigInt(Number(info.generatedAt || 0)), false); offset += 8;
+    view.setBigUint64(offset, BigInt(Number(info.expiresAt || 0)), false); offset += 8;
+    pqWriteSnowflake(view, offset, info.accountId, 'account id'); offset += 8;
+    pqWriteSnowflake(view, offset, info.channelId, 'channel id'); offset += 8;
+    out.set(deviceId, offset); offset += 16;
+    out.set(devicePublicKey, offset); offset += 133;
+    out.set(classicalPrekeyId, offset); offset += 16;
+    out.set(pqKeyId, offset); offset += 16;
+    out.set(pqPublicKey, offset); offset += SDC_PQ_PUBLIC_KEY_BYTES;
+    if (offset !== out.byteLength) throw new Error('PQ announcement encode length mismatch');
+    return out;
+  }
+
+  function decodePqPrekeyAnnouncementPayload(bytesLike) {
+    const bytes = new Uint8Array(bytesLike || []);
+    const expected = 4 + 1 + 1 + 8 + 8 + 8 + 8 + 16 + 133 + 16 + 16 + SDC_PQ_PUBLIC_KEY_BYTES;
+    if (bytes.byteLength !== expected) throw new Error('Invalid PQ announcement payload length');
+    for (let i = 0; i < 4; i++) if (bytes[i] !== SDC_PQ_ANNOUNCE_MAGIC[i]) throw new Error('Unsupported PQ announcement format');
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let offset = 4;
+    const version = bytes[offset++];
+    const kemCode = bytes[offset++];
+    if (version !== SDC_PQ_FOUNDATION_VERSION || kemCode !== 1) throw new Error('Unsupported PQ announcement profile');
+    const generatedAt = Number(view.getBigUint64(offset, false)); offset += 8;
+    const expiresAt = Number(view.getBigUint64(offset, false)); offset += 8;
+    if (!Number.isSafeInteger(generatedAt) || !Number.isSafeInteger(expiresAt)) throw new Error('PQ announcement timestamp overflow');
+    const accountId = pqReadSnowflake(view, offset); offset += 8;
+    const channelId = pqReadSnowflake(view, offset); offset += 8;
+    const deviceId = Utils.BytesToBase64url(bytes.slice(offset, offset + 16)); offset += 16;
+    const devicePublicKey = Utils.BytesToBase64url(bytes.slice(offset, offset + 133)); offset += 133;
+    const boundClassicalPrekeyId = Utils.BytesToBase64url(bytes.slice(offset, offset + 16)); offset += 16;
+    const pqPrekeyId = Utils.BytesToBase64url(bytes.slice(offset, offset + 16)); offset += 16;
+    const pqPublicKey = Utils.BytesToBase64url(bytes.slice(offset, offset + SDC_PQ_PUBLIC_KEY_BYTES)); offset += SDC_PQ_PUBLIC_KEY_BYTES;
+    return { version, algorithm: SDC_PQ_KEM, profile: SDC_PQ_PROFILE, generatedAt, expiresAt, accountId, channelId, deviceId, devicePublicKey, boundClassicalPrekeyId, pqPrekeyId, pqPublicKey };
+  }
+
+  function parsePqPrekeyAnnouncementEnvelope(sysmsg) {
+    const version = getSystemMessageProperty('deviceVersion', sysmsg);
+    const pqVersion = getSystemMessageProperty('pqVersion', sysmsg);
+    const payload = getSystemMessageProperty('payload', sysmsg);
+    const signature = getSystemMessageProperty('signature', sysmsg);
+    if (version !== String(SDC_DEVICE_PROTOCOL) || pqVersion !== String(SDC_PQ_FOUNDATION_VERSION) || !payload || !signature)
+      throw new Error('Invalid DEVICE PQ ANNOUNCE envelope');
+    const clearBytes = Utils.PayloadDecode(payload);
+    return { clearBytes, info: decodePqPrekeyAnnouncementPayload(clearBytes), signatureBytes: Utils.PayloadDecode(signature) };
+  }
+
+  async function sendPqPrekeyAnnouncement(channelId, force = false, localOverride = null, classicalPrekeyOverride = null) {
+    if (DuressRuntime.active) return false;
+    const support = await pqMlKemBackendStatus();
+    if (!support.supported) return false;
+    const local = localOverride || await ensureLocalDeviceIdentity();
+    const classicalPrekey = classicalPrekeyOverride || await ensureLocalAsyncPrekey(false);
+    const pqPrekey = await ensureLocalPqPrekey(false, local, classicalPrekey);
+    if (!pqPrekey) return false;
+    const channelKey = String(channelId || '');
+    if (!local.announcedPqPrekeys || typeof local.announcedPqPrekeys !== 'object') local.announcedPqPrekeys = {};
+    const previous = String(local.announcedPqPrekeys[channelKey] || '');
+    if (!force && previous === pqPrekey.keyId) return false;
+    const info = {
+      accountId: String(Discord.getCurrentUser().id),
+      channelId: channelKey,
+      deviceId: local.deviceId,
+      devicePublicKey: Utils.BytesToBase64url(local.publicKeyBytes),
+      boundClassicalPrekeyId: pqPrekey.boundClassicalPrekeyId,
+      pqPrekeyId: pqPrekey.keyId,
+      pqPublicKey: pqPrekey.publicKey,
+      generatedAt: Date.now(),
+      expiresAt: pqPrekey.expiresAt,
+    };
+    const payloadBytes = encodePqPrekeyAnnouncementPayload(info);
+    const signature = await signKexTranscript(payloadBytes);
+    const controlBody =
+      '*type*: `DEVICE PQ ANNOUNCE`\n' +
+      '*deviceVersion*: `' + SDC_DEVICE_PROTOCOL + '`\n' +
+      '*pqVersion*: `' + SDC_PQ_FOUNDATION_VERSION + '`\n' +
+      '*payload*: `' + Utils.PayloadEncode(payloadBytes) + '`\n' +
+      '*signature*: `' + Utils.PayloadEncode(signature) + '`';
+    const wrappedLength = ('```ml\n-----SYSTEM MESSAGE-----\n```' + controlBody + '\n```yaml\n🔒\n```').length;
+    if (wrappedLength > SDC_PQ_ANNOUNCE_MAX_WIRE_CHARS)
+      throw new Error(`Signed PQ device announcement exceeds safe Discord transport budget (${wrappedLength} chars)`);
+    local.announcedPqPrekeys[channelKey] = pqPrekey.keyId;
+    try {
+      await persistLocalDeviceMetadata();
+      const sent = Utils.SendSystemMessage(channelKey, controlBody);
+      if (sent && typeof sent.then === 'function') await sent;
+      return true;
+    } catch (error) {
+      if (previous) local.announcedPqPrekeys[channelKey] = previous;
+      else delete local.announcedPqPrekeys[channelKey];
+      try { await persistLocalDeviceMetadata(); } catch (_) {}
+      throw error;
+    }
+  }
+
+  async function acceptPqPrekeyAnnouncement(message, sysmsg, oldMessage = false) {
+    const parsed = parsePqPrekeyAnnouncementEnvelope(sysmsg);
+    const info = parsed.info;
+    const senderId = String(message?.author?.id || '');
+    const channelId = String(message?.channel_id || '');
+    if (info.accountId !== senderId || info.channelId !== channelId) throw new Error('PQ announcement context mismatch');
+    if (Date.now() - info.generatedAt > SDC_PQ_PREKEY_RETENTION_MS || info.generatedAt > Date.now() + 60_000)
+      throw new Error('PQ announcement timestamp outside retention window');
+    if (info.expiresAt <= info.generatedAt || info.expiresAt - info.generatedAt > SDC_PQ_PREKEY_LIFETIME_MS + 60_000)
+      throw new Error('PQ announcement expiry is malformed');
+    const devicePublicBytes = Utils.Base64urlToBytes(info.devicePublicKey);
+    if (await deviceIdFromPublicKey(devicePublicBytes) !== info.deviceId) throw new Error('PQ announcement deviceId/public-key mismatch');
+    const pqPublicBytes = Utils.Base64urlToBytes(info.pqPublicKey);
+    if (await pqPrekeyIdFromPublicKey(pqPublicBytes) !== info.pqPrekeyId) throw new Error('PQ announcement keyId/public-key mismatch');
+    await pqMlKemValidatePublic(pqPublicBytes); // canonical FIPS-203 public-key validation through the selected backend
+    await verifySignedDeviceControl(senderId, parsed.clearBytes, parsed.signatureBytes, null, 'device-pq-announce', oldMessage === true);
+    const record = registerDeviceRecord(senderId, {
+      deviceId: info.deviceId,
+      devicePublicKey: info.devicePublicKey,
+      createdAt: info.generatedAt,
+    }, oldMessage ? 'peer-pq-announcement-history' : 'peer-pq-announcement');
+    const previousAt = Number(record.pqPrekey?.generatedAt || 0);
+    if (oldMessage && previousAt >= info.generatedAt) return record;
+    if (record.pqPrekey && previousAt > info.generatedAt) return record;
+    record.pqPrekey = {
+      version: SDC_PQ_FOUNDATION_VERSION,
+      algorithm: SDC_PQ_KEM,
+      profile: SDC_PQ_PROFILE,
+      keyId: info.pqPrekeyId,
+      publicKey: info.pqPublicKey,
+      boundClassicalPrekeyId: info.boundClassicalPrekeyId,
+      generatedAt: info.generatedAt,
+      expiresAt: info.expiresAt,
+      source: 'identity-signed-pq-device-announcement',
+    };
+    record.pqEverHybrid = true;
+    record.pqFirstVerifiedAt = Number(record.pqFirstVerifiedAt || Date.now());
+    record.pqLastVerifiedAt = Date.now();
+    record.pqDowngradePolicy = 'STICKY_PER_DEVICE';
+    record.pqPrekeyBindingCurrent = !record.asyncPrekey ||
+      String(record.asyncPrekey?.keyId || '') === String(info.boundClassicalPrekeyId || '');
+    Utils.dbChanged = true;
+    Utils.FastSaveDb();
+    return record;
+  }
+
+  function pqPeerDeviceSummary(accountId, deviceId) {
+    const record = getDeviceRecord(accountId, deviceId);
+    const pq = record?.pqPrekey || null;
+    return {
+      accountId: String(accountId || ''),
+      deviceId: String(deviceId || ''),
+      revoked: !!record?.revokedAt,
+      everHybrid: record?.pqEverHybrid === true,
+      stickyAntiDowngrade: record?.pqEverHybrid === true,
+      keyId: pq?.keyId || null,
+      algorithm: pq?.algorithm || null,
+      profile: pq?.profile || null,
+      expiresAt: Number(pq?.expiresAt || 0) || null,
+      boundClassicalPrekeyId: pq?.boundClassicalPrekeyId || null,
+      bindingCurrent: record?.pqPrekeyBindingCurrent === true,
+      usableNow: !!pq && !record?.revokedAt && Number(pq.expiresAt || 0) > Date.now() && record?.pqPrekeyBindingCurrent === true,
+    };
+  }
+
   function getDeviceAccountRegistry(accountId, create = false) {
     if (!DataBase) return null;
     if (!DataBase.deviceRegistry && create) DataBase.deviceRegistry = {};
@@ -22524,6 +23679,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       stored.announcedChannels = {};
       local.announcedPrekeys = {};
       stored.announcedPrekeys = {};
+      // v69.0: the PQ prekey is bound to this exact classical-prekey epoch.
+      // A classical rotation therefore invalidates every per-channel PQ announce marker.
+      local.announcedPqPrekeys = {};
+      stored.announcedPqPrekeys = {};
       await Utils.StorageSave(storageKey, stored);
       console.log('[SDC][ASYNC][v68.4.5] local signed prekey generated/rotated', {
         accountId: ownId,
@@ -22781,6 +23940,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             announcedChannels: legacy.announcedChannels && typeof legacy.announcedChannels === 'object' ? legacy.announcedChannels : {},
             announcedPrekeys: legacy.announcedPrekeys && typeof legacy.announcedPrekeys === 'object' ? legacy.announcedPrekeys : {},
             announcedCompactWire: legacy.announcedCompactWire && typeof legacy.announcedCompactWire === 'object' ? legacy.announcedCompactWire : {},
+            announcedPqPrekeys: {},
             pendingSyncRequests: legacy.pendingSyncRequests || {},
             answeredSyncRequests: legacy.answeredSyncRequests || {},
           };
@@ -22851,6 +24011,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             announcedCompactWire: stored.announcedCompactWire && typeof stored.announcedCompactWire === 'object'
               ? stored.announcedCompactWire
               : {},
+            announcedPqPrekeys: stored.announcedPqPrekeys && typeof stored.announcedPqPrekeys === 'object'
+              ? stored.announcedPqPrekeys
+              : {},
           };
           if (!DataBase.identityBoundDiscordAccountId) {
             DataBase.identityBoundDiscordAccountId = ownId;
@@ -22904,6 +24067,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         announcedChannels: {},
         announcedPrekeys: {},
         announcedCompactWire: {},
+        announcedPqPrekeys: {},
         pendingSyncRequests: {},
         answeredSyncRequests: {},
       };
@@ -22921,6 +24085,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         announcedChannels: localRecord.announcedChannels,
         announcedPrekeys: localRecord.announcedPrekeys,
         announcedCompactWire: localRecord.announcedCompactWire,
+        announcedPqPrekeys: localRecord.announcedPqPrekeys,
       };
       registerDeviceRecord(ownId, {
         deviceId,
@@ -22948,6 +24113,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     stored.announcedChannels = LocalDevice.announcedChannels || {};
     stored.announcedPrekeys = LocalDevice.announcedPrekeys || {};
     stored.announcedCompactWire = LocalDevice.announcedCompactWire || {};
+    stored.announcedPqPrekeys = LocalDevice.announcedPqPrekeys || {};
     const entries = Object.entries(stored.announcedChannels)
       .sort(([, a], [, b]) => Number(b) - Number(a))
       .slice(0, 256);
@@ -22956,6 +24122,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     stored.announcedPrekeys = Object.fromEntries(prekeyEntries);
     const compactEntries = Object.entries(stored.announcedCompactWire || {}).slice(-256);
     stored.announcedCompactWire = Object.fromEntries(compactEntries);
+    const pqEntries = Object.entries(stored.announcedPqPrekeys || {}).slice(-256);
+    stored.announcedPqPrekeys = Object.fromEntries(pqEntries);
     prunePendingDeviceSyncRequests();
     stored.pendingSyncRequests = Object.fromEntries(pendingDeviceSyncRequests);
     stored.answeredSyncRequests = Object.fromEntries(answeredDeviceSyncRequests);
@@ -23435,7 +24603,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const previousPrekey = String(local.announcedPrekeys[channelKey] || '');
     const previousLast = Number(local.announcedChannels?.[channelKey] || 0);
     const previousCompactWire = Number(local.announcedCompactWire[channelKey] || 0);
-    if (!force && previousPrekey === prekeyId && previousCompactWire === 1) return false;
+    if (!force && previousPrekey === prekeyId && previousCompactWire === 1) {
+      try { return await sendPqPrekeyAnnouncement(channelId, false, local, asyncPrekey); }
+      catch (error) { console.warn('[SDC][PQ][v69.0.5] PQ announcement deferred; classical DEVICE ANNOUNCE remains valid', error); return false; }
+    }
 
     deviceAnnouncementInFlight.add(channelKey);
     const now = Date.now();
@@ -23446,6 +24617,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const announcement = await buildLocalDeviceAnnouncement(channelId, local, asyncPrekey);
       await persistLocalDeviceMetadata();
       await sendSignedDeviceControl(channelId, 'DEVICE ANNOUNCE', announcement);
+      try { await sendPqPrekeyAnnouncement(channelId, force, local, asyncPrekey); }
+      catch (error) { console.warn('[SDC][PQ][v69.0.5] PQ announcement deferred; frozen classical announcement succeeded', error); }
       return true;
     } catch (error) {
       if (previousLast > 0) local.announcedChannels[channelKey] = previousLast;
@@ -23528,6 +24701,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       record.asyncPrekey = asyncPrekey;
       record.asyncPrekeyVerifiedAt = Date.now();
       record.asyncPrekeySource = 'identity-signed-device-announcement';
+    }
+    if (record.pqPrekey) {
+      record.pqPrekeyBindingCurrent = !asyncPrekey ||
+        String(record.pqPrekey.boundClassicalPrekeyId || '') === String(asyncPrekey.keyId || '');
+      // Absence of a PQ field in the classical announcement can never clear a
+      // previously authenticated PQ capability. The separate PQ announcement is
+      // intentionally sticky per device to prevent silent HYBRID -> CLASSICAL downgrade.
+      if (record.pqEverHybrid === true) record.pqDowngradePolicy = 'STICKY_PER_DEVICE';
     }
     record.lastAnnouncementGeneratedAt = Math.max(
       Number(record.lastAnnouncementGeneratedAt || 0),
@@ -24672,6 +25853,167 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return result?.applied === true;
   }
 
+  async function runPqV690FoundationSelfTest() {
+    const backend = await pqMlKemBackendStatus(true);
+    const capability = pqFoundationCapability();
+    if (!backend.supported) {
+      return {
+        ok: false,
+        supported: false,
+        backend,
+        capability,
+        tests: {
+          classicalStackFrozen: SDC_CLASSICAL_STACK_FROZEN === true,
+          mlKemBackendAvailable: false,
+          embeddedFallbackKnownAnswer: backend.embedded?.knownAnswerTest === true,
+          pqApplicationNetworkStillOff: SDC_PQ_NETWORK_APPLICATION_ACTIVATED === false,
+          pqRatchetStillOff: SDC_PQ_RATCHET_ACTIVATED === false,
+        },
+      };
+    }
+    let material = null, material2 = null;
+    let senderShared = null, receiverShared = null, tamperedShared = null, wrongShared = null;
+    let hybridA = null, hybridB = null, hybridTampered = null, hybridWrong = null, seedImportedShared = null;
+    let crossNativeMaterial = null, crossEmbeddedMaterial = null;
+    let crossNativeEnc = null, crossEmbeddedEnc = null, crossNativeReceived = null, crossEmbeddedReceived = null;
+    try {
+      material = await pqMlKemGenerateKeyMaterial();
+      material2 = await pqMlKemGenerateKeyMaterial();
+      const encapsulated = await pqMlKemEncapsulate(material.publicBytes);
+      senderShared = encapsulated.sharedSecret;
+      receiverShared = await pqMlKemDecapsulate(material.seedBytes, encapsulated.ciphertext);
+      seedImportedShared = await pqMlKemDecapsulate(new Uint8Array(material.seedBytes), encapsulated.ciphertext);
+
+      const tamperedCiphertext = new Uint8Array(encapsulated.ciphertext);
+      tamperedCiphertext[tamperedCiphertext.length - 1] ^= 1;
+      let tamperChangesSecret = false;
+      try {
+        tamperedShared = await pqMlKemDecapsulate(material.seedBytes, tamperedCiphertext);
+        tamperChangesSecret = !pqBytesEqual(senderShared, tamperedShared);
+      } catch (_) {
+        tamperChangesSecret = true;
+      }
+      wrongShared = await pqMlKemDecapsulate(material2.seedBytes, encapsulated.ciphertext);
+
+      // If Chromium exposes native ML-KEM on this origin, prove both byte directions
+      // interoperate with the embedded FIPS-203 backend. This also proves raw-seed
+      // portability between the two v69.0 backends before later network activation.
+      let crossNativeToEmbedded = true;
+      let crossEmbeddedToNative = true;
+      let nativeSeedReexpandsSamePublicKey = true;
+      if (backend.native?.supported === true) {
+        crossNativeMaterial = await nativeMlKemGenerateKeyMaterial();
+        const expandedNativeSeed = EmbeddedMlKem768.keygen(crossNativeMaterial.seedBytes);
+        nativeSeedReexpandsSamePublicKey = pqBytesEqual(crossNativeMaterial.publicBytes, expandedNativeSeed.publicKey);
+        try { expandedNativeSeed.publicKey.fill(0); expandedNativeSeed.secretKey.fill(0); expandedNativeSeed.seed.fill(0); } catch (_) {}
+
+        crossEmbeddedMaterial = embeddedMlKemGenerateKeyMaterial();
+        crossNativeEnc = await nativeMlKemEncapsulate(crossEmbeddedMaterial.publicBytes);
+        crossEmbeddedReceived = embeddedMlKemDecapsulate(crossEmbeddedMaterial.seedBytes, crossNativeEnc.ciphertext);
+        crossNativeToEmbedded = pqBytesEqual(crossNativeEnc.sharedSecret, crossEmbeddedReceived);
+
+        crossEmbeddedEnc = embeddedMlKemEncapsulate(crossNativeMaterial.publicBytes);
+        crossNativeReceived = await nativeMlKemDecapsulate(crossNativeMaterial.seedBytes, crossEmbeddedEnc.ciphertext);
+        crossEmbeddedToNative = pqBytesEqual(crossEmbeddedEnc.sharedSecret, crossNativeReceived);
+      }
+
+      const classical = Utils.GetRandomBytes(32);
+      const context = {
+        accountId: '111', recipientAccountId: '222', channelId: '333',
+        senderDeviceId: Utils.BytesToBase64url(Utils.GetRandomBytes(16)),
+        recipientDeviceId: Utils.BytesToBase64url(Utils.GetRandomBytes(16)),
+        classicalPrekeyId: Utils.BytesToBase64url(Utils.GetRandomBytes(16)),
+        pqPrekeyId: await pqPrekeyIdFromPublicKey(material.publicBytes),
+        purpose: 'PQ_FOUNDATION_SELFTEST',
+      };
+      hybridA = await deriveV69HybridFoundationSecret(classical, senderShared, context);
+      hybridB = await deriveV69HybridFoundationSecret(classical, receiverShared, context);
+      hybridTampered = tamperedShared
+        ? await deriveV69HybridFoundationSecret(classical, tamperedShared, context)
+        : Utils.GetRandomBytes(32);
+      hybridWrong = await deriveV69HybridFoundationSecret(classical, wrongShared, context);
+
+      const announcementInfo = {
+        accountId: '1537969944803942460', channelId: '1538118646457565229',
+        deviceId: context.senderDeviceId,
+        devicePublicKey: Utils.BytesToBase64url(new Uint8Array(133)),
+        boundClassicalPrekeyId: context.classicalPrekeyId,
+        pqPrekeyId: context.pqPrekeyId,
+        pqPublicKey: Utils.BytesToBase64url(material.publicBytes),
+        generatedAt: Date.now(), expiresAt: Date.now() + SDC_PQ_PREKEY_LIFETIME_MS,
+      };
+      const announcementPayload = encodePqPrekeyAnnouncementPayload(announcementInfo);
+      const announcementDecoded = decodePqPrekeyAnnouncementPayload(announcementPayload);
+      const fakeSignature = new Uint8Array(132);
+      const fakeBody = '*type*: `DEVICE PQ ANNOUNCE`\n*deviceVersion*: `1`\n*pqVersion*: `1`\n*payload*: `' + Utils.PayloadEncode(announcementPayload) + '`\n*signature*: `' + Utils.PayloadEncode(fakeSignature) + '`';
+      const fakeWrappedLength = ('```ml\n-----SYSTEM MESSAGE-----\n```' + fakeBody + '\n```yaml\n🔒\n```').length;
+
+      const tests = {
+        classicalStackFrozen: SDC_CLASSICAL_STACK_FROZEN === true,
+        mlKemBackendAvailable: backend.supported === true,
+        selectedBackendIsKnown: backend.selected === 'NATIVE_WEBCRYPTO' || backend.selected === 'EMBEDDED_FIPS203_JS',
+        embeddedFallbackAvailable: backend.embedded?.supported === true,
+        embeddedFallbackKnownAnswer: backend.embedded?.knownAnswerTest === true,
+        embeddedFallbackRoundtrip: backend.embedded?.roundtrip === true,
+        nativeOptionalNotRequired: backend.native?.supported === true || backend.embedded?.supported === true,
+        mlKemPublicKeyLength: material.publicBytes.byteLength === SDC_PQ_PUBLIC_KEY_BYTES,
+        mlKemPrivateSeedLength: material.seedBytes.byteLength === SDC_PQ_PRIVATE_SEED_BYTES,
+        mlKemCiphertextLength: encapsulated.ciphertext.byteLength === SDC_PQ_CIPHERTEXT_BYTES,
+        mlKemSharedSecretLength: senderShared.byteLength === SDC_PQ_SHARED_SECRET_BYTES,
+        mlKemRoundtrip: pqBytesEqual(senderShared, receiverShared),
+        mlKemSeedExportImportRoundtrip: pqBytesEqual(senderShared, seedImportedShared),
+        mlKemTamperChangesSecret: tamperChangesSecret,
+        mlKemWrongRecipientChangesSecret: !pqBytesEqual(senderShared, wrongShared),
+        nativeEmbeddedInteropWhenAvailable: crossNativeToEmbedded && crossEmbeddedToNative && nativeSeedReexpandsSamePublicKey,
+        hybridCombinerRoundtrip: pqBytesEqual(hybridA, hybridB),
+        hybridCombinerRejectsTamperedKemMaterial: !pqBytesEqual(hybridA, hybridTampered),
+        hybridCombinerRejectsWrongRecipientMaterial: !pqBytesEqual(hybridA, hybridWrong),
+        compactPqAnnouncementRoundtrip: announcementDecoded.pqPrekeyId === announcementInfo.pqPrekeyId && announcementDecoded.deviceId === announcementInfo.deviceId,
+        compactPqAnnouncementFitsDiscord: fakeWrappedLength <= SDC_PQ_ANNOUNCE_MAX_WIRE_CHARS,
+        pqReannounceAfterPerDeviceSdc4Live:
+          String(handleRatchetReady).includes('sendPqPrekeyAnnouncement(message.channel_id, true)') &&
+          String(handleRatchetReadyAck).includes('sendPqPrekeyAnnouncement(message.channel_id, true)'),
+        stickyPerDeviceAntiDowngradeDeclared: capability.stickyPerDeviceAntiDowngrade === true,
+        pqPrivateSeedNotPortable: capability.privateSeedPortableWithDatabase === false,
+        pqApplicationNetworkStillOff: SDC_PQ_NETWORK_APPLICATION_ACTIVATED === false,
+        pqRatchetStillOff: SDC_PQ_RATCHET_ACTIVATED === false,
+      };
+      return {
+        ok: Object.values(tests).every(Boolean),
+        supported: true,
+        backend,
+        selectedBackend: backend.selected,
+        support: backend.native,
+        capability,
+        tests,
+        announcementWireChars: fakeWrappedLength,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        supported: true,
+        backend,
+        selectedBackend: backend.selected,
+        support: backend.native,
+        capability,
+        error: error?.message || String(error),
+        tests: {},
+      };
+    } finally {
+      try {
+        material?.publicBytes?.fill?.(0); material?.seedBytes?.fill?.(0);
+        material2?.publicBytes?.fill?.(0); material2?.seedBytes?.fill?.(0);
+        senderShared?.fill?.(0); receiverShared?.fill?.(0); tamperedShared?.fill?.(0); wrongShared?.fill?.(0); seedImportedShared?.fill?.(0);
+        hybridA?.fill?.(0); hybridB?.fill?.(0); hybridTampered?.fill?.(0); hybridWrong?.fill?.(0);
+        crossNativeMaterial?.publicBytes?.fill?.(0); crossNativeMaterial?.seedBytes?.fill?.(0);
+        crossEmbeddedMaterial?.publicBytes?.fill?.(0); crossEmbeddedMaterial?.seedBytes?.fill?.(0);
+        crossNativeEnc?.sharedSecret?.fill?.(0); crossNativeEnc?.ciphertext?.fill?.(0); crossEmbeddedReceived?.fill?.(0);
+        crossEmbeddedEnc?.sharedSecret?.fill?.(0); crossEmbeddedEnc?.ciphertext?.fill?.(0); crossNativeReceived?.fill?.(0);
+      } catch (_) {}
+    }
+  }
+
+
   async function runAsyncV684SelfTest() {
     const sender = await Utils.DhGenerateKeys();
     const receiver = await Utils.DhGenerateKeys();
@@ -24813,7 +26155,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         password15Accepted: password15.acceptable === true,
         password25Recommended: password25.recommended === true,
         argon2CurrentProfileAtLeast64MiB3PassesP4: SDC_DB_ARGON2_MEMORY_KIB >= 65536 && SDC_DB_ARGON2_PASSES >= 3 && SDC_DB_ARGON2_PARALLELISM >= 4,
-        capabilityIsExplicitlyClassical: capability.classical === 'P-521' && capability.postQuantum === 'NONE',
+        classicalAsyncCapabilityRemainsFrozen: capability.classical === 'P-521' && capability.postQuantum === 'NONE',
         futureMlKemSlotReserved: capability.futureHybridSlot === 'ML-KEM',
         noRatchetSecretsInPortableHistoryPolicy: true,
       };
@@ -27058,6 +28400,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   function deviceControlExpectedPayloadType(messageType) {
     switch (String(messageType || '')) {
       case 'DEVICE ANNOUNCE': return 'DEVICE_ANNOUNCE';
+      case 'DEVICE PQ ANNOUNCE': return 'DEVICE_PQ_ANNOUNCE';
       case 'DEVICE SYNC REQUEST': return 'DEVICE_SYNC_REQUEST';
       case 'DEVICE KEY SYNC': return 'DEVICE_KEY_SYNC';
       case 'DEVICE REVOKE': return 'DEVICE_REVOKE';
@@ -27069,6 +28412,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const expectedType = deviceControlExpectedPayloadType(messageType);
     if (!expectedType) return null;
     try {
+      if (expectedType === 'DEVICE_PQ_ANNOUNCE') {
+        const parsedPq = parsePqPrekeyAnnouncementEnvelope(sysmsg);
+        return {
+          generatedAt: Number(parsedPq?.info?.generatedAt || 0),
+          deviceId: String(parsedPq?.info?.deviceId || ''),
+          requestId: String(parsedPq?.info?.pqPrekeyId || ''),
+        };
+      }
       const parsed = parseDeviceControlEnvelope(sysmsg, expectedType);
       const info = parsed?.object;
       const generatedAt = Number(info?.generatedAt || 0);
@@ -31629,6 +32980,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       generatedAt: Date.now(),
     });
     await reconcileRatchetSessionsForDm(message.channel_id, senderId, 'responder-live');
+    // v69.0.1: an installation that was not the winning endpoint of the account-
+    // level KEX can only prove current membership once its targeted SDC4 handshake
+    // reaches LIVE. Re-announce its own PQ prekey now so the peer learns HYBRID
+    // capability for this exact deviceId. This publishes no ratchet secret.
+    try { await sendPqPrekeyAnnouncement(message.channel_id, true); }
+    catch (error) {
+      console.warn('[SDC][PQ][v69.0.5] post-SDC4-LIVE PQ announcement deferred', {
+        channelId: String(message.channel_id), peerId: senderId,
+        localDeviceId: state.localDeviceId, reason: error?.message || String(error),
+      });
+    }
     console.log('[SDC][RATCHET][v67.1.113] SDC4 responder LIVE', ratchetStateSummary(state));
     try { SecureComposer.toast('SDC4 Double Ratchet text session ready.', 'success'); } catch (_) {}
     return true;
@@ -31668,6 +33030,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     PendingRatchetHandshakes.delete(state.sessionId);
     await persistRatchetSessions();
     await reconcileRatchetSessionsForDm(message.channel_id, senderId, 'initiator-live');
+    try { await sendPqPrekeyAnnouncement(message.channel_id, true); }
+    catch (error) {
+      console.warn('[SDC][PQ][v69.0.5] post-SDC4-LIVE PQ announcement deferred', {
+        channelId: String(message.channel_id), peerId: senderId,
+        localDeviceId: state.localDeviceId, reason: error?.message || String(error),
+      });
+    }
     console.log('[SDC][RATCHET][v67.1.113] SDC4 initiator LIVE', ratchetStateSummary(state));
     try { SecureComposer.toast('SDC4 Double Ratchet text session ready.', 'success'); } catch (_) {}
     return true;
@@ -32029,11 +33398,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           return true;
         }
         const localEchoId = await ratchetWireCacheId(normalizedSelfWire);
-        if (typeof SecureComposer !== 'undefined' && SecureComposer.hasLocalEcho(localEchoId)) {
+        if (typeof SecureComposer !== 'undefined' &&
+            SecureComposer.canUseEphemeralLocalEcho(localEchoId, message.channel_id)) {
           // Keep Discord's own message model free of plaintext. The invisible
           // separator preserves a renderable content node; an opaque local-echo
           // iframe is mounted over it and receives plaintext directly from the
-          // Secure Input iframe over MessageChannel.
+          // CURRENT Secure Input iframe over MessageChannel.
           message.content = '\u2063';
           message.embeds = Array.isArray(message.embeds)
             ? message.embeds.filter(isNativeKlipyEmbed)
@@ -32043,6 +33413,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           return true;
         }
 
+        // v69.0.1: after a channel leave/re-entry the short-lived pending echo may
+        // still exist for up to five minutes but belongs to the previous opaque
+        // Secure Input instance. Do not hide the canonical Discord row behind U+2063
+        // in that case; fall through to the encrypted durable sent-history record.
         // v67.1.114: after reload the short-lived plaintext bridge is gone, but
         // an authenticated local ciphertext history record can still exist. The
         // parent never decrypts this sent record: an opaque render iframe receives
@@ -35607,6 +36981,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const isKexV3Control = kexV3ControlTypes.has(earlyMessageType);
     const passiveDeviceControlTypes = new Set([
       'DEVICE ANNOUNCE',
+      'DEVICE PQ ANNOUNCE',
       'DEVICE SYNC REQUEST',
       'DEVICE KEY SYNC',
       'DEVICE REVOKE'
@@ -35808,7 +37183,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         oldMessage = false;
       } else {
         oldMessage = true;
-        const persistentSignedState = earlyMessageType === 'DEVICE ANNOUNCE' || earlyMessageType === 'DEVICE REVOKE';
+        const persistentSignedState = earlyMessageType === 'DEVICE ANNOUNCE' || earlyMessageType === 'DEVICE PQ ANNOUNCE' || earlyMessageType === 'DEVICE REVOKE';
         if (persistentSignedState) {
           // v68.4: a signed device certificate/prekey announcement and a signed
           // revocation are persistent account state, not one-shot protocol actions.
@@ -37013,6 +38388,55 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               error,
               `🔴 SECURITY ALERT: this Discord account presented a different SDC identity (${error.observedFingerprint || 'unknown'}). Previous VERIFIED trust is revoked; device control blocked until explicit KEX/Safety Number verification.`
             )) message.content = '💻 SDC device announcement rejected.';
+          }
+          return true;
+        }
+      case 'DEVICE PQ ANNOUNCE':
+        {
+          renderSdcVisualCryptoControl(message, 'Post-quantique', 'ML-KEM PREKEY', {
+            bucket: 'device', status: oldMessage ? 'historical' : 'device',
+            direction: sdcVisualControlDirection(message, oldMessage),
+            detail: oldMessage ? 'prekey ML-KEM historique signé · cache public uniquement' : 'capacité HYBRID par appareil authentifiée'
+          });
+          if (DuressRuntime.active) {
+            renderSdcVisualCryptoControl(message, 'Post-quantique', 'ML-KEM PREKEY ignoré en profil alternatif', {
+              bucket: 'device', status: 'historical', direction: sdcVisualControlDirection(message, oldMessage), detail: 'aucun état Real-Vault chargé'
+            });
+            return true;
+          }
+          try {
+            const record = await acceptPqPrekeyAnnouncement(message, sysmsg, oldMessage);
+            renderSdcVisualCryptoControl(message, 'Post-quantique', record?.revokedAt ? 'ML-KEM PREKEY reçu · appareil révoqué' : 'ML-KEM PREKEY vérifié', {
+              bucket: 'device', status: record?.revokedAt ? 'warning' : (oldMessage ? 'historical' : 'success'),
+              direction: sdcVisualControlDirection(message, oldMessage),
+              detail: record?.revokedAt ? 'capacité conservée comme historique mais inutilisable' : 'capacité HYBRID sticky liée au deviceId'
+            });
+          } catch (error) {
+            if (error?.code === 'SDC_HISTORICAL_IDENTITY_SUPERSEDED') {
+              renderSdcVisualCryptoControl(message, 'Post-quantique', 'ML-KEM PREKEY historique ignoré', { bucket: 'device', status: 'historical', direction: sdcVisualControlDirection(message, true), detail: 'ancienne identité superseded' });
+              return true;
+            }
+            if (/No pinned account identity for device control sender/i.test(String(error?.message || ''))) {
+              // Expected ordering case: device/PQ controls can be delivered before
+              // the account-level KEX identity is pinned on a fresh installation.
+              // Keep the packet inert; a fresh signed PQ announcement is emitted
+              // after the exact per-device SDC4 handshake reaches LIVE.
+              console.info('[SDC][PQ][v69.0.5] PQ device announcement deferred until account identity is pinned', {
+                channelId: String(message?.channel_id || ''),
+                authorId: String(message?.author?.id || ''),
+                oldMessage: oldMessage === true,
+              });
+              renderSdcVisualCryptoControl(message, 'Post-quantique', 'ML-KEM PREKEY différé', {
+                bucket: 'device',
+                status: oldMessage ? 'historical' : 'progress',
+                direction: sdcVisualControlDirection(message, oldMessage),
+                detail: 'identité de compte pas encore épinglée · aucun état PQ accepté avant authentification',
+              });
+              return true;
+            }
+            console.error('[SDC][PQ][v69.0.5] PQ device announcement rejected', error);
+            if (!renderObservedIdentityAlertOrHide(message, error, `🔴 SECURITY ALERT: invalid post-quantum device capability (${error.observedFingerprint || 'identity mismatch'}).`))
+              message.content = '⚛️ SDC post-quantum device announcement rejected.';
           }
           return true;
         }
@@ -40173,7 +41597,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             ) {
               sendParent('sdc-secure-local-echo-height', {
                 echoId,
-                height: Math.max(18, Math.min(5000, Math.ceil(Number(message.height))))
+                height: Math.max(18, Math.min(5000, Math.ceil(Number(message.height)))),
+                tailLeft: Number(message.tailLeft),
+                tailTop: Number(message.tailTop),
+                tailBottom: Number(message.tailBottom),
+                lineHeight: Number(message.lineHeight)
               });
             }
           };
@@ -40548,6 +41976,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     line-height: var(--sdc-echo-line-height, 22px);
     font-weight: var(--sdc-echo-weight, 400);
   }
+  #echo a { color:#00a8fc; text-decoration:none; cursor:pointer; }
+  #echo a:hover { text-decoration:underline; }
+  #sdc-tail {
+    display:inline-block; width:0; height:1em; margin:0; padding:0; overflow:hidden;
+    vertical-align:baseline; pointer-events:none; user-select:none;
+  }
 </style>
 </head>
 <body><span id="enc-marker" aria-hidden="true"></span><div id="echo"></div>
@@ -40555,11 +41989,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 (() => {
   'use strict';
   const echo = document.getElementById('echo');
+  const tail = document.createElement('span');
+  tail.id = 'sdc-tail';
+  tail.setAttribute('aria-hidden', 'true');
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   let echoId = '';
   let port = null;
-  let lastHeight = 0;
+  let lastLayoutSignature = '';
 
   function concatBuffers(buffers) {
     let length = 0;
@@ -40678,13 +42115,74 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return concatBuffers([prefix, messageCiphertext]);
   }
 
+  function renderEchoPlaintext(value) {
+    const text = String(value == null ? '' : value);
+    const fragment = document.createDocumentFragment();
+    // Keep parsing deliberately narrow: only explicit http/https URLs become
+    // anchors. Everything else stays a Text node, so decrypted message content
+    // can never become HTML/script inside the opaque frame.
+    const re = /https?:\/\/[^\s<>"']+/gi;
+    let cursor = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const start = match.index;
+      let raw = match[0];
+      let trailing = '';
+      while (/[),.;!?}\]]$/.test(raw)) {
+        trailing = raw.slice(-1) + trailing;
+        raw = raw.slice(0, -1);
+      }
+      if (start > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, start)));
+      let linked = false;
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          const a = document.createElement('a');
+          a.href = parsed.href;
+          a.textContent = raw;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.referrerPolicy = 'no-referrer';
+          fragment.appendChild(a);
+          linked = true;
+        }
+      } catch (_) {}
+      if (!linked) fragment.appendChild(document.createTextNode(raw));
+      if (trailing) fragment.appendChild(document.createTextNode(trailing));
+      cursor = start + match[0].length;
+    }
+    if (cursor < text.length) fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    // Keep a zero-width in-frame tail caret after the real plaintext. Its geometry
+    // is plaintext-free layout metadata used only to keep Discord's native edited
+    // marker at the same visual endpoint Discord would choose for native text.
+    echo.replaceChildren(fragment, tail);
+  }
+
   function reportHeight() {
     if (!port || !echoId) return;
     requestAnimationFrame(() => {
       const height = Math.max(18, Math.ceil(document.documentElement.scrollHeight || echo.scrollHeight || 22));
-      if (height === lastHeight) return;
-      lastHeight = height;
-      try { port.postMessage({ type: 'sdc-local-echo-height', echoId, height }); } catch (_) {}
+      let tailLeft = 22, tailTop = 0, tailBottom = 22, lineHeight = 22;
+      try {
+        const rect = tail.getBoundingClientRect();
+        tailLeft = Number.isFinite(Number(rect.left)) ? Number(rect.left) : tailLeft;
+        tailTop = Number.isFinite(Number(rect.top)) ? Number(rect.top) : tailTop;
+        tailBottom = Number.isFinite(Number(rect.bottom)) ? Number(rect.bottom) : (tailTop + lineHeight);
+        const computed = getComputedStyle(echo);
+        const parsed = parseFloat(String(computed.lineHeight || '22'));
+        if (Number.isFinite(parsed) && parsed > 0) lineHeight = parsed;
+      } catch (_) {}
+      const signature = [height, tailLeft, tailTop, tailBottom, lineHeight]
+        .map((value) => Math.round(Number(value || 0) * 10) / 10)
+        .join('|');
+      if (signature === lastLayoutSignature) return;
+      lastLayoutSignature = signature;
+      try {
+        port.postMessage({
+          type: 'sdc-local-echo-height', echoId, height,
+          tailLeft, tailTop, tailBottom, lineHeight
+        });
+      } catch (_) {}
     });
   }
 
@@ -40720,7 +42218,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           envelope.slice(12),
           sentHistoryAad(meta, messageCiphertext)
         );
-        echo.textContent = decoder.decode(clear);
+        renderEchoPlaintext(decoder.decode(clear));
         reportHeight();
       } catch (_) {
         echo.textContent = '🔒 Encrypted local history could not be opened on this device.';
@@ -40741,7 +42239,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         message.echoId !== echoId ||
         typeof message.plaintext !== 'string'
       ) return;
-      echo.textContent = message.plaintext;
+      renderEchoPlaintext(message.plaintext);
       reportHeight();
     };
     try { port.start?.(); } catch (_) {}
@@ -40778,6 +42276,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       maxHeightCommandsSent: 0,
       nativeMutationCallbacks: 0,
       nativeEvacuationSchedules: 0,
+      localEchoRepairSchedules: 0,
+      localEchoRepairRuns: 0,
+      localEchoRepairRemounts: 0,
+      localEchoPortalPositions: 0,
+      localEchoPortalHidden: 0,
       mounts: 0,
       unmounts: 0,
     },
@@ -40794,6 +42297,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     localEchoPending: new Map(),
     localEchoFrames: new Map(),
     localEchoMountTimers: new Map(),
+    // v69.0.4: Discord may recycle an already-processed own-message DOM row
+    // without dispatching the message through processMessage again. Coalesce
+    // mutation-driven repair so the opaque local-history frame follows the
+    // canonical row instead of leaving the intentional U+2063 model placeholder.
+    localEchoRepairTimer: null,
+    // v69.0.4: local sent-message iframes live outside Discord's React-owned
+    // message subtree.  The parent retains only opaque ids/geometry; plaintext
+    // remains inside the sandboxed iframe.
+    localEchoPortal: null,
+    localEchoViewportHandler: null,
 
     // Only already-encrypted long-paste attachments generated by Secure Input.
     // channelId -> [{ file, encryptedFilename, plaintextCharacters, source }]
@@ -41382,6 +42895,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       editor.style.zIndex = '0';
 
       editor.setAttribute('tabindex', '-1');
+      // Chromium rejects aria-hidden when Slate (or one of its descendants) still
+      // owns focus. Move focus out first; this is presentation-only and does not
+      // alter Discord's draft/state.
+      try {
+        const focused = document.activeElement;
+        if (focused && (focused === editor || editor.contains(focused))) focused.blur?.();
+      } catch (_) {}
       editor.setAttribute('aria-hidden', 'true');
     },
 
@@ -45185,6 +46705,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           enabled: false,
         }
       );
+
+      // v69.0.6: the read-only portal was intentionally hidden while editing.
+      // Re-anchor it immediately after save/cancel instead of waiting for the
+      // slow guard or an unrelated Discord mutation.
+      this.scheduleVisibleLocalEchoRepair(0);
     },
 
     async cancelNativeEditMode(
@@ -47740,9 +49265,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         const expired = !record?.durable && now - Number(record?.createdAt || 0) > ttl;
         const detached = record?.iframe && !record.iframe.isConnected;
         if (expired) {
+          this.restoreNativeEditedMarker(record);
           try { record?.iframe?.remove?.(); } catch (_) {}
           this.localEchoFrames.delete(echoId);
         } else if (detached) {
+          this.restoreNativeEditedMarker(record);
           this.localEchoFrames.delete(echoId);
         }
       }
@@ -47756,31 +49283,577 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return this.localEchoPending.has(String(echoId || ''));
     },
 
+    canUseEphemeralLocalEcho(echoId, channelId) {
+      this.pruneLocalEchoState();
+      const pending = this.localEchoPending.get(String(echoId || ''));
+      if (!pending || pending.durable) return false;
+      const active = this.active;
+      return !!(
+        active?.iframe?.contentWindow &&
+        String(active.channelId || '') === String(channelId || '') &&
+        String(active.instanceId || '') === String(pending.instanceId || '')
+      );
+    },
+
     findMessageContentNode(channelId, messageId) {
       const cid = String(channelId || '');
       const mid = String(messageId || '');
       if (!/^[0-9]{10,32}$/.test(mid)) return null;
-      const selectors = [
+
+      // v69.0.4: Discord can transiently keep more than one DOM representation
+      // of the same message (optimistic/canonical row, reply previews, virtualized
+      // stale copies). querySelector() alone may therefore anchor the opaque frame
+      // to a hidden/offscreen clone. Collect candidates and pick the one that is
+      // actually visible inside the selected chat scroller.
+      const candidates = [];
+      const seen = new Set();
+      const addCandidate = (node) => {
+        if (!(node instanceof Element) || seen.has(node)) return;
+        seen.add(node);
+        candidates.push(node);
+      };
+
+      const contentSelectors = [
         cid ? `#message-content-${cid}-${mid}` : null,
         `[id^="message-content-"][id$="-${mid}"]`,
       ].filter(Boolean);
-      for (const selector of selectors) {
+      for (const selector of contentSelectors) {
         try {
-          const node = document.querySelector(selector);
-          if (node) return node;
+          for (const node of document.querySelectorAll(selector)) addCandidate(node);
         } catch (_) {}
       }
+
+      const rowSelectors = [
+        `[data-list-item-id^="chat-messages"][data-list-item-id$="${mid}"]`,
+        `[id^="chat-messages-"][id$="-${mid}"]`,
+      ];
+      for (const selector of rowSelectors) {
+        try {
+          for (const row of document.querySelectorAll(selector)) {
+            const exact = cid
+              ? row.querySelector(`#message-content-${cid}-${mid}`)
+              : null;
+            addCandidate(exact);
+            try {
+              addCandidate(row.querySelector(
+                '[id^="message-content-"], [class*="messageContent"], [class*="markup"]'
+              ));
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      if (!candidates.length) return null;
+      let best = null;
+      let bestScore = -Infinity;
+      for (const node of candidates) {
+        let rect = null;
+        let row = null;
+        try { rect = node.getBoundingClientRect(); } catch (_) {}
+        try {
+          row = node.closest(
+            '[data-list-item-id^="chat-messages"], [id^="chat-messages-"], [class*="messageListItem"], [class*="message_"]'
+          );
+        } catch (_) {}
+        if (!rect) continue;
+
+        let style = null;
+        try { style = getComputedStyle(node); } catch (_) {}
+        if (style?.display === 'none' || style?.visibility === 'hidden') continue;
+
+        const viewport = this.findLocalEchoViewportElement(row || node);
+        const clip = this.getLocalEchoViewportRect(viewport);
+        const rowRect = (() => { try { return row?.getBoundingClientRect?.() || rect; } catch (_) { return rect; } })();
+        const overlaps = !!clip &&
+          Number(rowRect.bottom) > Number(clip.top) && Number(rowRect.top) < Number(clip.bottom) &&
+          Number(rowRect.right) > Number(clip.left) && Number(rowRect.left) < Number(clip.right);
+        const placeholderRect = this.findLocalEchoPlaceholderRect(node);
+
+        let score = 0;
+        if (placeholderRect) score += 140;
+        if (overlaps) score += 100;
+        if (cid && String(node.id || '') === `message-content-${cid}-${mid}`) score += 50;
+        if (row && this.getNativeMessageIdFromContainer(row) === mid) score += 35;
+        if (Number(rect.width) > 0 && Number(rect.height) > 0) score += 10;
+        if (clip) {
+          const cy = (Number(clip.top) + Number(clip.bottom)) / 2;
+          const ry = (Number(rowRect.top) + Number(rowRect.bottom)) / 2;
+          score -= Math.min(25, Math.abs(cy - ry) / 1000);
+        }
+        if (score > bestScore) {
+          best = node;
+          bestScore = score;
+        }
+      }
+      return best || candidates[0] || null;
+    },
+
+    findLocalEchoPlaceholderRect(anchor) {
+      if (!(anchor instanceof Element)) return null;
+      try {
+        const walker = document.createTreeWalker(anchor, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+          const text = String(node.nodeValue || '');
+          const index = text.indexOf('\u2063');
+          if (index < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, index);
+          range.setEnd(node, Math.min(text.length, index + 1));
+          const rects = Array.from(range.getClientRects?.() || []);
+          const rect = rects.find((candidate) =>
+            Number.isFinite(Number(candidate?.left)) &&
+            Number.isFinite(Number(candidate?.top)) &&
+            (Number(candidate?.height) > 0 || Number(candidate?.width) >= 0)
+          ) || range.getBoundingClientRect?.();
+          if (rect && Number.isFinite(Number(rect.left)) && Number.isFinite(Number(rect.top))) {
+            return {
+              left: Number(rect.left),
+              top: Number(rect.top),
+              right: Number(rect.right),
+              bottom: Number(rect.bottom),
+              width: Number(rect.width),
+              height: Number(rect.height),
+              source: 'native-u2063-range',
+            };
+          }
+        }
+      } catch (_) {}
+      return null;
+    },
+
+    findNativeEditedMarker(anchor) {
+      if (!(anchor instanceof Element)) return null;
       let row = null;
       try {
-        row = document.querySelector(`[data-list-item-id^="chat-messages"][data-list-item-id$="${mid}"]`) ||
-          document.querySelector(`[id^="chat-messages-"][id$="-${mid}"]`);
+        row = anchor.closest(
+          '[data-list-item-id^="chat-messages"], [id^="chat-messages-"], [class*="messageListItem"], [class*="message_"]'
+        );
       } catch (_) {}
-      if (!row) return null;
+      const scopes = [anchor, row].filter(Boolean);
+      const candidates = [];
+      const seen = new Set();
+      const add = (node) => {
+        if (!(node instanceof Element) || seen.has(node)) return;
+        seen.add(node);
+        candidates.push(node);
+      };
+      for (const scope of scopes) {
+        try {
+          for (const node of scope.querySelectorAll('[class*="edited" i]')) add(node);
+        } catch (_) {}
+      }
+      // Class names are the stable path. The text fallback is deliberately local
+      // to the current message row and only accepts the tiny native edit labels.
+      for (const scope of scopes) {
+        if (candidates.length) break;
+        try {
+          for (const node of scope.querySelectorAll('span, time')) {
+            const text = String(node.textContent || '').trim().toLowerCase();
+            if (!text || text.length > 24) continue;
+            if (/^\(?\s*(?:edited|modifi(?:é|e|ée)|bearbeitet|editado|modificato)\s*\)?$/iu.test(text)) add(node);
+          }
+        } catch (_) {}
+      }
+      for (const node of candidates) {
+        try {
+          const rect = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          if (style.display === 'none' || style.visibility === 'hidden') continue;
+          if (Number(rect.width) <= 0 || Number(rect.height) <= 0) continue;
+          return node;
+        } catch (_) {}
+      }
+      return null;
+    },
+
+    restoreNativeEditedMarker(record) {
+      const marker = record?.editedMarker;
+      const previous = record?.editedMarkerPreviousStyle;
+      if (marker instanceof HTMLElement && previous) {
+        try {
+          marker.style.position = previous.position;
+          marker.style.left = previous.left;
+          marker.style.top = previous.top;
+          marker.style.zIndex = previous.zIndex;
+        } catch (_) {}
+      }
+      if (record) {
+        record.editedMarker = null;
+        record.editedMarkerPreviousStyle = null;
+        record.editedMarkerDx = 0;
+        record.editedMarkerDy = 0;
+      }
+    },
+
+    positionNativeEditedMarker(record, anchor, iframe, viewportRect) {
+      if (!record || !(anchor instanceof Element) || !(iframe instanceof HTMLIFrameElement)) return false;
+      const marker = this.findNativeEditedMarker(anchor);
+      if (!marker) {
+        this.restoreNativeEditedMarker(record);
+        return false;
+      }
+      if (!Number.isFinite(Number(record.tailLeft)) || !Number.isFinite(Number(record.tailBottom))) {
+        return false;
+      }
+
+      // Always measure from Discord's unmodified native marker position so repeated
+      // portal repair passes cannot accumulate offsets.
+      if (record.editedMarker && record.editedMarker !== marker) this.restoreNativeEditedMarker(record);
+      if (!record.editedMarkerPreviousStyle) {
+        record.editedMarker = marker;
+        record.editedMarkerPreviousStyle = {
+          position: marker.style.position || '',
+          left: marker.style.left || '',
+          top: marker.style.top || '',
+          zIndex: marker.style.zIndex || '',
+        };
+      } else {
+        try {
+          marker.style.position = record.editedMarkerPreviousStyle.position;
+          marker.style.left = record.editedMarkerPreviousStyle.left;
+          marker.style.top = record.editedMarkerPreviousStyle.top;
+          marker.style.zIndex = record.editedMarkerPreviousStyle.zIndex;
+        } catch (_) {}
+      }
+
+      let iframeRect = null;
+      let markerRect = null;
+      try { iframeRect = iframe.getBoundingClientRect(); } catch (_) {}
+      try { markerRect = marker.getBoundingClientRect(); } catch (_) {}
+      if (!iframeRect || !markerRect) return false;
+
+      const lineHeight = Math.max(12, Math.min(80, Number(record.lineHeight || 22)));
+      const textStartLeft = Number(iframeRect.left) + 22; // 8px marker + 14px native gap.
+      let targetLeft = Number(iframeRect.left) + Math.max(22, Number(record.tailLeft || 22)) + 3;
+      let targetBottom = Number(iframeRect.top) + Math.max(lineHeight, Number(record.tailBottom || lineHeight));
+      let targetTop = targetBottom - Number(markerRect.height || 12) - 1;
+
+      // If Discord's native marker no longer fits after the last plaintext glyph,
+      // mirror inline wrapping by moving only that native element to the next line.
+      const clipRight = Number(viewportRect?.right || window.innerWidth || 0) - 8;
+      if (targetLeft + Number(markerRect.width || 0) > clipRight && clipRight > textStartLeft + 24) {
+        targetLeft = textStartLeft;
+        targetTop += lineHeight;
+        try {
+          const needed = Math.ceil((targetTop - Number(iframeRect.top)) + Number(markerRect.height || lineHeight) + 2);
+          anchor.style.setProperty('min-height', `${Math.max(Number(record.height || 22), needed)}px`, 'important');
+        } catch (_) {}
+      }
+
+      const dx = Math.round(targetLeft - Number(markerRect.left));
+      const dy = Math.round(targetTop - Number(markerRect.top));
       try {
-        return row.querySelector('[id^="message-content-"], [class*="messageContent"], [class*="markup"]');
+        marker.style.position = 'relative';
+        marker.style.left = `${dx}px`;
+        marker.style.top = `${dy}px`;
+        marker.style.zIndex = '4';
+        record.editedMarker = marker;
+        record.editedMarkerDx = dx;
+        record.editedMarkerDy = dy;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    },
+
+    findLocalEchoViewportElement(anchor) {
+      let node = anchor instanceof Element ? anchor.parentElement : null;
+      let classFallback = null;
+      while (node && node !== document.body && node !== document.documentElement) {
+        try {
+          const rect = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          const overflowY = String(style.overflowY || '');
+          const className = String(node.className || '');
+          const id = String(node.id || '');
+          if (!classFallback && /scroller|messageswrapper|chatcontent/i.test(`${className} ${id}`) &&
+              Number(rect.width) > 180 && Number(rect.height) > 100) {
+            classFallback = node;
+          }
+          if (/(auto|scroll)/i.test(overflowY) &&
+              Number(node.clientHeight || 0) > 100 && Number(rect.width) > 180) {
+            return node;
+          }
+        } catch (_) {}
+        node = node.parentElement;
+      }
+      return classFallback || document.documentElement;
+    },
+
+    getLocalEchoViewportRect(viewportElement) {
+      if (!viewportElement || viewportElement === document.documentElement || viewportElement === document.body) {
+        return {
+          left: 0,
+          top: 0,
+          right: Number(window.innerWidth || 0),
+          bottom: Number(window.innerHeight || 0),
+          width: Number(window.innerWidth || 0),
+          height: Number(window.innerHeight || 0),
+        };
+      }
+      try {
+        const rect = viewportElement.getBoundingClientRect();
+        const left = Math.max(0, Number(rect.left || 0));
+        const top = Math.max(0, Number(rect.top || 0));
+        const right = Math.min(Number(window.innerWidth || rect.right || 0), Number(rect.right || 0));
+        const bottom = Math.min(Number(window.innerHeight || rect.bottom || 0), Number(rect.bottom || 0));
+        if (right <= left || bottom <= top) return null;
+        return { left, top, right, bottom, width: right - left, height: bottom - top };
       } catch (_) {
         return null;
       }
+    },
+
+    ensureLocalEchoPortal() {
+      if (this.localEchoPortal?.isConnected) return this.localEchoPortal;
+      const root = document.body || document.documentElement;
+      if (!root) return null;
+      const portal = document.createElement('div');
+      portal.className = 'sdc-local-echo-portal';
+      portal.setAttribute('data-sdc-local-echo-portal', 'v69.0.5');
+      portal.style.cssText = [
+        'position:fixed',
+        'left:0',
+        'top:0',
+        'width:0',
+        'height:0',
+        'z-index:3',
+        'pointer-events:none',
+        'overflow:hidden',
+        'background:transparent',
+        'contain:layout paint',
+      ].join(';');
+      root.appendChild(portal);
+      this.localEchoPortal = portal;
+      return portal;
+    },
+
+    syncLocalEchoPortalBounds(viewportElement) {
+      const portal = this.ensureLocalEchoPortal();
+      const rect = this.getLocalEchoViewportRect(viewportElement);
+      if (!portal || !rect) return null;
+      portal.style.left = `${Math.round(rect.left)}px`;
+      portal.style.top = `${Math.round(rect.top)}px`;
+      portal.style.width = `${Math.max(0, Math.round(rect.width))}px`;
+      portal.style.height = `${Math.max(0, Math.round(rect.height))}px`;
+      portal.style.right = 'auto';
+      portal.style.bottom = 'auto';
+      portal.style.overflow = 'hidden';
+      return rect;
+    },
+
+    rememberLocalEchoMessageId(pending, messageId) {
+      if (!pending) return '';
+      const mid = String(messageId || '');
+      if (!/^[0-9]{10,32}$/.test(mid)) return '';
+      if (!Array.isArray(pending.messageIds)) pending.messageIds = [];
+      pending.messageIds = pending.messageIds.filter((value) => String(value) !== mid);
+      pending.messageIds.push(mid);
+      while (pending.messageIds.length > 6) pending.messageIds.shift();
+      pending.messageId = mid;
+      return mid;
+    },
+
+    findLocalEchoContentNode(pending) {
+      if (!pending) return null;
+      const ids = [];
+      const add = (value) => {
+        const mid = String(value || '');
+        if (/^[0-9]{10,32}$/.test(mid) && !ids.includes(mid)) ids.push(mid);
+      };
+      add(pending.messageId);
+      if (Array.isArray(pending.messageIds)) {
+        for (let i = pending.messageIds.length - 1; i >= 0; i--) add(pending.messageIds[i]);
+      }
+      for (const messageId of ids) {
+        const node = this.findMessageContentNode(pending.channelId, messageId);
+        if (node?.isConnected) return { node, messageId };
+      }
+      return null;
+    },
+
+    positionLocalEchoFrame(echoId, record, contentNode = null, messageId = null) {
+      const pending = this.localEchoPending.get(String(echoId || ''));
+      const iframe = record?.iframe;
+      if (!pending || !iframe?.isConnected) return false;
+
+      const currentChannelId = String(Cache.channelId || this.active?.channelId || '');
+      if (!currentChannelId || String(pending.channelId || '') !== currentChannelId) {
+        iframe.style.visibility = 'hidden';
+        iframe.style.pointerEvents = 'none';
+        this.perf.localEchoPortalHidden++;
+        return false;
+      }
+
+      let anchor = contentNode?.isConnected ? contentNode : null;
+      let resolvedMessageId = String(messageId || '');
+      if (!anchor) {
+        const resolved = this.findLocalEchoContentNode(pending);
+        anchor = resolved?.node || null;
+        resolvedMessageId = String(resolved?.messageId || resolvedMessageId || '');
+      }
+      if (!anchor?.isConnected) {
+        iframe.style.visibility = 'hidden';
+        iframe.style.pointerEvents = 'none';
+        this.perf.localEchoPortalHidden++;
+        return false;
+      }
+
+      if (resolvedMessageId) this.rememberLocalEchoMessageId(pending, resolvedMessageId);
+
+      // v69.0.6: inline edit is an exclusive plaintext surface. While Discord's
+      // native inline editor is being covered by Secure Input, the ordinary
+      // read-only sender-history portal for that exact message must not remain
+      // visible underneath/alongside it or the plaintext appears twice. Match by
+      // canonical/optimistic message-id aliases and, as a DOM fallback, by the
+      // currently edited message row. No plaintext is inspected in the parent.
+      const editActive = this.active;
+      if (editActive?.nativeEditModeArmed) {
+        const editMessageId = String(editActive.nativeEditMessageId || '');
+        const pendingIds = [
+          String(resolvedMessageId || ''),
+          String(record?.messageId || ''),
+          String(pending?.messageId || ''),
+          ...(Array.isArray(pending?.messageIds) ? pending.messageIds.map(String) : []),
+        ].filter(Boolean);
+        let sameEditRow = false;
+        try {
+          const editRow = editActive.editTarget?.messageContainer;
+          const anchorRow = anchor.closest(
+            '[data-list-item-id^="chat-messages"], [id^="chat-messages-"], [class*="messageListItem"], [class*="message_"]'
+          );
+          sameEditRow = !!(
+            editRow?.isConnected &&
+            anchorRow?.isConnected &&
+            (
+              editRow === anchorRow ||
+              editRow.contains(anchor) ||
+              anchorRow.contains(editActive.editTarget?.editor)
+            )
+          );
+        } catch (_) {}
+        if ((editMessageId && pendingIds.includes(editMessageId)) || sameEditRow) {
+          this.restoreNativeEditedMarker(record);
+          iframe.style.visibility = 'hidden';
+          iframe.style.pointerEvents = 'none';
+          record.hiddenForInlineEdit = true;
+          this.perf.localEchoPortalHidden++;
+          return true;
+        }
+      }
+      record.hiddenForInlineEdit = false;
+
+      const height = Math.max(18, Math.min(5000, Math.ceil(Number(record.height || 22))));
+
+      // v69.0.4: reserve only the vertical space that native Discord content would
+      // occupy. v69.0.3 also forced height, which could perturb grouped-message
+      // layout while React was recycling rows.
+      try {
+        anchor.style.setProperty('min-height', `${height}px`, 'important');
+        anchor.style.removeProperty('height');
+      } catch (_) {}
+
+      let anchorRect = null;
+      try { anchorRect = anchor.getBoundingClientRect(); } catch (_) {}
+      if (!anchorRect) {
+        iframe.style.visibility = 'hidden';
+        iframe.style.pointerEvents = 'none';
+        return false;
+      }
+
+      let row = null;
+      let rowRect = null;
+      try {
+        row = anchor.closest(
+          '[data-list-item-id^="chat-messages"], [id^="chat-messages-"], [class*="messageListItem"], [class*="message_"]'
+        );
+        rowRect = row?.getBoundingClientRect?.() || anchorRect;
+      } catch (_) { rowRect = anchorRect; }
+
+      const viewportElement = this.findLocalEchoViewportElement(row || anchor);
+      const viewportRect = this.syncLocalEchoPortalBounds(viewportElement);
+      if (!viewportRect) {
+        iframe.style.visibility = 'hidden';
+        iframe.style.pointerEvents = 'none';
+        this.perf.localEchoPortalHidden++;
+        return false;
+      }
+
+      // Match the old/native renderer's geometry without putting plaintext back in
+      // message.content: the U+2063 placeholder is already laid out by Discord at
+      // the exact inline insertion point where the encrypted marker/text belongs.
+      // A DOM Range over that single parent-safe character gives the correct x/y
+      // even when the surrounding messageContent block spans the avatar gutter.
+      const inlineRect = this.findLocalEchoPlaceholderRect(anchor);
+      let left = Number(inlineRect?.left ?? anchorRect.left ?? 0);
+      let top = Number(inlineRect?.top ?? anchorRect.top ?? 0);
+
+      // Defensive fallback when Chromium returns no client rect for U+2063. Prefer
+      // the native username/header inset or row padding over the row's raw left
+      // edge, which is the avatar gutter in Discord's current layout.
+      if (!inlineRect && rowRect) {
+        let derivedLeft = left;
+        try {
+          const header = row?.querySelector?.('h3 [class*="username"], h3, [class*="headerText"] [class*="username"], [class*="username"]');
+          const headerRect = header?.getBoundingClientRect?.();
+          if (headerRect && Number(headerRect.left) > Number(rowRect.left) + 16)
+            derivedLeft = Math.max(derivedLeft, Number(headerRect.left));
+        } catch (_) {}
+        try {
+          const rowStyle = row ? getComputedStyle(row) : null;
+          const paddingLeft = parseFloat(String(rowStyle?.paddingLeft || '0')) || 0;
+          if (paddingLeft > 16) derivedLeft = Math.max(derivedLeft, Number(rowRect.left) + paddingLeft);
+        } catch (_) {}
+        left = derivedLeft;
+      }
+
+      const visible =
+        Number(rowRect?.bottom ?? (top + height)) > Number(viewportRect.top) &&
+        Number(rowRect?.top ?? top) < Number(viewportRect.bottom) &&
+        Number(rowRect?.right ?? anchorRect.right) > Number(viewportRect.left) &&
+        Number(rowRect?.left ?? anchorRect.left) < Number(viewportRect.right);
+      if (!visible) {
+        iframe.style.visibility = 'hidden';
+        iframe.style.pointerEvents = 'none';
+        this.perf.localEchoPortalHidden++;
+        return false;
+      }
+
+      let right = Number(viewportRect.right) - 8;
+      if (rowRect && Number(rowRect.right) > left + 40)
+        right = Math.min(right, Number(rowRect.right) - 12);
+      if (anchorRect && Number(anchorRect.right) > left + 80)
+        right = Math.min(right, Number(anchorRect.right));
+      if (!Number.isFinite(right) || right <= left + 20) right = Number(viewportRect.right) - 8;
+      let width = Math.floor(right - left);
+      width = Math.max(40, Math.min(Number(viewportRect.right) - left - 4, width));
+      if (!Number.isFinite(width) || width < 24) {
+        iframe.style.visibility = 'hidden';
+        iframe.style.pointerEvents = 'none';
+        this.perf.localEchoPortalHidden++;
+        return false;
+      }
+
+      // The portal itself is clipped to Discord's message scroller. Coordinates
+      // are therefore rebased to that viewport instead of the global body. This
+      // prevents frames from crossing the DM header, sidebar or composer bounds.
+      iframe.style.position = 'absolute';
+      iframe.style.left = `${Math.round(left - Number(viewportRect.left))}px`;
+      iframe.style.top = `${Math.round(top - Number(viewportRect.top))}px`;
+      iframe.style.width = `${Math.round(width)}px`;
+      iframe.style.height = `${height}px`;
+      iframe.style.visibility = 'visible';
+      iframe.style.pointerEvents = 'auto';
+      iframe.style.clipPath = 'none';
+      record.anchorNode = anchor;
+      record.messageId = String(resolvedMessageId || pending.messageId || record.messageId || '');
+      record.channelId = String(pending.channelId || '');
+      record.geometrySource = inlineRect?.source || 'native-row-fallback';
+      record.viewportElement = viewportElement || null;
+      this.positionNativeEditedMarker(record, anchor, iframe, viewportRect);
+      this.perf.localEchoPortalPositions++;
+      return true;
     },
 
     getNativeMessageIdFromContainer(container) {
@@ -47807,7 +49880,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let bestId = null;
       let bestCreatedAt = -1;
       for (const [echoId, record] of this.localEchoPending) {
-        if (String(record?.messageId || '') !== messageId) continue;
+        const ids = [record?.messageId, ...(Array.isArray(record?.messageIds) ? record.messageIds : [])].map(String);
+        if (!ids.includes(messageId)) continue;
         const createdAt = Number(record?.createdAt || 0);
         if (createdAt >= bestCreatedAt) {
           bestId = echoId;
@@ -47823,14 +49897,111 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return null;
     },
 
-    updateLocalEchoHeight(echoId, height) {
-      const record = this.localEchoFrames.get(String(echoId || ''));
-      if (!record?.iframe?.isConnected) return false;
-      const next = Math.max(18, Math.min(5000, Math.ceil(Number(height || 22))));
-      if (record.height === next) return true;
-      record.height = next;
-      record.iframe.style.height = `${next}px`;
+    scheduleVisibleLocalEchoRepair(delayMs = 80) {
+      if (!this.started || this.localEchoPending.size === 0) return false;
+      if (this.localEchoRepairTimer) return true;
+      this.perf.localEchoRepairSchedules++;
+      this.localEchoRepairTimer = setTimeout(() => {
+        this.localEchoRepairTimer = null;
+        this.repairVisibleLocalEchoFrames().catch((error) => {
+          this.warn('local-echo-visible-row-repair-failed', {
+            channelId: String(Cache.channelId || this.active?.channelId || ''),
+            reason: error?.message || String(error),
+          });
+        });
+      }, Math.max(0, Math.min(500, Number(delayMs || 0))));
       return true;
+    },
+
+    async repairVisibleLocalEchoFrames() {
+      this.pruneLocalEchoState();
+      this.perf.localEchoRepairRuns++;
+
+      const currentChannelId = String(Cache.channelId || this.active?.channelId || '');
+      if (!currentChannelId || this.localEchoPending.size === 0) return 0;
+
+      // A portal child is not owned by Discord React, so reconciliation cannot
+      // delete it. Hide frames from non-selected channels and only re-anchor the
+      // current DM's rows.
+      for (const record of this.localEchoFrames.values()) {
+        if (!record?.iframe?.isConnected) continue;
+        if (String(record.channelId || '') !== currentChannelId) {
+          record.iframe.style.visibility = 'hidden';
+          record.iframe.style.pointerEvents = 'none';
+        }
+      }
+
+      let repaired = 0;
+      for (const [echoId, pending] of Array.from(this.localEchoPending.entries())) {
+        if (repaired >= 96) break;
+        if (!pending || String(pending.channelId || '') !== currentChannelId) continue;
+
+        const resolved = this.findLocalEchoContentNode(pending);
+        if (!resolved?.node?.isConnected) {
+          const existing = this.localEchoFrames.get(String(echoId));
+          if (existing?.iframe?.isConnected) {
+            existing.iframe.style.visibility = 'hidden';
+            existing.iframe.style.pointerEvents = 'none';
+          }
+          continue;
+        }
+
+        const existing = this.localEchoFrames.get(String(echoId));
+        if (existing?.iframe?.isConnected) {
+          const moved = String(existing.messageId || '') !== String(resolved.messageId || '');
+          this.rememberLocalEchoMessageId(pending, resolved.messageId);
+          if (this.positionLocalEchoFrame(String(echoId), existing, resolved.node, resolved.messageId)) {
+            repaired++;
+            if (moved) {
+              this.perf.localEchoRepairRemounts++;
+              this.log('local-echo-visible-row-repaired', {
+                channelId: currentChannelId,
+                messageId: String(resolved.messageId || ''),
+                echoId: String(echoId),
+                durable: !!pending.durable,
+                mode: 'portal-reanchor',
+              });
+            }
+          }
+          continue;
+        }
+
+        if (existing) this.localEchoFrames.delete(String(echoId));
+        const mounted = await this.mountLocalEchoFrame(
+          resolved.node, resolved.messageId, String(echoId)
+        );
+        if (mounted) {
+          repaired++;
+          this.perf.localEchoRepairRemounts++;
+          this.log('local-echo-visible-row-repaired', {
+            channelId: currentChannelId,
+            messageId: String(resolved.messageId || ''),
+            echoId: String(echoId),
+            durable: !!pending.durable,
+            mode: 'portal-recreate',
+          });
+        }
+      }
+      return repaired;
+    },
+
+    updateLocalEchoLayout(echoId, layout = {}) {
+      const id = String(echoId || '');
+      const record = this.localEchoFrames.get(id);
+      if (!record?.iframe?.isConnected) return false;
+      const next = Math.max(18, Math.min(5000, Math.ceil(Number(layout.height || record.height || 22))));
+      record.height = next;
+      for (const key of ['tailLeft', 'tailTop', 'tailBottom', 'lineHeight']) {
+        const value = Number(layout[key]);
+        if (Number.isFinite(value)) record[key] = value;
+      }
+      record.iframe.style.height = `${next}px`;
+      this.positionLocalEchoFrame(id, record);
+      return true;
+    },
+
+    updateLocalEchoHeight(echoId, height) {
+      return this.updateLocalEchoLayout(echoId, { height });
     },
 
     scheduleDurableLocalEchoForMessage(message, echoId, historyRecord, messageCiphertext) {
@@ -47849,6 +50020,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       this.localEchoPending.set(id, {
         channelId,
         messageId,
+        messageIds: [messageId],
         durable: true,
         historyRecord: JSON.parse(JSON.stringify(historyRecord)),
         messageCiphertext: Utils.BytesToBase64url(ciphertext),
@@ -47901,7 +50073,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // ArrowUp edit can ask the Secure Input iframe to restore its own cached
       // plaintext without ever copying that plaintext into the parent renderer.
       const pending = this.localEchoPending.get(id);
-      if (pending) pending.messageId = messageId;
+      if (pending) this.rememberLocalEchoMessageId(pending, messageId);
 
       if (this.localEchoMountTimers.has(id)) return true;
 
@@ -47937,7 +50109,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (!pending) return false;
 
       const existing = this.localEchoFrames.get(echoId);
-      if (existing?.iframe?.isConnected) return true;
+      if (existing?.iframe?.isConnected) {
+        const previousMessageId = String(existing.messageId || '');
+        this.rememberLocalEchoMessageId(pending, messageId);
+        this.positionLocalEchoFrame(echoId, existing, contentNode, messageId);
+        if (previousMessageId !== String(messageId || '')) {
+          this.log('local-echo-rebound', {
+            channelId: pending.channelId,
+            messageId: String(messageId || ''),
+            echoId,
+            reason: 'discord-optimistic-to-canonical-row-portal',
+          });
+        }
+        return true;
+      }
 
       const active = this.active;
       if (
@@ -47952,11 +50137,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       const iframe = document.createElement('iframe');
       iframe.className = 'sdc-local-echo-frame';
-      iframe.setAttribute('sandbox', 'allow-scripts');
+      // v69.0.1: local sent plaintext remains inside this opaque-origin iframe.
+      // allow-popups is only used by validated http/https anchors built in-frame;
+      // no plaintext URL is posted back through the parent renderer.
+      iframe.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');
       iframe.setAttribute('aria-label', 'SDC protected local sent message');
       iframe.style.cssText = [
         'display:block',
-        'width:100%',
+        'position:absolute',
+        'left:0',
+        'top:0',
+        'width:320px',
         'height:22px',
         'border:0',
         'margin:0',
@@ -47964,20 +50155,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         'background:transparent',
         'overflow:hidden',
         'pointer-events:auto',
+        'visibility:hidden',
       ].join(';');
       iframe.srcdoc = SECURE_LOCAL_ECHO_FRAME_HTML;
 
-      // v67.1.111 visual fix:
-      // Discord needs the invisible U+2063 placeholder in message.content so that
-      // the native message-content node is created. Once that node exists, however,
-      // leaving the placeholder in the live DOM creates an anonymous first line.
-      // Because the protected local-echo iframe is display:block, appendChild()
-      // consequently puts it on a second line.
-      //
-      // Keep U+2063 in Discord's message model, but replace the rendered placeholder
-      // inside the already-created content node with the opaque iframe.
-      contentNode.replaceChildren(iframe);
+      // v69.0.4: never insert the iframe inside Discord's React-owned message
+      // subtree. React reconciliation was legitimately deleting those foreign
+      // children after our successful repairs. Keep the model's U+2063 placeholder
+      // as a layout anchor and render the opaque frame through a body-level portal.
+      const portal = this.ensureLocalEchoPortal();
+      if (!portal) return false;
+      portal.appendChild(iframe);
 
+      this.rememberLocalEchoMessageId(pending, messageId);
       const frameRecord = {
         iframe,
         messageId: String(messageId || ''),
@@ -47987,6 +50177,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         height: 22,
       };
       this.localEchoFrames.set(echoId, frameRecord);
+      this.positionLocalEchoFrame(echoId, frameRecord, contentNode, messageId);
 
       iframe.addEventListener('load', async () => {
         if (!iframe.contentWindow) return;
@@ -48012,7 +50203,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 msg.echoId === echoId &&
                 Number.isFinite(Number(msg.height))
               ) {
-                this.updateLocalEchoHeight(echoId, msg.height);
+                this.updateLocalEchoLayout(echoId, msg);
               }
             };
             try { channel.port1.start?.(); } catch (_) {}
@@ -52329,9 +54520,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (
           data.type === 'sdc-secure-local-echo-height'
         ) {
-          this.updateLocalEchoHeight(
+          this.updateLocalEchoLayout(
             String(data.echoId || ''),
-            Number(data.height || 22)
+            {
+              height: Number(data.height || 22),
+              tailLeft: Number(data.tailLeft),
+              tailTop: Number(data.tailTop),
+              tailBottom: Number(data.tailBottom),
+              lineHeight: Number(data.lineHeight)
+            }
           );
           return;
         }
@@ -53785,6 +55982,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       this.mutationObserver = new MutationObserver(() => {
         this.perf.globalMutationCallbacks++;
 
+        // v69.0.4: message rows can be recycled while the bottom composer remains
+        // perfectly healthy. The old early-return therefore missed local-echo DOM
+        // loss. Repair is coalesced and only scans pending rows in the selected DM.
+        if (this.localEchoPending.size > 0) this.scheduleVisibleLocalEchoRepair(70);
+
         const active = this.active;
 
         // v67.1.110: once the secure iframe is mounted on a connected editor,
@@ -53818,6 +56020,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         });
       }
 
+      // Portal frames are scroller-clipped and viewport-measured. Scroll does not necessarily mutate
+      // Discord's message DOM, so re-anchor them explicitly on scroll/resize.
+      this.localEchoViewportHandler = () => {
+        if (!this.started || this.localEchoPending.size === 0) return;
+        this.scheduleVisibleLocalEchoRepair(0);
+      };
+      document.addEventListener('scroll', this.localEchoViewportHandler, true);
+      window.addEventListener('resize', this.localEchoViewportHandler, false);
+
       this.RefreshSoon(0);
 
       // Recovery guard only. Explicit channel/toggle/key hooks already refresh
@@ -53827,6 +56038,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
         const active = this.active;
         const config = this.getCurrentConfig();
+
+        // Slow fallback for Discord render paths that replace message content
+        // without a mutation shape useful to the coalesced fast repair.
+        if (this.localEchoPending.size > 0) this.scheduleVisibleLocalEchoRepair(0);
 
         if (active && !this.isChannelReady(active.channelId)) {
           // Slow recovery guard after the short transition probe window. This
@@ -54085,7 +56300,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         encryptedDraftsInMemory: this.encryptedDrafts.size,
         pendingSdc4SandboxReservations: this.sdc4SandboxReservations.size,
         senderLocalEcho: {
-          mode: 'opaque-sandbox-iframe-via-MessageChannel',
+          mode: 'opaque-sandbox-iframe-via-MessageChannel + body-portal-local-history-v69.0.5',
           plaintextInParent: false,
           pending: this.localEchoPending.size,
           mountedFrames: Array.from(this.localEchoFrames.values()).filter((x) => x?.iframe?.isConnected).length,
@@ -54176,6 +56391,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         localEchoPending: this.localEchoPending.size,
         localEchoMountedFrames: Array.from(this.localEchoFrames.values()).filter((x) => x?.iframe?.isConnected).length,
         localEchoMountTimers: this.localEchoMountTimers.size,
+        localEchoRepairTimerPending: !!this.localEchoRepairTimer,
+        localEchoRepairSchedules: this.perf.localEchoRepairSchedules,
+        localEchoRepairRuns: this.perf.localEchoRepairRuns,
+        localEchoRepairRemounts: this.perf.localEchoRepairRemounts,
+        localEchoPortalPositions: this.perf.localEchoPortalPositions,
+        localEchoPortalHidden: this.perf.localEchoPortalHidden,
+        localEchoPortalConnected: !!this.localEchoPortal?.isConnected,
+        localEchoGeometry: 'native-u2063-range + visible-canonical-row + scroller-clipped-portal-v69.0.5',
+        localEchoPortalRect: this.localEchoPortal?.isConnected ? (() => { try { const r = this.localEchoPortal.getBoundingClientRect(); return { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }; } catch (_) { return null; } })() : null,
       });
 
       Discord.window.SdcSecureInputBurnNextSdc4Reservation = () => {
@@ -54251,6 +56475,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       this.messageListener = null;
 
+      if (this.localEchoViewportHandler) {
+        try { document.removeEventListener('scroll', this.localEchoViewportHandler, true); } catch (_) {}
+        try { window.removeEventListener('resize', this.localEchoViewportHandler, false); } catch (_) {}
+      }
+      this.localEchoViewportHandler = null;
+
       this.unmount('plugin-unload');
 
       for (const record of this.encryptedDrafts.values()) {
@@ -54267,6 +56497,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         try { clearTimeout(timer); } catch (_) {}
       }
       this.localEchoMountTimers.clear();
+      if (this.localEchoRepairTimer) {
+        try { clearTimeout(this.localEchoRepairTimer); } catch (_) {}
+      }
+      this.localEchoRepairTimer = null;
       for (const timer of this.channelReadinessProbeTimers.values()) {
         try { clearTimeout(timer); } catch (_) {}
       }
@@ -54275,6 +56509,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         try { record?.iframe?.remove?.(); } catch (_) {}
       }
       this.localEchoFrames.clear();
+      try { this.localEchoPortal?.remove?.(); } catch (_) {}
+      this.localEchoPortal = null;
       this.secureQueuedAttachments.clear();
 
       this.removeComponentDispatchBridge();
