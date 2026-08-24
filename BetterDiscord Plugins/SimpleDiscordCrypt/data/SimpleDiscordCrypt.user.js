@@ -15,10 +15,10 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.9.2';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_2_CHAT_RENDER_REPLY_UX';
-    console.info('[SDC][BUILD][v70.9.2] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_2_CHAT_RENDER_REPLY_UX',
+    window.SdcRuntimeBuild = () => 'v70.9.4';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_4_SECURE_REPLY_PQ_TRANSPORT';
+    console.info('[SDC][BUILD][v70.9.4] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_4_SECURE_REPLY_PQ_TRANSPORT',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -36,7 +36,7 @@
   // AADs or application ciphertext formats.
   const SDC_PUBLIC_RELEASE_VERSION = '1.7.8.15';
   const SDC_MINIMUM_SUPPORTED_VERSION = '1.7.5.9';
-  const SDC_VERSION_POLICY_BUILD = 'v70.9.2';
+  const SDC_VERSION_POLICY_BUILD = 'v70.9.4';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -33124,6 +33124,89 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     });
   }
 
+
+  // v70.9.4 terminal transport classifier. This is orchestration-only: it recognizes
+  // the already-frozen wire prefixes so native Reply/Edit paths can keep their Discord
+  // metadata without downgrading the cryptographic transport.
+  function secureInputEncryptedTransportFamily(transport) {
+    const wireLine = String(transport || '').split(/\r?\n/, 1)[0].trim();
+    if (wireLine.startsWith(SDC4_WIRE_PREFIX)) return 'SDC4';
+    if (wireLine.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX)) return 'SDC4QF';
+    if (wireLine.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX)) return 'SDC4Q';
+    return 'OTHER';
+  }
+
+  // Native composer state can delay the final Discord enqueue after the opaque sandbox
+  // produced an SDC4Q carrier. Re-read the exact current recipient membership and the
+  // signed classical/PQ prekey binding at that last boundary. A changed/revoked target
+  // burns/rejects the pending send instead of silently delivering a stale async packet.
+  function assertSecureHybridAsyncOutboundTransportCurrent(channelId, transport, stage = 'native-messagequeue') {
+    channelId = String(channelId || '');
+    const family = secureInputEncryptedTransportFamily(transport);
+    if (family !== 'SDC4Q' && family !== 'SDC4QF') return true;
+
+    const peerId = String(ratchetPeerAccountId(channelId) || '');
+    if (!peerId) throw new Error(`Secure Input ${family} cannot resolve peer at ${stage}`);
+
+    const firstLine = String(transport || '').split(/\r?\n/, 1)[0].trim();
+    let innerWire = firstLine;
+    let fanoutCount = 1;
+    if (family === 'SDC4QF') {
+      const carrier = decodeHybridAsyncFanoutCarrierWire(firstLine);
+      innerWire = carrier.innerWire;
+      fanoutCount = Number(carrier.count || 0);
+    }
+
+    const decoded = decodeHybridAsyncMessageWire(innerWire, {
+      accountId: String(Discord.getCurrentUser()?.id || ''),
+      recipientAccountId: peerId,
+      channelId,
+    });
+    const entry = Array.isArray(decoded?.top?.entries) ? decoded.top.entries[0] : null;
+    const targetId = String(entry?.recipientDeviceId || '');
+    if (!isValidRatchetDeviceId(targetId)) throw new Error(`Secure Input ${family} target device is invalid at ${stage}`);
+
+    const current = activeAsyncPrekeyRecipientRecords(channelId, peerId);
+    const currentIds = current.map((row) => String(row.deviceId)).sort();
+    const expectedSingle = family === 'SDC4Q';
+    const membershipMatches = expectedSingle
+      ? currentIds.length === 1 && currentIds[0] === targetId
+      : currentIds.length === fanoutCount && currentIds.includes(targetId);
+    if (!membershipMatches) {
+      const error = new Error(`Secure Input ${family} recipient set changed at ${stage}`);
+      error.code = 'SDC_PQ_SECURE_NATIVE_RECIPIENT_SET_CHANGED';
+      error.deviceIds = currentIds;
+      error.targetDeviceId = targetId;
+      throw error;
+    }
+
+    const target = current.find((row) => String(row.deviceId) === targetId);
+    const record = target?.record || getDeviceRecord(peerId, targetId);
+    const summary = pqPeerDeviceSummary(peerId, targetId);
+    if (!record || record.revokedAt || isDeviceRevoked(peerId, targetId) ||
+        summary.v692HybridOfflineCapable !== true || summary.usableNow !== true ||
+        (family === 'SDC4QF' && summary.v692MultiDeviceFanoutCapable !== true)) {
+      const error = new Error(`Secure Input ${family} target lost authenticated eligibility at ${stage}`);
+      error.code = 'SDC_PQ_SECURE_NATIVE_TARGET_INELIGIBLE';
+      error.targetDeviceId = targetId;
+      throw error;
+    }
+
+    const classicalPrekeyId = String(record.asyncPrekey?.keyId || '');
+    const pqPrekeyId = String(record.pqPrekey?.keyId || '');
+    const boundClassicalPrekeyId = String(record.pqPrekey?.boundClassicalPrekeyId || '');
+    if (!classicalPrekeyId || !pqPrekeyId ||
+        classicalPrekeyId !== String(entry.recipientPrekeyId || '') ||
+        pqPrekeyId !== String(entry.recipientPqPrekeyId || '') ||
+        boundClassicalPrekeyId !== classicalPrekeyId) {
+      const error = new Error(`Secure Input ${family} prekey binding changed at ${stage}`);
+      error.code = 'SDC_PQ_SECURE_NATIVE_PREKEY_BINDING_CHANGED';
+      error.targetDeviceId = targetId;
+      throw error;
+    }
+    return true;
+  }
+
   async function buildAsyncPrekeyMessageWire(channelId, plaintext) {
     channelId = String(channelId || '');
     const channel = Discord.getChannel(channelId);
@@ -40815,7 +40898,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   // authoritative send recipient-set. v68.0.3 keeps that as the authorization base,
   // but after a fresh KEX filters it through a per-generation signed-announcement
   // membership epoch. LIVE ratchet sessions remain transport capability, not membership.
-  function ratchetV4ActiveDeviceIdsFromRegistry(registry, accountId = null) {
+  //
+  // v70.9.3 IMPORTANT ORDERING INVARIANT:
+  //   1. validate/collect the non-revoked registry,
+  //   2. apply the current KEX-generation membership epoch,
+  //   3. enforce the minimum client version on THAT final recipient set only.
+  // Checking version before step 2 made historical/stale UNKNOWN device records block a
+  // fresh KEX generation even though they were no longer authorized recipients.
+  function ratchetV4ActiveDeviceIdsFromRegistry(registry) {
     if (!registry) return [];
     if (!registry.devices || typeof registry.devices !== 'object' || Array.isArray(registry.devices))
       throw new Error('SDC4 peer device registry is malformed');
@@ -40829,11 +40919,6 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         throw new Error('SDC4 peer device registry contains an invalid active device id');
       if (typeof record.devicePublicKey !== 'string' || !record.devicePublicKey)
         throw new Error('SDC4 peer device registry active device has no public key');
-      // Real recipient resolution is fail-closed for legacy/unknown clients. Synthetic
-      // fixtures omit accountId so frozen ratchet tests can continue testing membership
-      // independently from the compatibility policy.
-      if (accountId != null && !sdcDeviceRecordMeetsMinimumVersion(record))
-        throw sdcMinimumVersionError(accountId, record, 'SDC4/SDC4Q recipient coverage');
       active.push(deviceId);
     }
     active.sort();
@@ -40842,16 +40927,41 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return active;
   }
 
+  function ratchetV4EnforceMinimumVersionForRecipientIds(registry, accountId, deviceIds, context = 'SDC4/SDC4Q recipient coverage') {
+    const peer = String(accountId || '');
+    const ids = Array.from(deviceIds || []).map(String);
+    for (const deviceId of ids) {
+      const record = registry?.devices?.[deviceId] || null;
+      // Membership filtering may only return a device that is still represented by a
+      // valid active registry record. Treat any inconsistency as corruption, never as
+      // permission to silently drop a recipient.
+      if (!record || record.revokedAt || String(record.deviceId || '') !== deviceId)
+        throw new Error(`SDC4 current recipient membership references an invalid device ${deviceId}`);
+      if (!sdcDeviceRecordMeetsMinimumVersion(record))
+        throw sdcMinimumVersionError(peer, record, context);
+    }
+    return ids;
+  }
+
   function ratchetV4ActiveDeviceIdsForChannel(channelId, remoteAccountId, registry = null) {
     const channel = String(channelId || '');
     const peer = String(remoteAccountId || '');
     const resolvedRegistry = registry || getDeviceAccountRegistry(peer, false);
-    const activeRegistryDeviceIds = ratchetV4ActiveDeviceIdsFromRegistry(resolvedRegistry, peer);
+    const activeRegistryDeviceIds = ratchetV4ActiveDeviceIdsFromRegistry(resolvedRegistry);
     const epoch = ratchetV4GenerationRecipientEpoch(channel, peer);
     const activeDeviceIds = ratchetV4GenerationMembershipFilter(
       activeRegistryDeviceIds,
       epoch.deviceIds,
       epoch.enabled
+    );
+    // Fail closed only for devices that are ACTUALLY authorized recipients for this
+    // channel/generation. If no KEX epoch exists, membershipFilter() returns the full
+    // active registry and legacy/unknown devices therefore still block exactly as before.
+    ratchetV4EnforceMinimumVersionForRecipientIds(
+      resolvedRegistry,
+      peer,
+      activeDeviceIds,
+      'SDC4/SDC4Q recipient coverage'
     );
     return {
       activeDeviceIds,
@@ -69701,7 +69811,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.9.2',
+      build: 'v70.9.4',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -69744,7 +69854,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   // Final protocol-freeze summary: deliberately read-only and compact.
-  // v70.9.2: read-only compatibility projection. This lets operators distinguish
+  // v70.9.3: read-only compatibility projection. This lets operators distinguish
   // a cryptographic readiness problem from a peer simply running an obsolete build.
   window.SdcVersionPolicyStatus = () => {
     const incompatibleDevices = [];
@@ -69781,32 +69891,76 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const signedAdvertisementInstalled =
       String(buildLocalDeviceAnnouncement || '').includes('clientVersion: SDC_PUBLIC_RELEASE_VERSION') &&
       String(sendSignedDeviceControl || '').includes('canonicalJsonBytes(enriched)');
+    const recipientMembershipScopedVersionCheck = (() => {
+      const source = String(ratchetV4ActiveDeviceIdsForChannel || '');
+      const membershipAt = source.indexOf('ratchetV4GenerationMembershipFilter');
+      const versionAt = source.indexOf('ratchetV4EnforceMinimumVersionForRecipientIds');
+      return membershipAt >= 0 && versionAt > membershipAt;
+    })();
+
+    // Current-channel projection: global registry UNKNOWN entries are useful for cleanup,
+    // but after KEX they are not necessarily blocking. Expose the distinction explicitly.
+    let currentChannel = null;
+    try {
+      const channelId = String(Cache.channelId || Discord.getChannelId?.() || '');
+      const peerId = channelId ? String(ratchetPeerAccountId(channelId) || '') : '';
+      const registry = peerId ? getDeviceAccountRegistry(peerId, false) : null;
+      if (channelId && peerId && registry) {
+        const registryIds = ratchetV4ActiveDeviceIdsFromRegistry(registry);
+        const epoch = ratchetV4GenerationRecipientEpoch(channelId, peerId);
+        const recipientIds = ratchetV4GenerationMembershipFilter(registryIds, epoch.deviceIds, epoch.enabled);
+        const recipientSet = new Set(recipientIds);
+        const blockingDevices = [];
+        const staleNonBlockingDevices = [];
+        for (const deviceId of registryIds) {
+          const record = registry.devices?.[deviceId] || null;
+          if (sdcDeviceRecordMeetsMinimumVersion(record)) continue;
+          const row = {
+            deviceId,
+            version: normalizeSdcClientVersion(record?.sdcClientVersion) || null,
+            versionState: normalizeSdcClientVersion(record?.sdcClientVersion) ? 'EXPLICIT_LEGACY' : 'UNKNOWN',
+          };
+          (recipientSet.has(deviceId) ? blockingDevices : staleNonBlockingDevices).push(row);
+        }
+        currentChannel = {
+          channelId,
+          peerId,
+          membershipSource: epoch.enabled ? 'current-kex-device-membership' : 'active-device-registry',
+          kexGeneration: Number(epoch.generation || 0) || null,
+          recipientDeviceIds: recipientIds,
+          blockingDevices,
+          staleNonBlockingDevices: epoch.enabled ? staleNonBlockingDevices : [],
+        };
+      }
+    } catch (_) {}
     return {
-      build: 'v70.9.2',
-      ok: versionComparisonSelfTest && signedAdvertisementInstalled && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
+      build: 'v70.9.4',
+      ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
       localMeetsMinimum: sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       versionComparisonSelfTest,
       signedAdvertisementInstalled,
-      policy: 'FAIL_CLOSED_FOR_NEW_SECURE_RECIPIENT_MEMBERSHIP',
+      recipientMembershipScopedVersionCheck,
+      policy: 'FAIL_CLOSED_FOR_CURRENT_SECURE_RECIPIENT_MEMBERSHIP',
       missingVersionIsLegacy: true,
       signedAdvertisement: 'DEVICE_ANNOUNCE.clientVersion',
       incompatibleDevices,
       unknownVersionDevices,
       explicitLegacyDevices,
       compatibleDevices,
+      currentChannel,
       blockingUi: 'LOCALIZED_MODAL_WITH_DEVICE_MANAGER_ACTION',
-      unknownDevicePolicy: 'FAIL_CLOSED_UNTIL_REMOTE_UPDATE_OR_AUTHENTICATED_REVOCATION',
+      unknownDevicePolicy: 'FAIL_CLOSED_IF_MEMBER_OF_CURRENT_KEX_EPOCH; STALE_NONMEMBERS_DO_NOT_BLOCK',
       note: SdcUiI18n.pick(
-        'Historical content is not deleted. Unknown devices remain fail-closed; the remote owner must update or revoke stale installations.',
-        'L’historique n’est pas supprimé. Les appareils de version inconnue restent bloqués ; leur propriétaire doit les mettre à jour ou révoquer les anciennes installations.'
+        'Historical content is not deleted. Unknown devices block only when they are actual recipients of the current KEX epoch (or when no KEX epoch exists). Stale registry devices outside a fresh KEX generation remain visible for cleanup but do not block it.',
+        'L’historique n’est pas supprimé. Un appareil de version inconnue ne bloque que s’il est réellement destinataire de l’époque KEX courante (ou si aucune époque KEX n’existe). Un ancien device hors de la nouvelle génération reste visible pour nettoyage mais ne bloque plus l’échange.'
       ),
     };
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.9.2',
+    build: 'v70.9.4',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -69823,6 +69977,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       String(SECURE_LOCAL_ECHO_FRAME_HTML || '').includes('sdc-code-block'),
     formattingPlaintextLeavesSandbox: false,
     localEchoOptimisticCanonicalAliasFollow: true,
+    minimumVersionScopedToCurrentKexMembership:
+      String(ratchetV4ActiveDeviceIdsForChannel || '').indexOf('ratchetV4GenerationMembershipFilter') <
+      String(ratchetV4ActiveDeviceIdsForChannel || '').indexOf('ratchetV4EnforceMinimumVersionForRecipientIds'),
+    secureReplyAcceptsAuthenticatedSdc4QFamily:
+      String(Discord.detour_enqueue || '').includes("secureTransportFamily === 'SDC4Q'") &&
+      String(Discord.detour_enqueue || '').includes("secureTransportFamily === 'SDC4QF'"),
+    hybridNativeTerminalRecipientRevalidation:
+      String(assertSecureHybridAsyncOutboundTransportCurrent || '').includes('prekey binding changed') &&
+      String(Discord.detour_enqueue || '').includes('MessageQueue-immediately-before-original-enqueue'),
+    frozenHybridWirePrefixesUnchanged:
+      SDC_HYBRID_ASYNC_WIRE_PREFIX === 'SDC4Q:' && SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX === 'SDC4QF:',
     note: SdcUiI18n.pick(
       'UI-only corrective; Classical, PQ and GROUP protocol semantics remain frozen.',
       'Correctif uniquement UI ; les sémantiques protocolaires Classical, PQ et GROUP restent gelées.'
@@ -69830,7 +69995,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   });
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.9.2',
+    build: 'v70.9.4',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -71967,29 +72132,45 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             secureOutgoing?.transport != null
           ) {
             const secureTransport = String(secureOutgoing.transport);
-            const isSdc4Transport = secureTransport.startsWith(SDC4_WIRE_PREFIX);
+            const secureTransportFamily = secureInputEncryptedTransportFamily(secureTransport);
+            const isSdc4FamilyTransport =
+              secureTransportFamily === 'SDC4' ||
+              secureTransportFamily === 'SDC4Q' ||
+              secureTransportFamily === 'SDC4QF';
             const isDedicatedAttachmentTransport =
               secureOutgoing.nativeMode === 'attachment';
 
-            // v67.1.110: the SDCSECURE token is an in-memory capability, not a public
-            // NOENC escape hatch. When SDC4 is sticky, ordinary Secure Input text
-            // may bypass the second handleSend() stage only if it is already SDC4.
-            // Attachment encryption is prepared before this terminal boundary: DM files use SDC4FSF1 (LIVE SDC4 or Lot 3C SDC4Q/SDC4QF CEK delivery); v70.6 GROUP-key files with a distributed file epoch also use SDC4FSF1 with a generation-wrapped CEK inside SDC3, while legacy/other non-DM files retain the dedicated SDC3AEAD plane.
+            // v70.9.4: the SDCSECURE token is an in-memory capability, not a public
+            // NOENC escape hatch. When SDC4 is sticky, native Reply/Edit paths may
+            // carry LIVE SDC4 OR the authenticated frozen SDC4Q/SDC4QF fallback used
+            // during a PQ-refresh convergence window. SDC3/plaintext are still rejected.
+            // Attachment encryption remains on its separately authenticated file plane.
             if (
               ratchetV4IsRequired(channelId) &&
-              !isSdc4Transport &&
+              !isSdc4FamilyTransport &&
               !isDedicatedAttachmentTransport
             ) {
               const error = new Error(
-                'Secure Input produced a non-SDC4 text transport while SDC4 is required'
+                'Secure Input produced a non-SDC4-family text transport while SDC4 is required'
               );
               error.code = 'SDC4_SECURE_TRANSPORT_MISMATCH';
               console.error('[SDC][SECURE_INPUT] trusted transport rejected', {
                 channelId,
                 nativeMode: secureOutgoing.nativeMode || null,
-                transport: isSdc4Transport ? 'SDC4' : 'NON_SDC4',
+                transport: secureTransportFamily,
               }, error);
               throw error;
+            }
+
+            // Native composer state can outlive the earlier SDC4Q preparation step.
+            // Revalidate hybrid membership/capability/prekey binding before accepting
+            // the token as a terminal encrypted transport.
+            if (secureTransportFamily === 'SDC4Q' || secureTransportFamily === 'SDC4QF') {
+              assertSecureHybridAsyncOutboundTransportCurrent(
+                channelId,
+                secureTransport,
+                'trusted-native-transport-observation'
+              );
             }
 
             message.content = secureTransport;
@@ -71997,7 +72178,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             console.debug('[SDC][SECURE_INPUT] trusted encrypted transport accepted', {
               channelId,
               nativeMode: secureOutgoing.nativeMode || null,
-              transport: isSdc4Transport ? 'SDC4' : 'SDC3_ATTACHMENT',
+              transport: isSdc4FamilyTransport ? secureTransportFamily : 'SDC3_ATTACHMENT',
             });
           } else if (secureOutgoing?.normalizedContent != null) {
             message.content = secureOutgoing.normalizedContent;
@@ -72027,6 +72208,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           message.content.startsWith(SDC4_WIRE_PREFIX)
         ) {
           assertRatchetV4OutboundWireRecipientSetCurrent(
+            channelId,
+            message.content,
+            'MessageQueue-immediately-before-original-enqueue'
+          );
+        }
+        if (
+          channelId &&
+          typeof message?.content === 'string' &&
+          (message.content.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ||
+           message.content.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX))
+        ) {
+          assertSecureHybridAsyncOutboundTransportCurrent(
             channelId,
             message.content,
             'MessageQueue-immediately-before-original-enqueue'
