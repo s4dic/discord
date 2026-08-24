@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.5.9
+// @version      1.7.6.0
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -15,16 +15,16 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.9.0';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_0_MANUAL_VERSION_GATE';
-    console.info('[SDC][BUILD][v70.9.0] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_0_MANUAL_VERSION_GATE',
+    window.SdcRuntimeBuild = () => 'v70.9.2';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_2_CHAT_RENDER_REPLY_UX';
+    console.info('[SDC][BUILD][v70.9.2] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_2_CHAT_RENDER_REPLY_UX',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
 
   // ============================================================================
-  // v70.9.0 COMPATIBILITY POLICY — signed client-version admission
+  // v70.9.2 COMPATIBILITY POLICY — signed client-version admission + visible blocking UX
   // ============================================================================
   // The userscript metadata version remains the packaging/build version. The numeric
   // public release prefix is advertised inside identity-signed DEVICE_ANNOUNCE payloads.
@@ -36,7 +36,7 @@
   // AADs or application ciphertext formats.
   const SDC_PUBLIC_RELEASE_VERSION = '1.7.8.15';
   const SDC_MINIMUM_SUPPORTED_VERSION = '1.7.5.9';
-  const SDC_VERSION_POLICY_BUILD = 'v70.9.0';
+  const SDC_VERSION_POLICY_BUILD = 'v70.9.2';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -66,6 +66,71 @@
     return !!record && sdcClientVersionMeetsMinimum(record.sdcClientVersion);
   }
 
+  const SdcMinimumVersionUiState = { lastKey: '', lastAt: 0, cooldownMs: 5000 };
+
+  function showSdcMinimumVersionRequiredUi(error) {
+    if (!error || error.code !== 'SDC_MINIMUM_VERSION_REQUIRED') return false;
+    const accountId = String(error.accountId || '');
+    const deviceId = String(error.deviceId || '');
+    const advertised = String(error.advertisedVersion || 'legacy/unknown');
+    const state = advertised === 'legacy/unknown' ? 'UNKNOWN' : 'EXPLICIT_LEGACY';
+    const dedupeKey = [accountId, deviceId, String(error.context || ''), state].join('|');
+    const now = Date.now();
+    if (SdcMinimumVersionUiState.lastKey === dedupeKey &&
+        now - SdcMinimumVersionUiState.lastAt < SdcMinimumVersionUiState.cooldownMs) return false;
+    SdcMinimumVersionUiState.lastKey = dedupeKey;
+    SdcMinimumVersionUiState.lastAt = now;
+
+    const title = SdcUiI18n.pick('SDC update required', 'Mise à jour SDC requise');
+    const versionLine = state === 'UNKNOWN'
+      ? SdcUiI18n.pick(
+          'This device has not announced a signed SDC version yet. It may be an old/stale installation or a client that still needs to update.',
+          'Cet appareil n’a pas encore annoncé de version SDC signée. Il peut s’agir d’une ancienne installation devenue obsolète ou d’un client qui doit encore être mis à jour.'
+        )
+      : SdcUiI18n.pick(
+          `This device explicitly reports SDC ${advertised}, which is below the required minimum.`,
+          `Cet appareil annonce explicitement SDC ${advertised}, une version inférieure au minimum requis.`
+        );
+    const ownerLine = SdcUiI18n.pick(
+      'The remote owner must update that installation or revoke it if it no longer exists. SDC will not silently drop an authorized device from recipient coverage.',
+      'Le propriétaire distant doit mettre à jour cette installation ou la révoquer si elle n’existe plus. SDC ne retire jamais silencieusement un appareil autorisé de la couverture des destinataires.'
+    );
+    const openLabel = SdcUiI18n.pick('Open Device Manager', 'Ouvrir le gestionnaire d’appareils');
+    const closeLabel = SdcUiI18n.pick('Close', 'Fermer');
+
+    try {
+      MenuBar.ShowInfoDialog(
+        title,
+        title,
+        `<div class="SDC_EXPERT_INFO">
+          <p><strong>${HtmlEscape(SdcUiI18n.pick('Secure send blocked.', 'Envoi sécurisé bloqué.'))}</strong></p>
+          <p>${HtmlEscape(versionLine)}</p>
+          <p><strong>${HtmlEscape(SdcUiI18n.pick('Account:', 'Compte :'))}</strong> <code>${HtmlEscape(accountId || 'unknown')}</code><br>
+          <strong>${HtmlEscape(SdcUiI18n.pick('Device:', 'Appareil :'))}</strong> <code>${HtmlEscape(deviceId || 'unknown')}</code><br>
+          <strong>${HtmlEscape(SdcUiI18n.pick('Detected version:', 'Version détectée :'))}</strong> <code>${HtmlEscape(advertised)}</code><br>
+          <strong>${HtmlEscape(SdcUiI18n.pick('Minimum:', 'Minimum :'))}</strong> <code>${HtmlEscape(SDC_MINIMUM_SUPPORTED_VERSION)}</code></p>
+          <p class="SDC_INFO_WARN">${HtmlEscape(ownerLine)}</p>
+          <p style="display:flex!important;gap:8px!important;flex-wrap:wrap!important">
+            <button type="button" class="sdc-btn SDC_VERSION_OPEN_DEVICES">${HtmlEscape(openLabel)}</button>
+            <button type="button" class="sdc-lnkbtn SDC_VERSION_CLOSE">${HtmlEscape(closeLabel)}</button>
+          </p>
+        </div>`,
+        '720px'
+      );
+      MenuBar.infoPopup?.querySelector('.SDC_VERSION_OPEN_DEVICES')?.addEventListener('click', () => {
+        try { MenuBar.infoPopup?.remove?.(); } catch (_) {}
+        try { MenuBar.OpenDeviceManager?.(); } catch (_) {}
+      });
+      MenuBar.infoPopup?.querySelector('.SDC_VERSION_CLOSE')?.addEventListener('click', () => {
+        try { MenuBar.infoPopup?.remove?.(); } catch (_) {}
+      });
+      return true;
+    } catch (_) {
+      try { SecureComposer.toast(error.message, 'error'); } catch (_) {}
+      return false;
+    }
+  }
+
   function sdcMinimumVersionError(accountId, record, context = 'secure exchange') {
     const advertised = normalizeSdcClientVersion(record?.sdcClientVersion) || 'legacy/unknown';
     const message = SdcUiI18n?.pick?.(
@@ -79,6 +144,10 @@
     error.advertisedVersion = advertised;
     error.minimumVersion = SDC_MINIMUM_SUPPORTED_VERSION;
     error.context = String(context || 'secure exchange');
+    error.versionState = advertised === 'legacy/unknown' ? 'UNKNOWN' : 'EXPLICIT_LEGACY';
+    // Surface the same fail-closed condition in both native composer and Chat Control.
+    // The throw remains authoritative; this microtask only adds visible guidance.
+    try { queueMicrotask(() => showSdcMinimumVersionRequiredUi(error)); } catch (_) {}
     return error;
   }
 
@@ -2343,9 +2412,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       Utils.AttachEventToClass(menu, 'SDC_KEYMANAGER', 'mousedown', () =>
         keyManager()
       );
+      // Keep a stable UI entry point so compatibility/error dialogs can open the
+      // exact same Device Manager without fabricating a second registry UI.
+      this.OpenDeviceManager = () => {
+        try { menu.style.visibility = 'hidden'; } catch (_) {}
+        return deviceManager();
+      };
       Utils.AttachEventToClass(menu, 'SDC_DEVICEMANAGER', 'mousedown', () => {
-        menu.style.visibility = 'hidden';
-        deviceManager();
+        this.OpenDeviceManager();
       });
       Utils.AttachEventToClass(menu, 'SDC_CHMANAGER', 'mousedown', () =>
         channelManager()
@@ -14447,6 +14521,32 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return await Discord.original_dispatch.apply(this, arguments);
   }
 
+  async function handleCreatePendingReply(event) {
+    // Discord can build the reply bar from a fresh/raw message object instead of
+    // the decrypted MessageStore instance. Rehydrate that preview from trusted
+    // local presentation/history data before CREATE_PENDING_REPLY reaches React.
+    try {
+      await hydrateReplyMessagePresentation(event?.message);
+    } catch (error) {
+      console.warn('[SDC][UI][v70.9.2] pending reply presentation hydration failed', {
+        channelId: String(event?.message?.channel_id || ''),
+        messageId: String(event?.message?.id || ''),
+        reason: error?.message || String(error),
+      });
+    }
+
+    const result = await Discord.original_dispatch.apply(this, arguments);
+
+    // Native Reply intentionally keeps Discord's reference state, but plaintext
+    // typing belongs to Secure Input. Restore focus after React has mounted the
+    // reply bar, with bounded follow-up passes for current Discord rerenders.
+    try {
+      SecureComposer.forceSecureReplyFocus('CREATE_PENDING_REPLY');
+    } catch (_) {}
+
+    return result;
+  }
+
   // v68.0.20.4: missing-key recovery is an OUTBOUND operation. Never await or
   // start it while a LOAD_MESSAGES_* completion event is still being held away
   // from Discord's native dispatcher, otherwise MessageQueue can wait for the
@@ -14654,9 +14754,93 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return message;
   }
 
+  function copyReplyPresentationFields(target, source) {
+    if (!target || !source || target === source) return false;
+    const content = String(source.content == null ? '' : source.content);
+    if (!content || content === '\u2063') return false;
+
+    // Never replace a reply preview with another raw SDC transport. The source
+    // must already be authenticated/decrypted presentation data from MessageStore
+    // or the encrypted local receive-history cache.
+    const rawTransport =
+      content.startsWith(SDC4_WIRE_PREFIX) ||
+      content.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX) ||
+      content.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ||
+      content.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX) ||
+      content.startsWith(SDC4_FILE_FS_DETACHED_PREFIX);
+    if (rawTransport) return false;
+
+    try { target.content = content; } catch (_) { return false; }
+    for (const key of [
+      'mentions', 'mention_roles', 'mention_channels', 'mention_everyone',
+      'embeds', 'sticker_items', 'stickerItems'
+    ]) {
+      try {
+        if (source[key] != null) target[key] = source[key];
+      } catch (_) {}
+    }
+    return true;
+  }
+
+  async function hydrateReplyMessagePresentation(message) {
+    if (!message || typeof message !== 'object') return false;
+    const messageId = String(message.id || message.message_id || '');
+    const channelId = String(message.channel_id || message.channelId || '');
+    if (!messageId || !channelId) return false;
+
+    // First prefer Discord's already-processed store object. This is presentation
+    // only and cannot advance a ratchet or consume another message key.
+    try {
+      const stored = Discord.getMessage?.(channelId, messageId);
+      if (stored && copyReplyPresentationFields(message, stored)) return true;
+    } catch (_) {}
+
+    const raw = String(message.content || '');
+    if (!raw.startsWith(SDC4_WIRE_PREFIX)) return false;
+
+    try {
+      const splitTransport = splitSdc4WireAndNativeUnfurls(raw);
+      const normalizedWire = splitTransport.wireLine.replace(/\s+`🔒`\s*$/u, '');
+      const ownId = String(Discord.getCurrentUser?.()?.id || '');
+      const authorId = String(message.author?.id || '');
+
+      // Incoming SDC4 plaintext is recoverable from the authenticated encrypted
+      // receive-history cache without touching CK/MK state. For a non-Secure-Input
+      // self-send the short parent-side sent cache may also already contain it.
+      const plaintext = authorId && authorId === ownId
+        ? await ratchetGetSentPlaintext(normalizedWire)
+        : await ratchetGetReceivedPlaintext(normalizedWire, messageId, channelId);
+      if (plaintext == null) return false;
+
+      assertSdc4NativeUnfurlBinding(plaintext, splitTransport.nativeUnfurlUrls);
+      message.content = '<:ENC:465534298662109185>' + plaintext;
+      postProcessMessage(message, plaintext);
+      return true;
+    } catch (error) {
+      console.warn('[SDC][UI][v70.9.2] reply preview history hydration failed', {
+        channelId,
+        messageId,
+        reason: error?.message || String(error),
+      });
+      return false;
+    }
+  }
+
+  async function hydrateReferencedMessagePresentation(message) {
+    const referenced = message?.referenced_message;
+    if (!referenced || typeof referenced !== 'object') return false;
+    return await hydrateReplyMessagePresentation(referenced);
+  }
+
   async function processMessage(message, ignoreAttachments, processingContext = null) {
     let result;
     const content = message.content;
+
+    // v70.9.2 presentation fix: SDC4 bypasses decryptMessage(), so its nested
+    // referenced_message previously stayed as raw Braille ciphertext even though
+    // the referenced row itself had already authenticated/decrypted. Hydrate only
+    // from already-trusted store/history data; frozen ratchet state is untouched.
+    await hydrateReferencedMessagePresentation(message);
 
     // v68.5.5: independent Plausible-Deniability decoy transport is handled
     // before the Real-Vault ciphertext placeholder. It is genuinely AES-GCM
@@ -51294,6 +51478,53 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return true;
   }
 
+  function notifySecureFormattingSelection() {
+    const start = Number.isFinite(input.selectionStart) ? input.selectionStart : 0;
+    const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : start;
+    sendParent('sdc-secure-format-selection', { visible: end > start });
+  }
+
+  function applySecureFormatting(format) {
+    const start = Number.isFinite(input.selectionStart) ? input.selectionStart : 0;
+    const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : start;
+    if (end <= start) { notifySecureFormattingSelection(); input.focus(); return false; }
+    const selected = String(input.value || '').slice(start, end);
+    let replacement = selected, prefix = '', suffix = '';
+    switch (String(format || '')) {
+      case 'bold': prefix = '**'; suffix = '**'; break;
+      case 'italic': prefix = '*'; suffix = '*'; break;
+      case 'underline': prefix = '__'; suffix = '__'; break;
+      case 'strike': prefix = '~~'; suffix = '~~'; break;
+      case 'spoiler': prefix = '||'; suffix = '||'; break;
+      case 'code':
+        if (selected.includes('\n')) { prefix = '\x60\x60\x60\n'; suffix = '\n\x60\x60\x60'; }
+        else { prefix = '\x60'; suffix = '\x60'; }
+        break;
+      case 'quote':
+        replacement = selected.split('\n').map((line) => '> ' + line).join('\n');
+        break;
+      default: return false;
+    }
+    if (prefix || suffix) replacement = prefix + selected + suffix;
+    adjustMentionAliasesForMutation(start, end, replacement.length);
+    input.setRangeText(replacement, start, end, 'select');
+    if (prefix || suffix) {
+      input.selectionStart = start + prefix.length;
+      input.selectionEnd = start + prefix.length + selected.length;
+    } else {
+      input.selectionStart = start;
+      input.selectionEnd = start + replacement.length;
+    }
+    mentionDisplayLastValue = String(input.value || '');
+    requestCanonicalMentionResolutions();
+    enforceInputLimit();
+    syncInputHeight();
+    emitDraftSoon();
+    input.focus();
+    notifySecureFormattingSelection();
+    return true;
+  }
+
   input.addEventListener(
     'compositionstart',
     () => {
@@ -51320,12 +51551,27 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       syncInputHeight();
       emitDraftSoon();
       publishMentionSuggestions(0);
+      notifySecureFormattingSelection();
     }
   );
-  input.addEventListener('click', () => publishMentionSuggestions(mentionState?.activeIndex || 0));
+  input.addEventListener('click', () => {
+    publishMentionSuggestions(mentionState?.activeIndex || 0);
+    notifySecureFormattingSelection();
+  });
+  input.addEventListener('mouseup', notifySecureFormattingSelection);
+  input.addEventListener('select', notifySecureFormattingSelection);
+  input.addEventListener('blur', () => {
+    // Parent toolbar buttons prevent default on pointerdown and immediately return
+    // focus to this iframe. Delay hiding so a toolbar click is not mistaken for
+    // an unrelated focus loss.
+    setTimeout(() => {
+      if (document.activeElement !== input) sendParent('sdc-secure-format-selection', { visible: false });
+    }, 120);
+  });
   input.addEventListener('keyup', (event) => {
     if (!['ArrowDown','ArrowUp','Enter','Tab','Escape'].includes(String(event.key || '')))
       publishMentionSuggestions(mentionState?.activeIndex || 0);
+    notifySecureFormattingSelection();
   });
 
 
@@ -51861,6 +52107,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       } else if (data.command === 'sent') {
         input.value = '';
         mentionState = null;
+        notifySecureFormattingSelection();
         sendParent('sdc-secure-mention-suggestions', { suggestions: [] });
         busy = false;
         pendingSdc4Send = null;
@@ -52067,6 +52314,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       ) {
         applyMention(String(data.id), data.start, data.end);
       } else if (
+        data.command === 'format-selection'
+      ) {
+        applySecureFormatting(String(data.format || ''));
+      } else if (
         data.command ===
           'insert-text' &&
         typeof data.text ===
@@ -52215,6 +52466,37 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
   #echo a { color:#00a8fc; text-decoration:none; cursor:pointer; }
   #echo a:hover { text-decoration:underline; }
+
+  /* v70.9.2: sender-local formatting is rendered inside this opaque frame.
+     Only a narrow Markdown subset is materialized as DOM elements; HTML from
+     plaintext is never parsed, so formatting cannot become script/markup injection. */
+  #echo strong { font-weight:700; }
+  #echo em { font-style:italic; }
+  #echo u { text-decoration:underline; text-underline-offset:2px; }
+  #echo s { text-decoration:line-through; }
+  #echo .sdc-inline-code {
+    padding:.08em .28em; border-radius:4px; background:#2b2d31;
+    font-family:var(--font-code,Consolas,"Andale Mono WT","Andale Mono",Lucida Console,monospace);
+    font-size:.875em; line-height:1.125rem;
+  }
+  #echo .sdc-code-block {
+    display:block; margin:4px 0; padding:7px; border:1px solid #1e1f22;
+    border-radius:4px; background:#2b2d31; white-space:pre-wrap;
+    overflow-wrap:anywhere; font-family:var(--font-code,Consolas,"Andale Mono WT","Andale Mono",Lucida Console,monospace);
+    font-size:.875em; line-height:1.125rem;
+  }
+  #echo .sdc-quote {
+    display:block; margin:2px 0; padding-left:8px;
+    border-left:4px solid #4e5058;
+  }
+  #echo .sdc-spoiler {
+    border-radius:3px; padding:0 2px; background:#1e1f22; color:transparent;
+    cursor:pointer;
+  }
+  #echo .sdc-spoiler.sdc-spoiler-open {
+    background:rgba(255,255,255,.08); color:inherit;
+  }
+
   #echo .sdc-custom-emoji,
   #echo .sdc-discord-unicode-emoji,
   #echo .sdc-discord-unicode-sprite {
@@ -52625,13 +52907,143 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (cursor < segment.length) appendTextWithDiscordEmojiAssets(fragment, segment.slice(cursor));
   }
 
+  function appendSafeInlineMarkdown(fragment, value, depth = 0) {
+    const text = String(value == null ? '' : value);
+    if (!text) return;
+    if (depth > 6) {
+      appendSafeEchoSegment(fragment, text);
+      return;
+    }
+
+    // Longest delimiter wins when two formats start at the same offset. Every
+    // rendered node is created explicitly; no plaintext ever reaches innerHTML.
+    const tick = String.fromCharCode(96);
+    const specs = [
+      { open: '**', close: '**', tag: 'strong' },
+      { open: '__', close: '__', tag: 'u' },
+      { open: '~~', close: '~~', tag: 's' },
+      { open: '||', close: '||', tag: 'span', className: 'sdc-spoiler' },
+      { open: tick, close: tick, tag: 'code', className: 'sdc-inline-code', raw: true },
+      { open: '*', close: '*', tag: 'em' },
+      { open: '_', close: '_', tag: 'em' },
+    ];
+
+    let cursor = 0;
+    while (cursor < text.length) {
+      let best = null;
+      for (const spec of specs) {
+        const start = text.indexOf(spec.open, cursor);
+        if (start < 0) continue;
+        const end = text.indexOf(spec.close, start + spec.open.length);
+        if (end < 0 || end === start + spec.open.length) continue;
+        if (!best || start < best.start ||
+            (start === best.start && spec.open.length > best.spec.open.length)) {
+          best = { spec, start, end };
+        }
+      }
+
+      if (!best) {
+        appendSafeEchoSegment(fragment, text.slice(cursor));
+        break;
+      }
+      if (best.start > cursor) appendSafeEchoSegment(fragment, text.slice(cursor, best.start));
+
+      const inner = text.slice(best.start + best.spec.open.length, best.end);
+      const node = document.createElement(best.spec.tag);
+      if (best.spec.className) node.className = best.spec.className;
+      if (best.spec.raw) {
+        node.textContent = inner;
+      } else {
+        appendSafeInlineMarkdown(node, inner, depth + 1);
+      }
+
+      if (best.spec.className === 'sdc-spoiler') {
+        node.setAttribute('role', 'button');
+        node.tabIndex = 0;
+        const reveal = () => node.classList.toggle('sdc-spoiler-open');
+        node.addEventListener('click', reveal);
+        node.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            reveal();
+          }
+        });
+      }
+
+      fragment.appendChild(node);
+      cursor = best.end + best.spec.close.length;
+    }
+  }
+
+  function appendSafeMarkdownLines(fragment, value) {
+    const lines = String(value == null ? '' : value).split('\n');
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
+      const quote = /^>\s?/.test(line);
+      if (quote) {
+        const block = document.createElement('span');
+        block.className = 'sdc-quote';
+        appendSafeInlineMarkdown(block, line.replace(/^>\s?/, ''));
+        fragment.appendChild(block);
+      } else {
+        appendSafeInlineMarkdown(fragment, line);
+      }
+      if (index < lines.length - 1) fragment.appendChild(document.createElement('br'));
+    }
+  }
+
+  function appendSafeMarkdown(fragment, value) {
+    const text = String(value == null ? '' : value);
+    const fence = String.fromCharCode(96).repeat(3);
+    let cursor = 0;
+
+    while (cursor < text.length) {
+      const start = text.indexOf(fence, cursor);
+      if (start < 0) {
+        appendSafeMarkdownLines(fragment, text.slice(cursor));
+        break;
+      }
+      if (start > cursor) appendSafeMarkdownLines(fragment, text.slice(cursor, start));
+
+      const bodyStart = start + fence.length;
+      const end = text.indexOf(fence, bodyStart);
+      if (end < 0) {
+        appendSafeMarkdownLines(fragment, text.slice(start));
+        break;
+      }
+
+      let codeText = text.slice(bodyStart, end);
+      // Discord-style fenced blocks may begin with a language identifier. It is
+      // presentation-only here; remove the label but never execute/highlight code.
+      if (codeText.startsWith('\n')) {
+        codeText = codeText.slice(1);
+      } else {
+        const firstBreak = codeText.indexOf('\n');
+        if (firstBreak >= 0) {
+          const language = codeText.slice(0, firstBreak).trim();
+          if (/^[A-Za-z0-9_+.-]{1,24}$/.test(language)) codeText = codeText.slice(firstBreak + 1);
+        }
+      }
+      if (codeText.endsWith('\n')) codeText = codeText.slice(0, -1);
+
+      const pre = document.createElement('pre');
+      pre.className = 'sdc-code-block';
+      const code = document.createElement('code');
+      code.textContent = codeText;
+      pre.appendChild(code);
+      fragment.appendChild(pre);
+      cursor = end + fence.length;
+    }
+  }
+
   function renderEchoPlaintext(value) {
     const text = String(value == null ? '' : value);
     const fragment = document.createDocumentFragment();
-    // Rendering stays deliberately narrow. Only Discord custom-emoji tokens and
-    // explicit http/https URLs become DOM elements; all other decrypted content
-    // remains Text nodes and therefore cannot become HTML/script in this frame.
-    appendSafeEchoSegment(fragment, text);
+
+    // v70.9.2: mimic the subset produced by Secure Input's formatting toolbar
+    // while keeping the local echo inside the same opaque-origin security boundary.
+    // Links/custom emoji are still allowlisted; arbitrary HTML remains plain text.
+    appendSafeMarkdown(fragment, text);
 
     const jumbo = isJumboEmojiMessage(text);
     echo.classList.toggle('sdc-jumbo', jumbo);
@@ -52875,6 +53287,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     lastChatControlApplySignature: '',
     lastChatControlApplyAt: 0,
 
+    // Formatting UI is parent-rendered but never receives plaintext. The opaque
+    // iframe sends only selection visibility; button commands are authenticated
+    // back into that exact frame where Markdown wrapping happens locally.
+    formatToolbar: null,
+    formatToolbarInstanceId: '',
+    formatToolbarVisible: false,
+
     // v68.0.20.3: Discord's native MessageQueue does not accept a channel as
     // ready merely because the route/editor already exists. Rapid navigation can
     // expose the composer before LOAD_MESSAGES_SUCCESS has completed. Track that
@@ -52902,6 +53321,82 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       try {
         BdApi?.UI?.showToast?.(SdcUiI18n.localizeMessage(message), { type });
       } catch (_) {}
+    },
+
+    ensureSecureFormattingToolbar() {
+      if (this.formatToolbar?.isConnected) return this.formatToolbar;
+      const bar = document.createElement('div');
+      bar.className = 'SDC_SECURE_FORMAT_TOOLBAR';
+      bar.setAttribute('role', 'toolbar');
+      bar.setAttribute('aria-label', SdcUiI18n.pick('Text formatting', 'Mise en forme du texte'));
+      bar.style.cssText = [
+        'position:fixed', 'z-index:2147483646', 'display:none', 'align-items:center',
+        'gap:2px', 'padding:4px', 'border-radius:7px', 'background:#111214',
+        'box-shadow:0 6px 18px rgba(0,0,0,.45)', 'border:1px solid rgba(255,255,255,.08)',
+        'pointer-events:auto', 'user-select:none'
+      ].join(';');
+      const specs = [
+        ['bold', '<b>B</b>', SdcUiI18n.pick('Bold', 'Gras')],
+        ['italic', '<i>I</i>', SdcUiI18n.pick('Italic', 'Italique')],
+        ['underline', '<u>U</u>', SdcUiI18n.pick('Underline', 'Souligné')],
+        ['strike', '<s>S</s>', SdcUiI18n.pick('Strikethrough', 'Barré')],
+        ['quote', '&gt;', SdcUiI18n.pick('Quote', 'Citation')],
+        ['code', '&lt;/&gt;', SdcUiI18n.pick('Code', 'Code')],
+        ['spoiler', '||', SdcUiI18n.pick('Spoiler', 'Spoiler')],
+      ];
+      for (const [format, label, title] of specs) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.format = format;
+        button.title = title;
+        button.setAttribute('aria-label', title);
+        button.innerHTML = label;
+        button.style.cssText = 'min-width:28px;height:26px;padding:0 6px;border:0;border-radius:4px;background:transparent;color:#dbdee1;cursor:pointer;font:600 13px/26px var(--font-primary,"gg sans",sans-serif)';
+        button.addEventListener('pointerdown', (event) => event.preventDefault());
+        button.addEventListener('mouseenter', () => { button.style.background = 'rgba(255,255,255,.10)'; });
+        button.addEventListener('mouseleave', () => { button.style.background = 'transparent'; });
+        button.addEventListener('click', () => {
+          const active = this.active;
+          if (!active?.iframe?.contentWindow || !this.formatToolbarVisible) return;
+          this.postAuthenticatedFrameCommand(active, 'format-selection', { format });
+          this.frameCommand('focus');
+        });
+        bar.appendChild(button);
+      }
+      document.body.appendChild(bar);
+      this.formatToolbar = bar;
+      return bar;
+    },
+
+    positionSecureFormattingToolbar(active = this.active) {
+      const bar = this.formatToolbar;
+      if (!bar?.isConnected || !this.formatToolbarVisible || !active?.iframe?.isConnected) return false;
+      const rect = active.iframe.getBoundingClientRect();
+      const width = Math.max(1, bar.offsetWidth || 230);
+      const height = Math.max(1, bar.offsetHeight || 34);
+      let left = rect.left + Math.max(0, (rect.width - width) / 2);
+      let top = rect.top - height - 8;
+      left = Math.max(8, Math.min(window.innerWidth - width - 8, left));
+      if (top < 8) top = Math.min(window.innerHeight - height - 8, rect.bottom + 8);
+      bar.style.left = `${Math.round(left)}px`;
+      bar.style.top = `${Math.round(top)}px`;
+      return true;
+    },
+
+    setSecureFormattingToolbarVisible(active, visible) {
+      const bar = this.ensureSecureFormattingToolbar();
+      const next = visible === true && !!active?.iframe?.isConnected;
+      this.formatToolbarVisible = next;
+      this.formatToolbarInstanceId = next ? String(active.instanceId || '') : '';
+      bar.style.display = next ? 'flex' : 'none';
+      if (next) this.positionSecureFormattingToolbar(active);
+      return next;
+    },
+
+    hideSecureFormattingToolbar() {
+      this.formatToolbarVisible = false;
+      this.formatToolbarInstanceId = '';
+      if (this.formatToolbar?.isConnected) this.formatToolbar.style.display = 'none';
     },
 
     getSelectedDiscordChannelId() {
@@ -56686,6 +57181,34 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return false;
     },
 
+    forceSecureReplyFocus(reason = 'reply-transition') {
+      const active = this.active;
+      if (!active?.iframe?.contentWindow) return false;
+
+      const channelId = String(active.channelId || '');
+      const instanceId = String(active.instanceId || '');
+      const run = (delay) => {
+        setTimeout(() => {
+          const current = this.active;
+          if (!current?.iframe?.contentWindow ||
+              String(current.channelId || '') !== channelId ||
+              String(current.instanceId || '') !== instanceId ||
+              !this.hasPendingNativeReplyState()) {
+            return;
+          }
+          this.frameCommand('focus');
+          try { current.iframe.focus({ preventScroll: true }); } catch (_) {}
+        }, delay);
+      };
+
+      // Discord currently mounts/reparents the reply bar across several React
+      // commits. A bounded sequence is more reliable than one mutation callback
+      // and does not poll or steal focus after the transition has completed.
+      for (const delay of [0, 24, 80, 180, 320]) run(delay);
+      this.log('native-reply-secure-focus-requested', { channelId, reason });
+      return true;
+    },
+
     hasPendingNativeReplyState() {
       const active =
         this.active;
@@ -56695,6 +57218,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
 
       const roots = [];
+
+      // The Reply action can replace the native Slate/editor subtree while the
+      // opaque Secure Input remains mounted. Include the freshly resolved composer
+      // root, not only the references captured at mount time.
+      try {
+        const liveEditor = this.findNativeEditor();
+        const liveRoot = this.getComposerRoot(liveEditor);
+        if (liveRoot instanceof Element) roots.push(liveRoot);
+      } catch (_) {}
+
       let node =
         active.composerRoot ||
         active.editor;
@@ -61302,18 +61835,24 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const tryMount = () => {
         this.localEchoMountTimers.delete(id);
         if (!this.hasLocalEcho(id)) return;
-        const contentNode = this.findMessageContentNode(channelId, messageId);
-        if (!contentNode) {
-          if (++attempts < 30) {
+        const livePending = this.localEchoPending.get(id);
+        const resolved = this.findLocalEchoContentNode(livePending);
+        if (!resolved?.node) {
+          if (++attempts < 80) {
             const timer = setTimeout(tryMount, 50);
             this.localEchoMountTimers.set(id, timer);
+          } else {
+            // The optimistic row may have vanished before the canonical row was
+            // committed. Hand off to the bounded global repair pass instead of
+            // leaving the sender preview dependent on a later unrelated mutation.
+            this.scheduleVisibleLocalEchoRepair(0);
           }
           return;
         }
-        this.mountLocalEchoFrame(contentNode, messageId, id).catch((error) => {
+        this.mountLocalEchoFrame(resolved.node, resolved.messageId, id).catch((error) => {
           this.warn('local-echo-mount-failed', {
             channelId,
-            messageId,
+            messageId: String(resolved.messageId || messageId),
             echoId: id,
             reason: error?.message || String(error),
           });
@@ -64733,6 +65272,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           }
         });
       }
+
+      if (this.formatToolbarVisible && this.formatToolbarInstanceId === String(active.instanceId || '')) {
+        this.positionSecureFormattingToolbar(active);
+      }
     },
 
     startPositionLoop() {
@@ -64845,6 +65388,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                   active.secureLayoutMutationFrame = 0;
                   if (this.active !== active) return;
                   this.positionFrame();
+
+                  // Clicking Discord's native Reply action focuses Slate while
+                  // Chat Control owns the real plaintext surface. As soon as the
+                  // reply bar appears, return focus to the opaque Secure Input.
+                  const replyPending = this.hasPendingNativeReplyState();
+                  if (replyPending && !active.nativeReplyPendingLast) {
+                    active.nativeReplyPendingLast = true;
+                    this.forceSecureReplyFocus('composer-layout-mutation');
+                  } else if (!replyPending) {
+                    active.nativeReplyPendingLast = false;
+                  }
                 });
             });
 
@@ -65226,6 +65780,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           nativeEditAttachmentCount: 0,
           nativeShortcutInProgress: false,
           nativeEditSubmissionPending: false,
+          nativeReplyPendingLast: false,
 
           // v68.6.15 native encrypted-message.txt transaction lifecycle.
           nativeSecureFileSubmitInProgress: false,
@@ -65524,6 +66079,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const active = this.active;
       this.active = null;
       this.hideSecureMentionPopup();
+      this.hideSecureFormattingToolbar();
 
       if (!active) return;
       this.perf.unmounts++;
@@ -66647,6 +67203,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             textLength: Number(data.textLength || 0),
             height: requestedHeight,
           });
+          return;
+        }
+
+        if (data.type === 'sdc-secure-format-selection') {
+          // No selected plaintext crosses the sandbox boundary. Only a Boolean
+          // controls the parent toolbar; formatting itself runs inside the iframe.
+          this.setSecureFormattingToolbarVisible(active, data.visible === true);
           return;
         }
 
@@ -68270,6 +68833,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
         const active = this.active;
 
+        // v70.9.2: CREATE_PENDING_REPLY can reparent the bar outside the composer
+        // subtree observed at mount time. The app-level observer is only a bounded
+        // transition fallback: it never reads plaintext and only restores focus
+        // when a real pending-reply state is detected.
+        if (active) {
+          const replyPending = this.hasPendingNativeReplyState();
+          if (replyPending && !active.nativeReplyPendingLast) {
+            active.nativeReplyPendingLast = true;
+            this.forceSecureReplyFocus('app-mutation');
+          } else if (!replyPending) {
+            active.nativeReplyPendingLast = false;
+          }
+        }
+
         // v67.1.110: once the secure iframe is mounted on a connected editor,
         // arbitrary Discord DOM churn must not trigger a full Refresh().
         if (active?.editor?.isConnected) {
@@ -68400,7 +68977,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                     ? 'SDC3AEAD_SANDBOX'
                     : null)
             : null,
-        uiDomCorrectiveVersion: 'v68.5.5',
+        uiDomCorrectiveVersion: 'v70.9.2',
+        secureReplyAutoFocus: true,
+        replyFocusDispatcherAndMutationRecovery: true,
+        encryptedReplyPreviewHydrationFromTrustedStoreOrHistory: true,
+        secureFormattingToolbar: 'PARENT_UI_SELECTION_BOOLEAN_ONLY__FORMAT_INSIDE_OPAQUE_IFRAME',
+        localEchoSafeMarkdownRender: true,
+        localEchoOptimisticCanonicalAliasFollow: true,
         textPlusAttachmentBindingSnapshotBeforeAsyncSend: true,
         textPlusAttachmentBindingPassedExplicitlyToHandleSend: true,
         attachmentBindingCapturedAtAddFiles: true,
@@ -69118,7 +69701,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.9.0',
+      build: 'v70.9.2',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -69161,11 +69744,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   // Final protocol-freeze summary: deliberately read-only and compact.
-  // v70.9.0: read-only compatibility projection. This lets operators distinguish
+  // v70.9.2: read-only compatibility projection. This lets operators distinguish
   // a cryptographic readiness problem from a peer simply running an obsolete build.
   window.SdcVersionPolicyStatus = () => {
     const incompatibleDevices = [];
     const compatibleDevices = [];
+    const unknownVersionDevices = [];
+    const explicitLegacyDevices = [];
     const ownId = String(Discord.getCurrentUser?.()?.id || '');
     const currentLocalDeviceId = String(LocalDevice?.deviceId || '');
     for (const [accountId, registry] of Object.entries(DataBase?.deviceRegistry || {})) {
@@ -69179,10 +69764,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           deviceId: String(record.deviceId || ''),
           version: version || null,
           compatible,
+          versionState: compatible ? 'COMPATIBLE' : (version == null ? 'UNKNOWN' : 'EXPLICIT_LEGACY'),
           currentInstallation: isCurrentLocal,
           lastSeen: Number(record.lastSeen || 0) || null,
         };
         (compatible ? compatibleDevices : incompatibleDevices).push(row);
+        if (!compatible && version == null) unknownVersionDevices.push(row);
+        if (!compatible && version != null) explicitLegacyDevices.push(row);
       }
     }
     const versionComparisonSelfTest =
@@ -69194,7 +69782,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       String(buildLocalDeviceAnnouncement || '').includes('clientVersion: SDC_PUBLIC_RELEASE_VERSION') &&
       String(sendSignedDeviceControl || '').includes('canonicalJsonBytes(enriched)');
     return {
-      build: 'v70.9.0',
+      build: 'v70.9.2',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -69205,16 +69793,44 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       missingVersionIsLegacy: true,
       signedAdvertisement: 'DEVICE_ANNOUNCE.clientVersion',
       incompatibleDevices,
+      unknownVersionDevices,
+      explicitLegacyDevices,
       compatibleDevices,
+      blockingUi: 'LOCALIZED_MODAL_WITH_DEVICE_MANAGER_ACTION',
+      unknownDevicePolicy: 'FAIL_CLOSED_UNTIL_REMOTE_UPDATE_OR_AUTHENTICATED_REVOCATION',
       note: SdcUiI18n.pick(
-        'Historical content is not deleted. Update blocked devices and refresh their signed device announcement.',
-        'L’historique n’est pas supprimé. Mettez à jour les appareils bloqués puis actualisez leur annonce appareil signée.'
+        'Historical content is not deleted. Unknown devices remain fail-closed; the remote owner must update or revoke stale installations.',
+        'L’historique n’est pas supprimé. Les appareils de version inconnue restent bloqués ; leur propriétaire doit les mettre à jour ou révoquer les anciennes installations.'
       ),
     };
   };
 
+  window.SdcUiCorrectiveStatus = () => ({
+    build: 'v70.9.2',
+    ok: true,
+    minimumVersionBlockingModal: true,
+    deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
+    secureReplyAutoFocus: true,
+    replyFocusDispatcherAndMutationRecovery:
+      String(handleCreatePendingReply || '').includes('forceSecureReplyFocus') &&
+      String(SecureComposer.forceSecureReplyFocus || '').includes('320'),
+    encryptedReplyPreviewHydration:
+      String(hydrateReplyMessagePresentation || '').includes('ratchetGetReceivedPlaintext') &&
+      String(processMessage || '').includes('hydrateReferencedMessagePresentation'),
+    secureFormattingToolbar: true,
+    localEchoSafeMarkdownRender:
+      String(SECURE_LOCAL_ECHO_FRAME_HTML || '').includes('appendSafeMarkdown') &&
+      String(SECURE_LOCAL_ECHO_FRAME_HTML || '').includes('sdc-code-block'),
+    formattingPlaintextLeavesSandbox: false,
+    localEchoOptimisticCanonicalAliasFollow: true,
+    note: SdcUiI18n.pick(
+      'UI-only corrective; Classical, PQ and GROUP protocol semantics remain frozen.',
+      'Correctif uniquement UI ; les sémantiques protocolaires Classical, PQ et GROUP restent gelées.'
+    ),
+  });
+
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.9.0',
+    build: 'v70.9.2',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -70642,6 +71258,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     LOAD_PINNED_MESSAGES_SUCCESS: handleMessages,
     LOAD_RECENT_MENTIONS_SUCCESS: handleMessages,
     SEARCH_FINISH: handleSearch,
+    CREATE_PENDING_REPLY: handleCreatePendingReply,
     MESSAGE_CREATE: handleMessage,
     MESSAGE_UPDATE: handleUpdate,
     MESSAGE_DELETE: handleDelete,
