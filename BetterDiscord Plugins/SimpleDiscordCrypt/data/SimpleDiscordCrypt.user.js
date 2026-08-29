@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.3
+// @version      1.7.6.4
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -15,10 +15,10 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.10.3';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_3_QUIET_PQ_DIRECT_FINAL';
-    console.info('[SDC][BUILD][v70.10.3] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_3_QUIET_PQ_DIRECT_FINAL',
+    window.SdcRuntimeBuild = () => 'v70.10.4';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_4_GROUP_OWN_ECHO_VERSION_UI';
+    console.info('[SDC][BUILD][v70.10.4] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_4_GROUP_OWN_ECHO_VERSION_UI',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -34,12 +34,43 @@
   // IMPORTANT: this is a recipient/admission policy only. It never deletes historical
   // keys or messages and it does not change SDC3/SDC4/SDC4Q/PQ/GROUP primitives, KDFs,
   // AADs or application ciphertext formats.
-  const SDC_PUBLIC_RELEASE_VERSION = '1.7.8.15';
+  // Public version source: do not maintain a second UI/version literal. The
+  // BetterDiscord loader performs a direct eval(scriptContent), so locally loaded
+  // builds can read their own UserScript metadata comment from that lexical source.
+  // Tampermonkey/Greasemonkey exposes the same value through GM_info. The online
+  // loader fallback evaluates from its local `data` buffer, which is also visible to
+  // direct eval. If none are available, fail visibly as UNKNOWN rather than inventing
+  // a release number.
+  function readSdcUserscriptMetadataVersion() {
+    try {
+      const gmVersion = globalThis?.GM_info?.script?.version;
+      if (typeof gmVersion === 'string' && gmVersion.trim()) return gmVersion.trim();
+    } catch (_) {}
+
+    let source = '';
+    try {
+      if (typeof scriptContent === 'string') source = scriptContent;
+    } catch (_) {}
+    if (!source) {
+      try {
+        if (typeof data !== 'undefined' && Array.isArray(data) && data.length) {
+          if (typeof data[0] === 'string') source = data.join('');
+          else if (typeof Buffer !== 'undefined') source = Buffer.concat(data).toString();
+        }
+      } catch (_) {}
+    }
+    const match = /^\s*\/\/\s*@version\s+([^\s]+)\s*$/mi.exec(String(source || ''));
+    return match?.[1] ? String(match[1]).trim() : null;
+  }
+
+  const SDC_USERSCRIPT_METADATA_VERSION = readSdcUserscriptMetadataVersion() || 'UNKNOWN';
+  const SDC_PUBLIC_RELEASE_VERSION =
+    (/^\s*v?(\d+(?:\.\d+){2,3})/i.exec(SDC_USERSCRIPT_METADATA_VERSION)?.[1]) || '0.0.0.0';
   const SDC_MINIMUM_SUPPORTED_VERSION = '1.7.5.9';
   // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
   // but is NOT cryptographic key material and does not alter any frozen wire.
   const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
-  const SDC_VERSION_POLICY_BUILD = 'v70.10.3';
+  const SDC_VERSION_POLICY_BUILD = 'v70.10.4';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -1941,7 +1972,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         <a class="SDC_AUTOLOCK">Auto-lock: Disabled</a>
         <a class="SDC_SECURITY_DIAGNOSTICS">Security diagnostics</a>
         <a class="SDC_PLAUSIBLE_DENIABILITY">Plausible Deniability</a>
-        <a class="SDC_NEWDB" style="color:#ff4031">New Database</a>
+        <div class="SDC_NEWDB_VERSION_ROW" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <a class="SDC_NEWDB" style="color:#ff4031;flex:1;min-width:0">New Database</a>
+            <span class="SDC_PUBLIC_VERSION" data-sdc-version-source="@version" style="font-size:11px;opacity:.72;white-space:nowrap;user-select:text" title="UserScript @version">v?</span>
+        </div>
     </div>
 </div>`,
     Show: function (
@@ -1986,6 +2020,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       this.menuWrapper = document.createElement('div');
       this.menuWrapper.innerHTML = this.menuHtml;
       SdcUiI18n.localizeTree(this.menuWrapper);
+      // Exact packaging version shown to the user. It is read from // @version
+      // in the evaluated userscript source, not from the internal v70.x build id.
+      const publicVersionBadge = this.menuWrapper.getElementsByClassName('SDC_PUBLIC_VERSION')[0];
+      if (publicVersionBadge) {
+        const rawVersion = String(SDC_USERSCRIPT_METADATA_VERSION || 'UNKNOWN');
+        publicVersionBadge.textContent = rawVersion === 'UNKNOWN' ? 'v?' : (/^v/i.test(rawVersion) ? rawVersion : `v${rawVersion}`);
+        publicVersionBadge.title = rawVersion === 'UNKNOWN'
+          ? 'UserScript @version unavailable'
+          : `UserScript @version: ${rawVersion}`;
+      }
       document.body.appendChild(this.menuWrapper);
       let menu = this.menuWrapper.getElementsByClassName('SDC_MENU')[0];
       let menuFocus = this.menuWrapper.getElementsByClassName('SDC_FOCUS')[0];
@@ -30022,7 +30066,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       });
       await persistRatchetSessions();
-      console.info('[SDC][PQ][v70.10.1] deferred PQ ACK emitted immediately before protected user message', {
+      console.info('[SDC][PQ][v70.10.4] deferred PQ ACK emitted immediately before protected user message', {
         channelId: String(state.channelId), sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
         epoch: Number(state.pqLastAckEpoch || 0), reason: String(reason || ''), suppressNotifications: true,
       });
@@ -30045,7 +30089,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       try { if (await sendDeferredPqRatchetAckForState(state, reason)) sent += 1; }
       catch (error) {
         failed += 1;
-        console.warn('[SDC][PQ][v70.10.1] deferred ACK remains pending; user message may use frozen offline PQ transport', {
+        console.warn('[SDC][PQ][v70.10.4] deferred ACK remains pending; user message may use frozen offline PQ transport', {
           channelId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
           reason: error?.message || String(error),
         });
@@ -30346,7 +30390,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // message. An offline peer may therefore reconnect days later without
       // generating a notification-only acknowledgement.
       if (!ackSpec.duplicate || state.pqDeferredAck === true) {
-        console.info('[SDC][PQ][v70.10.1] PQ ratchet INIT accepted; ACK deferred until local user activity', {
+        console.info('[SDC][PQ][v70.10.4] PQ ratchet INIT accepted; ACK deferred until local user activity', {
           channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch: info.epoch,
           nextKemKeyId: ackSpec.nextKemKeyId, offlineHistory: oldMessage === true,
         });
@@ -30739,7 +30783,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // SDC4/SDC4Q fail-closed rules remain authoritative; never downgrade merely
       // because an announcement could not be queued.
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.debug('[SDC][PQ][v70.10.3] zero-touch quiet capability announcement deferred', {
+      console.debug('[SDC][PQ][v70.10.4] zero-touch quiet capability announcement deferred', {
         channelId, peerId, source: String(source || ''), reason: PqQuietControlStats.lastError,
       });
       return { applicable: true, sent: false, peerId, source: String(source || ''), error: PqQuietControlStats.lastError };
@@ -30783,7 +30827,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       PqQuietControlStats.inheritedPendingResumesSent += 1;
       PqQuietControlStats.initControlsSent += 1;
       PqQuietControlStats.lastControlAt = Date.now();
-      console.info('[SDC][PQ][v70.10.1] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
+      console.info('[SDC][PQ][v70.10.4] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         remoteDeviceId: String(state.remoteDeviceId), pendingEpoch: Number(state.pqPending?.epoch || 0) || null,
         suppressNotifications: true,
@@ -30792,7 +30836,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     } catch (error) {
       PqQuietControlStats.inheritedPendingResumeFailures += 1;
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.warn('[SDC][PQ][v70.10.1] inherited PQ pending resume deferred; confirmed epoch remains usable', {
+      console.warn('[SDC][PQ][v70.10.4] inherited PQ pending resume deferred; confirmed epoch remains usable', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         reason: PqQuietControlStats.lastError,
       });
@@ -30860,7 +30904,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
       if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
         PqQuietControlStats.legacyPeerRefreshSuppressed += 1;
-        console.debug('[SDC][PQ][v70.10.1] quiet refresh held until peer advertises deferred-ACK capability', {
+        console.debug('[SDC][PQ][v70.10.4] quiet refresh held until peer advertises deferred-ACK capability', {
           channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId), dueReason,
         });
         continue;
@@ -30871,7 +30915,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           initSent += 1;
           PqQuietControlStats.initControlsSent += 1;
           PqQuietControlStats.lastControlAt = Date.now();
-          console.info('[SDC][PQ][v70.10.1] lazy PQ refresh INIT emitted immediately before protected user message', {
+          console.info('[SDC][PQ][v70.10.4] lazy PQ refresh INIT emitted immediately before protected user message', {
             channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
             dueReason, suppressNotifications: true,
           });
@@ -30881,7 +30925,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Do not destroy an already-built user ciphertext because a maintenance
         // control could not be queued; next genuine user activity can try again.
         PqQuietControlStats.lastError = error?.message || String(error);
-        console.warn('[SDC][PQ][v70.10.1] lazy refresh deferred; current confirmed epoch remains usable', {
+        console.warn('[SDC][PQ][v70.10.4] lazy refresh deferred; current confirmed epoch remains usable', {
           channelId, peerId, sessionId: String(state.sessionId), reason: PqQuietControlStats.lastError,
         });
       }
@@ -32199,7 +32243,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // therefore forces that proof once as well; otherwise capability convergence could
       // accidentally leave SDC4Q disabled on mixed/current peers.
       try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey); }
-      catch (error) { console.warn('[SDC][PQ][v70.10.3] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
+      catch (error) { console.warn('[SDC][PQ][v70.10.4] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
       return true;
     } catch (error) {
       if (previousLast > 0) local.announcedChannels[channelKey] = previousLast;
@@ -70504,7 +70548,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.10.3',
+      build: 'v70.10.4',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -70636,7 +70680,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.3',
+      build: 'v70.10.4',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -70662,7 +70706,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.10.3',
+    build: 'v70.10.4',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -70679,6 +70723,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       String(SECURE_LOCAL_ECHO_FRAME_HTML || '').includes('sdc-code-block'),
     formattingPlaintextLeavesSandbox: false,
     localEchoOptimisticCanonicalAliasFollow: true,
+    nativeGroupSdc3OwnEchoAliasRegistration:
+      String(Discord.detour_enqueue || '').includes('native SDC3 own outbound alias marker registered') &&
+      String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
+    userscriptVersionReadFromMetadataComment:
+      SDC_USERSCRIPT_METADATA_VERSION !== 'UNKNOWN' &&
+      typeof readSdcUserscriptMetadataVersion === 'function',
+    newDatabaseMenuShowsMetadataVersion:
+      String(MenuBar?.menuHtml || '').includes('SDC_PUBLIC_VERSION') &&
+      String(MenuBar?.Show || '').includes('SDC_USERSCRIPT_METADATA_VERSION'),
     minimumVersionScopedToCurrentKexMembership:
       String(ratchetV4ActiveDeviceIdsForChannel || '').indexOf('ratchetV4GenerationMembershipFilter') <
       String(ratchetV4ActiveDeviceIdsForChannel || '').indexOf('ratchetV4EnforceMinimumVersionForRecipientIds'),
@@ -70742,7 +70795,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.3',
+      build: 'v70.10.4',
       portableAccountIdentity: true,
       portableDevicePrivateKey: false,
       portableMutableRatchetState: false,
@@ -70860,7 +70913,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     };
     return {
-      build: 'v70.10.3',
+      build: 'v70.10.4',
       ok: Object.values(gates).every(Boolean),
       policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
       backgroundNetworkMaintenance: false,
@@ -70877,11 +70930,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.10.3',
+    build: 'v70.10.4',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
     group: SDC_GROUP_STACK_FROZEN === true,
+    userscriptVersion: SDC_USERSCRIPT_METADATA_VERSION,
     localVersion: SDC_PUBLIC_RELEASE_VERSION,
     minimumPeerVersion: SDC_MINIMUM_SUPPORTED_VERSION,
     policy: 'Frozen protocol semantics require a separately versioned layer for future changes.',
@@ -71047,8 +71101,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     pruneSdc3OwnOutboundAdmissions(Date.now());
     return {
       lot: 'LOT_3_SDC3_REPLAY_OWN_ECHO_CORRECTIVE',
-      build: 'v70.5.1',
-      ok: true,
+      build: 'v70.10.4',
+      ok: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
       policy: {
         remoteDifferentMessageIdReplayRejected: true,
         recipientHasNoSenderLocalAliasMarker: true,
@@ -71056,6 +71110,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ownAliasMaxDistinctMessageIds: 2,
         ownAliasMaxSnowflakeDeltaMs: SDC3_OWN_ECHO_ALIAS_MAX_SNOWFLAKE_DELTA_MS,
         ownAliasMarkerTtlMs: SDC3_OWN_OUTBOUND_ALIAS_TTL_MS,
+        nativeSecureInputSdc3RegistersExactOutboundWire: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
         sdc3WireKdfAadUnchanged: true,
         pqAndSdc4FreezeUnchanged: true,
       },
@@ -73059,6 +73114,32 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
             message.content = secureTransport;
             secureTransportAlreadyFinal = true;
+
+            // v70.10.4: native Reply/Edit/attachment Chat Control paths do not pass
+            // through handleSend() after the sandbox has already produced final SDC3.
+            // Register that exact local authenticated wire BEFORE Discord enqueue so
+            // only this sender can admit Discord's optimistic/canonical row alias.
+            // Remote recipients never possess this in-memory marker, preserving strict
+            // Lot-3 replay rejection for copied ciphertext under another messageId.
+            if (!isSdc4FamilyTransport) {
+              try {
+                const ownWireId = await rememberSdc3OwnOutboundTransport(channelId, secureTransport);
+                if (ownWireId) {
+                  console.debug('[SDC][CRYPTO][LOT3][v70.10.4] native SDC3 own outbound alias marker registered', {
+                    channelId: String(channelId || ''),
+                    nativeMode: secureOutgoing.nativeMode || null,
+                    wireId: ownWireId,
+                  });
+                }
+              } catch (error) {
+                console.debug('[SDC][CRYPTO][LOT3][v70.10.4] native SDC3 own outbound alias marker unavailable', {
+                  channelId: String(channelId || ''),
+                  nativeMode: secureOutgoing.nativeMode || null,
+                  reason: error?.message || String(error),
+                });
+              }
+            }
+
             console.debug('[SDC][SECURE_INPUT] trusted encrypted transport accepted', {
               channelId,
               nativeMode: secureOutgoing.nativeMode || null,
