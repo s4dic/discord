@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.1
+// @version      1.7.6.2
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -15,10 +15,10 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.9.4';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_4_SECURE_REPLY_PQ_TRANSPORT';
-    console.info('[SDC][BUILD][v70.9.4] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_4_SECURE_REPLY_PQ_TRANSPORT',
+    window.SdcRuntimeBuild = () => 'v70.9.5';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_5_DURABLE_ECHO_PORTABLE_IMPORT';
+    console.info('[SDC][BUILD][v70.9.5] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_5_DURABLE_ECHO_PORTABLE_IMPORT',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -36,7 +36,7 @@
   // AADs or application ciphertext formats.
   const SDC_PUBLIC_RELEASE_VERSION = '1.7.8.15';
   const SDC_MINIMUM_SUPPORTED_VERSION = '1.7.5.9';
-  const SDC_VERSION_POLICY_BUILD = 'v70.9.4';
+  const SDC_VERSION_POLICY_BUILD = 'v70.9.5';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -2902,14 +2902,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>9 · Gestionnaire de clés et salons</h5>
             <p><strong>Gestionnaire de clés :</strong> affiche les clés connues, leur type, leur descripteur et permet leur suppression. <strong>Gestionnaire de salons :</strong> associe la clé voulue au salon. Supprimer une clé ou une association peut rendre de futurs messages illisibles ; exportez la base avant une opération importante.</p>
             <h5>10 · Export, import et nouvelle base</h5>
-            <p><strong>Exporter la base</strong> sauvegarde le coffre portable chiffré. Certaines clés privées propres à l’installation restent volontairement hors export afin de ne pas cloner un appareil complet. Après import sur une autre installation, une convergence multi-device/KEX peut être nécessaire.</p>
+            <p><strong>Exporter la base</strong> sauvegarde le coffre portable chiffré, y compris l’identité de compte, les clés portables et l’historique SDC4 lisible lorsqu’il peut être exporté sous forme chiffrée. La clé privée propre à l’appareil et les états ratchet mutables restent volontairement hors export afin de ne jamais cloner une installation complète. Après import, la première ouverture ou utilisation d’un DM protégé force automatiquement une nouvelle <strong>DEVICE ANNOUNCE</strong> signée depuis l’installation courante puis reconstruit la couverture SDC4 requise. Si l’identité/KEX du correspondant n’est plus exploitable, SDC bloque l’envoi et demande une nouvelle convergence/KEX au lieu de downgrader.</p>
             <p><strong>Nouvelle base</strong> efface la continuité cryptographique de l’ancienne base sur cette installation : les correspondants devront refaire KEX/vérification et les GROUP devront être recréés/redistribués.</p>
             <h5>11 · Auto-lock</h5>
             <p>Le verrouillage automatique masque le plaintext, sauvegarde le coffre, quitte la conversation active et détruit les références de secrets runtime avant de redemander le mot de passe. Il est recommandé sur un poste partagé ou laissé sans surveillance.</p>
             <h5>12 · Plausible Deniability / mot de passe de contrainte</h5>
             <p>Cette fonction utilise un coffre de contrainte séparé du Real Vault, avec identité/transport dédiés. Le mot de passe de contrainte ne dérive jamais la clé maître du vrai coffre. Configurez et testez cette fonction avant de compter dessus.</p>
             <h5>13 · Diagnostics</h5>
-            <p><strong>Diagnostics de sécurité</strong> produit le rapport global. Les consoles utiles incluent <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code> et <code>SdcCheck()</code>.</p>
+            <p><strong>Diagnostics de sécurité</strong> produit le rapport global. Les consoles utiles incluent <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code>, <code>SdcDatabasePortabilityStatus()</code> et <code>SdcCheck()</code>.</p>
             <p>Les trois piles doivent rester gelées : Classical, postQuantum et group = true dans <code>SdcProtocolFreezeStatus()</code>.</p>
             <h5>14 · Dépannage rapide</h5>
             <ul><li><strong>« Mise à jour obligatoire » :</strong> mettre à jour le ou les appareils indiqués vers ${minimum}+ et rafraîchir DEVICE_ANNOUNCE.</li><li><strong>SDC4 incomplet :</strong> vérifier le Gestionnaire d’appareils, les devices révoqués et laisser KEX/annonces converger.</li><li><strong>Identité CHANGED :</strong> ne pas forcer la confiance ; refaire KEX puis vérifier le nouveau Safety Number par un canal indépendant.</li><li><strong>Fichier bloqué :</strong> attendre une couverture LIVE/offline compatible ; SDC préfère bloquer plutôt que downgrader.</li><li><strong>GROUP bloqué :</strong> redistribuer ou faire une rotation après changement de membership/device.</li></ul>
@@ -2948,14 +2948,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>9 · Key Manager and Channel Manager</h5>
             <p><strong>Key Manager:</strong> shows known keys, types and descriptors and allows deletion. <strong>Channel Manager:</strong> binds the intended key to a channel. Deleting a key or binding can make future content unreadable; export the database before major changes.</p>
             <h5>10 · Export, import and New Database</h5>
-            <p><strong>Export Database</strong> saves the encrypted portable vault. Some installation-specific private material deliberately stays outside the export so an import does not clone a complete device. A new installation may need multi-device/KEX convergence after import.</p>
+            <p><strong>Export Database</strong> saves the encrypted portable vault, including the account identity, portable keys and readable SDC4 history when it can be exported in encrypted form. The installation device private key and mutable ratchet state deliberately stay outside the export so a complete installation is never cloned. After import, the first opening or use of a protected DM automatically sends a fresh signed <strong>DEVICE ANNOUNCE</strong> from the current installation and reconstructs the required SDC4 coverage. If the peer identity/KEX can no longer be used, SDC blocks sending and requires fresh convergence/KEX rather than downgrading.</p>
             <p><strong>New Database</strong> intentionally breaks cryptographic continuity on that installation: peers must perform KEX/verification again and GROUP keys must be recreated/redistributed.</p>
             <h5>11 · Auto-lock</h5>
             <p>Auto-lock masks plaintext, saves the vault, leaves the active conversation and tears down runtime secret references before requiring the database password again. It is recommended on shared or unattended machines.</p>
             <h5>12 · Plausible Deniability / duress password</h5>
             <p>This uses a Duress Vault separated from the Real Vault, with dedicated identity/transport material. The duress password never derives the Real Vault master key. Configure and test the feature before relying on it.</p>
             <h5>13 · Diagnostics</h5>
-            <p><strong>Security diagnostics</strong> builds the consolidated report. Useful console surfaces include <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code> and <code>SdcCheck()</code>.</p>
+            <p><strong>Security diagnostics</strong> builds the consolidated report. Useful console surfaces include <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code>, <code>SdcDatabasePortabilityStatus()</code> and <code>SdcCheck()</code>.</p>
             <p>All three stacks should remain frozen: Classical, postQuantum and group = true in <code>SdcProtocolFreezeStatus()</code>.</p>
             <h5>14 · Quick troubleshooting</h5>
             <ul><li><strong>“Update required”:</strong> update the listed installation(s) to ${minimum}+ and refresh DEVICE_ANNOUNCE.</li><li><strong>Incomplete SDC4 coverage:</strong> inspect Device Manager/revocation and allow KEX/device announcements to converge.</li><li><strong>Identity CHANGED:</strong> never force trust; run KEX again and verify the new Safety Number independently.</li><li><strong>File blocked:</strong> wait for compatible LIVE/offline coverage; SDC blocks rather than downgrades.</li><li><strong>GROUP blocked:</strong> redistribute or rotate after a membership/device change.</li></ul>
@@ -8514,6 +8514,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       DownloadDb: async function (uncompressed) {
         const exportData = JSON.parse(JSON.stringify(DataBase));
+        // v70.9.5: reconvergence bookkeeping belongs to the installation that
+        // performed an import. Never carry it into the next portable export.
+        delete exportData.portableImportConvergence;
         if (DataBase.isEncrypted && Cache?.dbKey) {
           try {
             const portableHistory = await buildPortableHistoryExportBundle();
@@ -8546,17 +8549,35 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       })(),
       ImportDb: function (callback, secondary) {
         this.fileInput.accept = '.json,.dat';
-        this.fileInput.click();
+        // Selecting the same backup twice must still fire onchange.
+        try { this.fileInput.value = ''; } catch (_) {}
         this.fileInput.onchange = async () => {
-          let buffer = await this.ReadFile(this.fileInput.files[0]);
-          DataBase = JSON.parse(
-            this.Utf8BytesToString(await this.TryDecompress(buffer))
-          );
-          if (secondary) DataBase.isSecondary = true;
-          else delete DataBase.isSecondary;
-          this.FastSaveDb();
-          this.LoadDb(callback, null, true);
+          try {
+            const file = this.fileInput.files?.[0];
+            if (!file) return;
+            const buffer = await this.ReadFile(file);
+            const imported = JSON.parse(
+              this.Utf8BytesToString(await this.TryDecompress(buffer))
+            );
+            if (!imported || typeof imported !== 'object' || Array.isArray(imported) ||
+                !imported.keys || typeof imported.keys !== 'object' ||
+                !imported.channels || typeof imported.channels !== 'object') {
+              throw new Error('Invalid SimpleDiscordCrypt database backup');
+            }
+            markPortableDatabaseImportNeedsConvergence(imported);
+            DataBase = imported;
+            if (secondary) DataBase.isSecondary = true;
+            else delete DataBase.isSecondary;
+            this.FastSaveDb();
+            this.LoadDb(callback, null, true);
+          } catch (error) {
+            console.error('[SDC][VAULT][v70.9.5] database import failed', error);
+            try { SecureComposer.toast(error?.message || 'Database import failed', 'error'); } catch (_) {}
+          } finally {
+            try { this.fileInput.value = ''; } catch (_) {}
+          }
         };
+        this.fileInput.click();
       },
 
       NewDb: function (callback, cancelCallback) {
@@ -39609,6 +39630,111 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
+  const SDC_PORTABLE_IMPORT_CONVERGENCE_VERSION = 1;
+  const PortableImportConvergencePromises = new Map();
+
+  function markPortableDatabaseImportNeedsConvergence(database) {
+    if (!database || typeof database !== 'object') return false;
+    database.portableImportConvergence = {
+      version: SDC_PORTABLE_IMPORT_CONVERGENCE_VERSION,
+      importedAt: Date.now(),
+      convergedChannels: {},
+      note: 'Device-private and mutable ratchet state are installation-local; protected DMs reconverge on first use.',
+    };
+    return true;
+  }
+
+  function portableImportConvergenceState() {
+    const state = DataBase?.portableImportConvergence;
+    if (!state || Number(state.version) !== SDC_PORTABLE_IMPORT_CONVERGENCE_VERSION) return null;
+    if (!state.convergedChannels || typeof state.convergedChannels !== 'object' || Array.isArray(state.convergedChannels))
+      state.convergedChannels = {};
+    return state;
+  }
+
+  async function ensurePortableImportConvergenceForChannel(channelId, reason = 'protected-use') {
+    const state = portableImportConvergenceState();
+    const channel = String(channelId || '');
+    if (!state || !channel) return { status: 'NOT_IMPORTED_OR_NOT_PENDING', channelId: channel };
+    if (state.convergedChannels[channel]) return { status: 'ALREADY_CONVERGED', channelId: channel, ...state.convergedChannels[channel] };
+
+    const discordChannel = Discord.getChannel(channel);
+    if (!discordChannel || discordChannel.type !== 1) return { status: 'NOT_DM', channelId: channel };
+    if (!ratchetV4IsRequired(channel)) return { status: 'SDC4_NOT_REQUIRED', channelId: channel };
+
+    const peerId = ratchetPeerAccountId(channel);
+    const peerIdentity = getPeerIdentityRecord(peerId);
+    if (!peerIdentity?.publicKey) {
+      const error = new Error('Imported database needs KEX v3 before this protected DM can be restored');
+      error.code = 'SDC_PORTABLE_IMPORT_KEX_REQUIRED';
+      throw error;
+    }
+
+    const existing = PortableImportConvergencePromises.get(channel);
+    if (existing) return await existing;
+
+    const task = (async () => {
+      const local = await ensureLocalDeviceIdentity();
+      // Explicit import is an active restoration operation, so a fresh signed
+      // announcement is appropriate here even though ordinary channel viewing
+      // remains passive in the normal non-import path.
+      await sendDeviceAnnouncement(channel, true);
+      const live = await ensureRatchetV4Live(channel, `portable-db-import:${reason}`, 15000);
+      const record = {
+        at: Date.now(),
+        localDeviceId: String(local.deviceId || ''),
+        peerId: String(peerId || ''),
+        kexGeneration: currentRatchetKexGeneration(channel),
+        sessionId: String(live?.sessionId || ''),
+      };
+      state.convergedChannels[channel] = record;
+      state.lastConvergedAt = record.at;
+      Utils.dbChanged = true;
+      try { await Utils.SaveDb(); } catch (_) {}
+      try {
+        SecureComposer.toast(
+          SdcUiI18n.pick('Imported database: this protected DM is ready on the current installation.', 'Base importée : ce DM protégé est prêt sur cette installation.'),
+          'success'
+        );
+      } catch (_) {}
+      console.log('[SDC][VAULT][v70.9.5] portable database device convergence complete', {
+        channelId: channel, peerId, localDeviceId: local.deviceId,
+        kexGeneration: record.kexGeneration, reason: String(reason || ''),
+      });
+      return { status: 'CONVERGED', channelId: channel, ...record };
+    })();
+
+    PortableImportConvergencePromises.set(channel, task);
+    try {
+      return await task;
+    } finally {
+      if (PortableImportConvergencePromises.get(channel) === task)
+        PortableImportConvergencePromises.delete(channel);
+    }
+  }
+
+  function schedulePortableImportConvergence(channelId, reason = 'channel-select') {
+    const channel = String(channelId || '');
+    if (!portableImportConvergenceState() || !channel || !ratchetV4IsRequired(channel)) return false;
+    setTimeout(() => {
+      ensurePortableImportConvergenceForChannel(channel, reason).catch((error) => {
+        console.warn('[SDC][VAULT][v70.9.5] imported database device convergence deferred', {
+          channelId: channel, reason: String(reason || ''), error: error?.message || String(error),
+        });
+        try {
+          SecureComposer.toast(
+            SdcUiI18n.pick(
+              'Imported database restored your keys, but this installation still needs device/KEX convergence before protected sending.',
+              'La base importée a restauré vos clés, mais cette installation doit encore converger côté appareil/KEX avant l’envoi protégé.'
+            ),
+            'error'
+          );
+        } catch (_) {}
+      });
+    }, 350);
+    return true;
+  }
+
   function scheduleAutomaticRatchetV4(channelId, reason = 'channel-selected') {
     // Re-check both when scheduling AND when the timer fires. This closes the
     // pre-unlock race where a timer armed against the Real Vault could execute
@@ -42954,29 +43080,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           return true;
         }
         const localEchoId = await ratchetWireCacheId(normalizedSelfWire);
-        if (typeof SecureComposer !== 'undefined' &&
-            SecureComposer.canUseEphemeralLocalEcho(localEchoId, message.channel_id)) {
-          // Keep Discord's own message model free of plaintext. The invisible
-          // separator preserves a renderable content node; an opaque local-echo
-          // iframe is mounted over it and receives plaintext directly from the
-          // CURRENT Secure Input iframe over MessageChannel.
-          message.content = '\u2063';
-          message.embeds = Array.isArray(message.embeds)
-            ? message.embeds.filter(isNativeKlipyEmbed)
-            : [];
-          SecureComposer.scheduleLocalEchoForMessage(message, localEchoId);
-          await decryptRatchetV4BoundAttachments(message, info, processingContext);
-          return true;
-        }
 
-        // v69.0.1: after a channel leave/re-entry the short-lived pending echo may
-        // still exist for up to five minutes but belongs to the previous opaque
-        // Secure Input instance. Do not hide the canonical Discord row behind U+2063
-        // in that case; fall through to the encrypted durable sent-history record.
-        // v67.1.114: after reload the short-lived plaintext bridge is gone, but
-        // an authenticated local ciphertext history record can still exist. The
-        // parent never decrypts this sent record: an opaque render iframe receives
-        // the encrypted blob + a freshly derived device-bound history key.
+        // v70.9.5: prefer the persist-before-send encrypted history immediately.
+        // The previous order used the current iframe's ephemeral echo first and
+        // left Discord's canonical message.content as U+2063. Once that five-minute
+        // cache expired, a remount could leave a permanently blank native row even
+        // though the durable encrypted sent-history record already existed. The
+        // durable renderer is still opaque-origin and receives only ciphertext + a
+        // freshly derived device-bound history key; plaintext never enters Discord.
         const durableSentHistory = await getSdc4HistoryRecord(localEchoId, 'sent');
         if (durableSentHistory && typeof SecureComposer !== 'undefined') {
           message.content = '\u2063';
@@ -42991,6 +43102,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               ? sdc4FanoutHistoryBindingBytes(dataPlaneEnvelope.fanout.entries)
               : info.ciphertext
           );
+          await decryptRatchetV4BoundAttachments(message, info, processingContext);
+          return true;
+        }
+
+        // Emergency compatibility fallback only: if encrypted sent-history could
+        // not be persisted, the just-sent plaintext may still be rendered directly
+        // frame-to-frame for the current Secure Input instance. It remains bounded
+        // and is never the normal path for canonical Chat Control messages.
+        if (typeof SecureComposer !== 'undefined' &&
+            SecureComposer.canUseEphemeralLocalEcho(localEchoId, message.channel_id)) {
+          message.content = '\u2063';
+          message.embeds = Array.isArray(message.embeds)
+            ? message.embeds.filter(isNativeKlipyEmbed)
+            : [];
+          SecureComposer.scheduleLocalEchoForMessage(message, localEchoId);
           await decryptRatchetV4BoundAttachments(message, info, processingContext);
           return true;
         }
@@ -48801,6 +48927,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // v67.1.110: selecting a previously SDC4-protected DM automatically
       // reconstructs a missing ratchet session. No console command is needed.
       scheduleAutomaticRatchetV4(channelId, 'channel-select');
+      // v70.9.5: after a portable DB import, the account identity/keys are
+      // restored but this installation's device private key/ratchet state is not.
+      // First protected use actively re-announces this device and rebuilds SDC4.
+      schedulePortableImportConvergence(channelId, 'channel-select');
       setTimeout(() => {
         PopupManager.Update();
       }, 0);
@@ -48971,6 +49101,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           reason: error?.message || String(error),
         });
       }
+    }
+
+    // v70.9.5: normal composer path gets the same portable-import restoration
+    // gate as Chat Control. This is not a protocol downgrade or a new handshake;
+    // it simply re-announces the current installation and reconstructs the already
+    // required frozen SDC4 sessions before user traffic resumes.
+    if (sdc4Required && portableImportConvergenceState()) {
+      await ensurePortableImportConvergenceForChannel(channelId, 'normal-composer-send');
     }
 
     // v67 root-rotation boundary: do not let application traffic race a KEX v3
@@ -60864,6 +61002,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         throw new Error('KEX v3 rotation is in progress');
       }
 
+      // Portable DB import restores account keys but intentionally not this
+      // installation's device private key or mutable ratchet state. Complete the
+      // explicit post-import device convergence before consuming a one-shot MK.
+      if (portableImportConvergenceState()) {
+        await ensurePortableImportConvergenceForChannel(channelId, 'secure-input-reservation');
+      }
+
       const attachmentScopedKeyId =
         await this.getSecureSdc4AttachmentScopedKeyId(channelId);
       const fileFsEnvelope = this.getSecureSdc4FileFsEnvelope(channelId);
@@ -69811,7 +69956,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.9.4',
+      build: 'v70.9.5',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -69934,7 +70079,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.9.4',
+      build: 'v70.9.5',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -69960,7 +70105,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.9.4',
+    build: 'v70.9.5',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -69988,14 +70133,58 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       String(Discord.detour_enqueue || '').includes('MessageQueue-immediately-before-original-enqueue'),
     frozenHybridWirePrefixesUnchanged:
       SDC_HYBRID_ASYNC_WIRE_PREFIX === 'SDC4Q:' && SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX === 'SDC4QF:',
+    durableOwnSdc4EchoPreferredBeforeEphemeral:
+      String(decryptRatchetV4TextMessageCore || '').indexOf("getSdc4HistoryRecord(localEchoId, 'sent')") <
+      String(decryptRatchetV4TextMessageCore || '').indexOf('canUseEphemeralLocalEcho(localEchoId'),
+    portableDatabaseDeviceReconvergence:
+      typeof ensurePortableImportConvergenceForChannel === 'function' &&
+      String(ensurePortableImportConvergenceForChannel || '').includes('sendDeviceAnnouncement(channel, true)') &&
+      String(ensurePortableImportConvergenceForChannel || '').includes('ensureRatchetV4Live'),
+    portableExportOmitsInstallationReconvergenceMarker:
+      String(Utils.DownloadDb || '').includes('delete exportData.portableImportConvergence'),
     note: SdcUiI18n.pick(
-      'UI-only corrective; Classical, PQ and GROUP protocol semantics remain frozen.',
-      'Correctif uniquement UI ; les sémantiques protocolaires Classical, PQ et GROUP restent gelées.'
+      'Presentation/storage-orchestration corrective; Classical, PQ and GROUP protocol semantics remain frozen.',
+      'Correctif de présentation/orchestration du stockage ; les sémantiques protocolaires Classical, PQ et GROUP restent gelées.'
     ),
   });
 
+  window.SdcDatabasePortabilityStatus = () => {
+    const state = portableImportConvergenceState();
+    let currentChannel = null;
+    try {
+      const channelId = String(Cache.channelId || Discord.getChannelId?.() || '');
+      if (channelId) {
+        const channel = Discord.getChannel(channelId);
+        const ratchetRequired = ratchetV4IsRequired(channelId);
+        currentChannel = {
+          channelId,
+          isDm: channel?.type === 1,
+          ratchetV4Required: ratchetRequired,
+          convergedAfterImport: !!state?.convergedChannels?.[channelId],
+          convergenceRecord: state?.convergedChannels?.[channelId] || null,
+        };
+      }
+    } catch (_) {}
+    return {
+      build: 'v70.9.5',
+      portableAccountIdentity: true,
+      portableDevicePrivateKey: false,
+      portableMutableRatchetState: false,
+      encryptedReadableHistoryPortableWhenExported: true,
+      importedAt: Number(state?.importedAt || 0) || null,
+      postImportDeviceConvergenceActive: !!state,
+      convergedChannels: state ? Object.keys(state.convergedChannels || {}).length : 0,
+      currentChannel,
+      behavior: 'FIRST PROTECTED DM USE AFTER IMPORT -> SIGNED DEVICE ANNOUNCE -> REQUIRED SDC4 COVERAGE RECONSTRUCTION',
+      note: SdcUiI18n.pick(
+        'A portable backup restores the account identity and encrypted keys/history, but never clones an installation device private key or live ratchet state.',
+        'Une sauvegarde portable restaure l’identité de compte ainsi que les clés/l’historique chiffrés, mais ne clone jamais la clé privée d’un appareil ni un état ratchet actif.'
+      ),
+    };
+  };
+
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.9.4',
+    build: 'v70.9.5',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
