@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.2
+// @version      1.7.6.3
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -15,10 +15,10 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.9.5';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_5_DURABLE_ECHO_PORTABLE_IMPORT';
-    console.info('[SDC][BUILD][v70.9.5] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_9_5_DURABLE_ECHO_PORTABLE_IMPORT',
+    window.SdcRuntimeBuild = () => 'v70.10.3';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_3_QUIET_PQ_DIRECT_FINAL';
+    console.info('[SDC][BUILD][v70.10.3] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_3_QUIET_PQ_DIRECT_FINAL',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -36,7 +36,10 @@
   // AADs or application ciphertext formats.
   const SDC_PUBLIC_RELEASE_VERSION = '1.7.8.15';
   const SDC_MINIMUM_SUPPORTED_VERSION = '1.7.5.9';
-  const SDC_VERSION_POLICY_BUILD = 'v70.9.5';
+  // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
+  // but is NOT cryptographic key material and does not alter any frozen wire.
+  const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
+  const SDC_VERSION_POLICY_BUILD = 'v70.10.3';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -2884,6 +2887,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>3 · Envoyer et recevoir des messages privés</h5>
             <p>Une fois SDC4 LIVE, chaque appareil utilise son propre Double Ratchet. Les clés de message évoluent automatiquement. Header Encryption masque aussi les en-têtes ratchet lorsque la migration sécurisée est disponible.</p>
             <p>Si le destinataire est hors ligne, SDC peut utiliser SDC4Q/SDC4QF avec P-521 + ML-KEM-768 si les prekeys/capacités authentifiées nécessaires sont encore valides. Une protection PQ déjà exigée ne redescend pas silencieusement vers un mode classique plus faible.</p>
+            <p><strong>Maintenance PQ silencieuse :</strong> SDC n’envoie plus de refresh horaire pendant une conversation inactive. Un refresh dû est déclenché uniquement par un vrai envoi utilisateur. L’INIT est un vrai message Discord persistant envoyé avec « Suppress Notifications » pour fonctionner même si le correspondant est hors ligne. Le destinataire l’authentifie à sa reconnexion mais diffère son ACK jusqu’à sa prochaine vraie réponse ; l’ACK est alors envoyé silencieusement juste avant son message afin que le message humain reste le dernier élément de l’échange. Les sessions existantes et les imports portables convergent automatiquement : le premier envoi protégé publie la capacité Quiet signée avant toute réservation SDC4, sans DEVICE ANNOUNCE/KEX manuel. En version mixte, l’époque déjà confirmée reste utilisée tant que le device distant exact n’annonce pas le support ACK différé.</p>
             <h5>4 · Chat Control / Secure Input</h5>
             <p>« Protection Chat Control (globale) » remplace la zone de saisie Discord dans les salons SDC chiffrés. Le brouillon reste dans une iframe opaque jusqu’au chiffrement ; le parent Discord ne reçoit que ciphertext, métadonnées bornées ou grants one-shot.</p>
             <p>Désactiver Chat Control ne désactive pas SDC : le compositeur natif peut encore chiffrer au moment de l’envoi. Pour le niveau d’isolation maximal, gardez Chat Control activé.</p>
@@ -2902,14 +2906,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>9 · Gestionnaire de clés et salons</h5>
             <p><strong>Gestionnaire de clés :</strong> affiche les clés connues, leur type, leur descripteur et permet leur suppression. <strong>Gestionnaire de salons :</strong> associe la clé voulue au salon. Supprimer une clé ou une association peut rendre de futurs messages illisibles ; exportez la base avant une opération importante.</p>
             <h5>10 · Export, import et nouvelle base</h5>
-            <p><strong>Exporter la base</strong> sauvegarde le coffre portable chiffré, y compris l’identité de compte, les clés portables et l’historique SDC4 lisible lorsqu’il peut être exporté sous forme chiffrée. La clé privée propre à l’appareil et les états ratchet mutables restent volontairement hors export afin de ne jamais cloner une installation complète. Après import, la première ouverture ou utilisation d’un DM protégé force automatiquement une nouvelle <strong>DEVICE ANNOUNCE</strong> signée depuis l’installation courante puis reconstruit la couverture SDC4 requise. Si l’identité/KEX du correspondant n’est plus exploitable, SDC bloque l’envoi et demande une nouvelle convergence/KEX au lieu de downgrader.</p>
+            <p><strong>Exporter la base</strong> sauvegarde le coffre portable chiffré, y compris l’identité de compte, les clés portables et l’historique SDC4 lisible lorsqu’il peut être exporté sous forme chiffrée. La clé privée propre à l’appareil et les états ratchet mutables restent volontairement hors export afin de ne jamais cloner une installation complète. Après import, la première ouverture ou utilisation d’un DM protégé crée/reprend automatiquement l’identité de la nouvelle installation, envoie une nouvelle <strong>DEVICE ANNOUNCE</strong> signée (incluant la capacité quiet PQ) puis reconstruit la couverture SDC4 requise. Aucune commande console, KEX manuel ou annonce manuelle n’est nécessaire lorsque les identités/KEX portables restent valides. Si l’identité/KEX du correspondant n’est plus exploitable, SDC bloque l’envoi et demande une nouvelle convergence/KEX au lieu de downgrader.</p>
             <p><strong>Nouvelle base</strong> efface la continuité cryptographique de l’ancienne base sur cette installation : les correspondants devront refaire KEX/vérification et les GROUP devront être recréés/redistribués.</p>
             <h5>11 · Auto-lock</h5>
             <p>Le verrouillage automatique masque le plaintext, sauvegarde le coffre, quitte la conversation active et détruit les références de secrets runtime avant de redemander le mot de passe. Il est recommandé sur un poste partagé ou laissé sans surveillance.</p>
             <h5>12 · Plausible Deniability / mot de passe de contrainte</h5>
             <p>Cette fonction utilise un coffre de contrainte séparé du Real Vault, avec identité/transport dédiés. Le mot de passe de contrainte ne dérive jamais la clé maître du vrai coffre. Configurez et testez cette fonction avant de compter dessus.</p>
             <h5>13 · Diagnostics</h5>
-            <p><strong>Diagnostics de sécurité</strong> produit le rapport global. Les consoles utiles incluent <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code>, <code>SdcDatabasePortabilityStatus()</code> et <code>SdcCheck()</code>.</p>
+            <p><strong>Diagnostics de sécurité</strong> produit le rapport global. Les consoles utiles incluent <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code>, <code>SdcDatabasePortabilityStatus()</code>, <code>SdcPqQuietMaintenanceStatus()</code> et <code>SdcCheck()</code>.</p>
             <p>Les trois piles doivent rester gelées : Classical, postQuantum et group = true dans <code>SdcProtocolFreezeStatus()</code>.</p>
             <h5>14 · Dépannage rapide</h5>
             <ul><li><strong>« Mise à jour obligatoire » :</strong> mettre à jour le ou les appareils indiqués vers ${minimum}+ et rafraîchir DEVICE_ANNOUNCE.</li><li><strong>SDC4 incomplet :</strong> vérifier le Gestionnaire d’appareils, les devices révoqués et laisser KEX/annonces converger.</li><li><strong>Identité CHANGED :</strong> ne pas forcer la confiance ; refaire KEX puis vérifier le nouveau Safety Number par un canal indépendant.</li><li><strong>Fichier bloqué :</strong> attendre une couverture LIVE/offline compatible ; SDC préfère bloquer plutôt que downgrader.</li><li><strong>GROUP bloqué :</strong> redistribuer ou faire une rotation après changement de membership/device.</li></ul>
@@ -2930,6 +2934,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>3 · Sending and receiving private messages</h5>
             <p>Once SDC4 is LIVE, each device has its own Double Ratchet. Message keys evolve automatically. Header Encryption also protects ratchet headers when the authenticated migration is available.</p>
             <p>If a recipient is offline, SDC can use SDC4Q/SDC4QF with P-521 + ML-KEM-768 when the required authenticated prekeys/capabilities are still valid. Once PQ is sticky-required, SDC does not silently fall back to a weaker classical mode.</p>
+            <p><strong>Quiet PQ maintenance:</strong> SDC no longer sends hourly refresh traffic while a conversation is inactive. A due refresh is triggered only by a genuine user send. INIT remains a real persistent Discord message sent with Suppress Notifications so it works while the peer is offline. The peer authenticates it on reconnect but defers ACK until their next genuine reply; ACK is then sent silently immediately before the human message so the user message stays last. Existing sessions and portable imports converge automatically: the first protected send publishes the signed Quiet capability before SDC4 reserves a message key, so no manual DEVICE ANNOUNCE/KEX is required. Mixed-version peers remain on the already-confirmed epoch until the exact remote device advertises deferred-ACK support.</p>
             <h5>4 · Chat Control / Secure Input</h5>
             <p>“Chat Control protection (global)” replaces Discord’s typing surface in encrypted SDC channels. The draft remains inside an opaque iframe until encryption; the Discord parent receives only ciphertext, bounded metadata or one-shot grants.</p>
             <p>Disabling Chat Control does not disable SDC: Discord’s native composer can still encrypt at send time. Keep Chat Control enabled when you want the strongest plaintext-isolation boundary.</p>
@@ -2948,14 +2953,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>9 · Key Manager and Channel Manager</h5>
             <p><strong>Key Manager:</strong> shows known keys, types and descriptors and allows deletion. <strong>Channel Manager:</strong> binds the intended key to a channel. Deleting a key or binding can make future content unreadable; export the database before major changes.</p>
             <h5>10 · Export, import and New Database</h5>
-            <p><strong>Export Database</strong> saves the encrypted portable vault, including the account identity, portable keys and readable SDC4 history when it can be exported in encrypted form. The installation device private key and mutable ratchet state deliberately stay outside the export so a complete installation is never cloned. After import, the first opening or use of a protected DM automatically sends a fresh signed <strong>DEVICE ANNOUNCE</strong> from the current installation and reconstructs the required SDC4 coverage. If the peer identity/KEX can no longer be used, SDC blocks sending and requires fresh convergence/KEX rather than downgrading.</p>
+            <p><strong>Export Database</strong> saves the encrypted portable vault, including the account identity, portable keys and readable SDC4 history when it can be exported in encrypted form. The installation device private key and mutable ratchet state deliberately stay outside the export so a complete installation is never cloned. After import, the first opening or use of a protected DM automatically creates/resumes the new installation identity, sends a fresh signed <strong>DEVICE ANNOUNCE</strong> (including the quiet-PQ capability), and reconstructs the required SDC4 coverage. No console command, manual KEX, or manual announce is required while the portable identity/KEX material remains valid. If the peer identity/KEX can no longer be used, SDC blocks sending and requires fresh convergence/KEX rather than downgrading.</p>
             <p><strong>New Database</strong> intentionally breaks cryptographic continuity on that installation: peers must perform KEX/verification again and GROUP keys must be recreated/redistributed.</p>
             <h5>11 · Auto-lock</h5>
             <p>Auto-lock masks plaintext, saves the vault, leaves the active conversation and tears down runtime secret references before requiring the database password again. It is recommended on shared or unattended machines.</p>
             <h5>12 · Plausible Deniability / duress password</h5>
             <p>This uses a Duress Vault separated from the Real Vault, with dedicated identity/transport material. The duress password never derives the Real Vault master key. Configure and test the feature before relying on it.</p>
             <h5>13 · Diagnostics</h5>
-            <p><strong>Security diagnostics</strong> builds the consolidated report. Useful console surfaces include <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code>, <code>SdcDatabasePortabilityStatus()</code> and <code>SdcCheck()</code>.</p>
+            <p><strong>Security diagnostics</strong> builds the consolidated report. Useful console surfaces include <code>SdcProtocolFreezeStatus()</code>, <code>SdcGroupRatchetStatus()</code>, <code>SdcOfflineFileForwardSecrecyStatus()</code>, <code>SdcGroupFileForwardSecrecyStatus()</code>, <code>SdcVersionPolicyStatus()</code>, <code>SdcDatabasePortabilityStatus()</code>, <code>SdcPqQuietMaintenanceStatus()</code> and <code>SdcCheck()</code>.</p>
             <p>All three stacks should remain frozen: Classical, postQuantum and group = true in <code>SdcProtocolFreezeStatus()</code>.</p>
             <h5>14 · Quick troubleshooting</h5>
             <ul><li><strong>“Update required”:</strong> update the listed installation(s) to ${minimum}+ and refresh DEVICE_ANNOUNCE.</li><li><strong>Incomplete SDC4 coverage:</strong> inspect Device Manager/revocation and allow KEX/device announcements to converge.</li><li><strong>Identity CHANGED:</strong> never force trust; run KEX again and verify the new Safety Number independently.</li><li><strong>File blocked:</strong> wait for compatible LIVE/offline coverage; SDC blocks rather than downgrades.</li><li><strong>GROUP blocked:</strong> redistribute or rotate after a membership/device change.</li></ul>
@@ -9142,7 +9147,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         this.ClearChannelAttachments(Cache.channelId);
       },
 
-      SendSystemMessage: function (channelId, sysmsg) {
+      SendSystemMessage: function (channelId, sysmsg, sendOptions = null) {
+        // v70.10.1: automatic cryptographic maintenance remains a real persistent
+        // Discord message for offline delivery, but uses Discord's documented
+        // Suppress Notifications message flag. This changes transport UX only;
+        // the authenticated control body/wire is byte-for-byte unchanged.
+        const optionsInput = sendOptions && typeof sendOptions === 'object' ? sendOptions : {};
+        const controlType = String(getSystemMessageProperty('type', String(sysmsg || '')) || '');
+        const quietTypes = new Set([
+          'PQ RATCHET INIT', 'PQ RATCHET ACK',
+          'DEVICE ANNOUNCE', 'DEVICE PQ ANNOUNCE', 'DEVICE PQ V692 ANNOUNCE',
+          'DEVICE SYNC REQUEST', 'DEVICE KEY SYNC',
+          'RATCHET HELLO', 'RATCHET ACCEPT', 'RATCHET READY', 'RATCHET READY ACK',
+          'GROUP RATCHET GRANT'
+        ]);
+        const suppressNotifications = optionsInput.suppressNotifications === true || quietTypes.has(controlType);
+
         // v68.6.3 defense-in-depth: the alternate/Duress runtime may send only
         // ordinary plaintext or SDCD1 user traffic plus its dedicated direct-REST
         // emergency alert. It must NEVER emit the Real-Vault SDC system control
@@ -9162,8 +9182,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           invalidEmojis: [],
           validNonShortcutEmojis: [],
           // Marquer comme message système pour bypasser handleSend
-          _sdc_system_message: true
+          _sdc_system_message: true,
+          _sdc_suppress_notifications: suppressNotifications
         };
+        // Preserve the legacy object shape for non-quiet human/security controls;
+        // only automatic quiet controls gain the Discord flag field.
+        if (suppressNotifications) messageObject.flags = SDC_DISCORD_SUPPRESS_NOTIFICATIONS_FLAG;
 
         const options = {
           alsoForwardToChannelId: undefined,
@@ -11985,7 +12009,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           allLiveSdc4SessionsPqLive: ratchet.allLiveSdc4SessionsPqLive === true,
           allPqLiveSessionsNextKemArmed: ratchet.allPqLiveSessionsNextKemArmed === true,
           noPendingSessions: Number(ratchet.pendingSessionCount || 0) === 0,
-          automaticMaintenanceActive: ratchet?.automaticRefresh?.maintenanceActive === true,
+          quietMaintenanceUserActivityOnly:
+            ratchet?.automaticRefresh?.maintenanceActive === false &&
+            Number(ratchet?.automaticRefresh?.maintenanceIntervalMs || 0) === 0 &&
+            ratchet?.automaticRefresh?.mode === 'USER_ACTIVITY_ONLY',
           noStickyDowngradeGap: (ratchet?.antiDowngrade?.stickyRequiredButNotLiveSessionIds || []).length === 0,
         },
         sessions: live.map((session) => ({
@@ -27751,9 +27778,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const SDC_PQ_RATCHET_PROFILE = 'SDC-V69.1|X25519-DR+ML-KEM-768-SPARSE|HKDF-SHA-256';
   const SDC_PQ_KEX_BINDING_VERSION = 2;
   const SDC_PQ_RATCHET_REFRESH_MESSAGES = 32;
-  const SDC_PQ_RATCHET_REFRESH_MAX_AGE_MS = 60 * 60 * 1000;
-  const SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS = 60 * 1000;
+  // v70.10.1: age is a lazy user-activity trigger, never a background network timer.
+  const SDC_PQ_RATCHET_REFRESH_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const SDC_PQ_RATCHET_BACKGROUND_MAINTENANCE_ENABLED = false;
+  const SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS = 0;
   const SDC_PQ_RATCHET_CONTROL_TTL_MS = 10 * 60 * 1000;
+  const SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+  const SDC_DISCORD_SUPPRESS_NOTIFICATIONS_FLAG = 1 << 12;
   const SDC_PQ_RATCHET_MAX_PREVIOUS_EPOCHS = 2;
   const SDC_PQ_RATCHET_PREVIOUS_EPOCH_TTL_MS = 24 * 60 * 60 * 1000;
   const SDC_PQ_RATCHET_INIT_MAGIC = Uint8Array.from([0x53, 0x51, 0x52, 0x11]);
@@ -27915,6 +27946,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       pqLastAckTag: '',
       pqLastAckRefreshId: '',
       pqLastAckEpoch: 0,
+      // v70.10.1: ACK delivery is installation-local mutable state. A responder
+      // persists the authenticated ACK material but emits it only at the next
+      // genuine protected user-send boundary. These fields live only in the
+      // encrypted per-installation ratchet store and are never part of DB export.
+      pqDeferredAck: false,
+      pqDeferredAckAt: 0,
+      pqDeferredAckEpoch: 0,
+      pqDeferredAckRefreshId: '',
+      pqLastAckSentAt: 0,
       // v70.3.8: responder outbound PQ is gated until peer traffic proves that
       // the initiator installed this exact epoch. Missing legacy state is migrated
       // conservatively on restore for responder sessions.
@@ -27931,6 +27971,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       activatedAt: Number(entry?.activatedAt || 0),
       expiresAt: Number(entry?.expiresAt || 0),
       refreshId: String(entry?.refreshId || ''),
+      // Quiet-PQ availability invariant: when a responder has accepted a new
+      // epoch but intentionally defers ACK until its next human reply, the peer
+      // is still legitimately allowed to send with the previously confirmed
+      // epoch. Pin that one old root until the deferred ACK is actually emitted.
+      holdUntilAckEpoch: Number(entry?.holdUntilAckEpoch || 0),
     })).filter((entry) => entry.epoch > 0 && entry.rootKey instanceof Uint8Array && entry.rootKey.byteLength === 32);
   }
 
@@ -27954,6 +27999,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       confirmKey: pending.confirmKey?.slice?.() || null,
       ciphertext: pending.ciphertext?.slice?.() || null,
       controlBody: typeof pending.controlBody === 'string' ? pending.controlBody : '',
+      // v70.10.1: installation-local delivery bookkeeping only. This never enters
+      // the signed/wire INIT payload and exists solely to prevent repeated resume
+      // of a pre-Quiet persisted pending proposal after peer capability convergence.
+      quietDeliveryCapabilityVersion: Number(pending.quietDeliveryCapabilityVersion || 0),
+      quietDeliveryAt: Number(pending.quietDeliveryAt || 0),
+      quietDeliverySource: String(pending.quietDeliverySource || ''),
     };
   }
 
@@ -27963,16 +28014,79 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     try { pending?.ciphertext?.fill?.(0); } catch (_) {}
   }
 
+  function pqRatchetPreviousRootHeldForDeferredAck(state, entry) {
+    const ackEpoch = Number(entry?.holdUntilAckEpoch || 0);
+    return ackEpoch > 0 && state?.pqDeferredAck === true &&
+      ackEpoch === Number(state.pqDeferredAckEpoch || 0) &&
+      ackEpoch === Number(state.pqLastAckEpoch || 0);
+  }
+
   function pqRatchetPrunePreviousRoots(state, now = Date.now()) {
     if (!state) return;
     const kept = [];
     for (const entry of Array.isArray(state.pqPreviousRoots) ? state.pqPreviousRoots : []) {
+      const held = pqRatchetPreviousRootHeldForDeferredAck(state, entry);
       const valid = entry?.rootKey instanceof Uint8Array && entry.rootKey.byteLength === 32 &&
-        Number(entry.epoch || 0) > 0 && Number(entry.expiresAt || 0) > now;
+        Number(entry.epoch || 0) > 0 && (held || Number(entry.expiresAt || 0) > now);
+      // Even a held root remains subject to the hard previous-epoch count bound;
+      // quiet operation may extend lifetime, never the number of retained roots.
       if (valid && kept.length < SDC_PQ_RATCHET_MAX_PREVIOUS_EPOCHS) kept.push(entry);
       else try { entry?.rootKey?.fill?.(0); } catch (_) {}
     }
     state.pqPreviousRoots = kept;
+  }
+
+  function pqRatchetHoldPreviousRootUntilDeferredAck(state, ackEpoch) {
+    ackEpoch = Number(ackEpoch || 0);
+    if (!state || ackEpoch <= 0 || !Array.isArray(state.pqPreviousRoots)) return false;
+    const expectedPreviousEpoch = ackEpoch - 1;
+    const entry = state.pqPreviousRoots.find((candidate) =>
+      Number(candidate?.epoch || 0) === expectedPreviousEpoch &&
+      candidate?.rootKey instanceof Uint8Array && candidate.rootKey.byteLength === 32
+    );
+    if (!entry) return false;
+    entry.holdUntilAckEpoch = ackEpoch;
+    return true;
+  }
+
+  function pqRatchetReleasePreviousRootAfterDeferredAck(state, ackEpoch, now = Date.now()) {
+    ackEpoch = Number(ackEpoch || 0);
+    if (!state || ackEpoch <= 0 || !Array.isArray(state.pqPreviousRoots)) return false;
+    let released = false;
+    for (const entry of state.pqPreviousRoots) {
+      if (Number(entry?.holdUntilAckEpoch || 0) !== ackEpoch) continue;
+      entry.holdUntilAckEpoch = 0;
+      // Start the normal historical grace period only once the peer has actually
+      // been sent the ACK that lets it advance away from this old confirmed root.
+      entry.expiresAt = Number(now) + SDC_PQ_RATCHET_PREVIOUS_EPOCH_TTL_MS;
+      released = true;
+    }
+    pqRatchetPrunePreviousRoots(state, now);
+    return released;
+  }
+
+  function pqRatchetDeferredAckRootRetentionSelfTest() {
+    const now = Date.now();
+    const root = new Uint8Array(32).fill(0x6d);
+    const state = {
+      pqDeferredAck: true,
+      pqDeferredAckEpoch: 2,
+      pqLastAckEpoch: 2,
+      pqPreviousRoots: [{ epoch: 1, rootKey: root, activatedAt: now - 10000, expiresAt: now - 1, refreshId: 'selftest', holdUntilAckEpoch: 2 }],
+    };
+    try {
+      // An expired old root must survive while the peer is still legitimately on
+      // that epoch, but release immediately back into the normal bounded TTL once
+      // the deferred ACK is emitted.
+      pqRatchetPrunePreviousRoots(state, now);
+      const held = state.pqPreviousRoots.length === 1 && state.pqPreviousRoots[0].rootKey === root;
+      const released = pqRatchetReleasePreviousRootAfterDeferredAck(state, 2, now);
+      const entry = state.pqPreviousRoots[0];
+      return held && released && !!entry && Number(entry.holdUntilAckEpoch || 0) === 0 &&
+        Number(entry.expiresAt || 0) === now + SDC_PQ_RATCHET_PREVIOUS_EPOCH_TTL_MS;
+    } finally {
+      pqRatchetErasePreviousRoots(state.pqPreviousRoots);
+    }
   }
 
   function pqRatchetCanonicalParties(state) {
@@ -28079,6 +28193,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       activatedAt: Number(state.pqActivatedAt || now),
       expiresAt: now + SDC_PQ_RATCHET_PREVIOUS_EPOCH_TTL_MS,
       refreshId: String(state.pqLastRefreshId || ''),
+      holdUntilAckEpoch: 0,
     });
     pqRatchetPrunePreviousRoots(state, now);
   }
@@ -29577,10 +29692,23 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     let v692CapabilitySent = false;
     try { v692CapabilitySent = await sendPqV692CapabilityAnnouncement(channelKey, force, local); }
     catch (error) { console.warn('[SDC][PQ][v69.2.6] v69.2 migration capability announcement deferred', error); }
-    // When a device first advertises v69.2 in this runtime, repeat the compact
-    // ML-KEM prekey once as well. This repairs peers whose old registry retained a
-    // PQ-LIVE session but missed/staled the earlier DEVICE PQ ANNOUNCE.
-    if (!force && previous === pqPrekey.keyId && !v692CapabilitySent) return false;
+    // v70.10.1 mixed-version quietness: the historical repair path repeated an
+    // unchanged ML-KEM prekey whenever the v69.2 capability lease was refreshed.
+    // A pre-v70.10 receiver treats that redundant prekey as a trigger for its old
+    // automatic PQ scheduler, which can create a notification-only INIT after the
+    // human message. Keep the repair behavior only when every current recipient
+    // device advertises the signed deferred-ACK/quiet capability. A genuinely new
+    // or rotated PQ prekey is still always announced regardless of peer build.
+    let peerQuietReady = false;
+    try {
+      const peerId = String(ratchetPeerAccountId(channelKey) || '');
+      const recipientIds = peerId ? ratchetV4ActiveDeviceIdsForChannel(channelKey, peerId) : [];
+      peerQuietReady = recipientIds.length > 0 && recipientIds.every((deviceId) =>
+        Number(getDeviceRecord(peerId, deviceId)?.quietPqControlVersion || 0) >= SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION
+      );
+    } catch (_) {}
+    if (!force && previous === pqPrekey.keyId && (!v692CapabilitySent || !peerQuietReady))
+      return v692CapabilitySent;
     const info = {
       accountId: String(Discord.getCurrentUser().id),
       channelId: channelKey,
@@ -29711,6 +29839,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     lastReason: null,
     lastError: null,
   };
+  const PqQuietControlStats = {
+    terminalUserSends: 0, initControlsSent: 0, ackControlsSent: 0, ackSendFailures: 0,
+    backgroundRunsSuppressed: 0, pendingInitRetriesSuppressed: 0, offlineControlsAccepted: 0,
+    legacyPeerRefreshSuppressed: 0, capabilityIntentChecks: 0, capabilityAnnouncementsSent: 0,
+    inheritedPendingResumeAttempts: 0, inheritedPendingResumesSent: 0, inheritedPendingResumeFailures: 0,
+    lastUserSendAt: 0, lastChannelId: null, lastPeerId: null, lastControlAt: 0, lastError: null,
+  };
 
   function pqRatchetControlIdBytes(value, label) {
     const bytes = Utils.Base64urlToBytes(String(value || ''));
@@ -29831,15 +29966,92 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       '*signature*: `' + Utils.PayloadEncode(signature) + '`';
     const wrappedLength = ('```ml\n-----SYSTEM MESSAGE-----\n```' + controlBody + '\n```yaml\n🔒\n```').length;
     if (wrappedLength > SDC_PQ_RATCHET_CONTROL_MAX_WIRE_CHARS) throw new Error(`PQ ratchet control exceeds safe Discord transport budget (${wrappedLength} chars)`);
-    const sent = Utils.SendSystemMessage(String(channelId), controlBody);
+    const sent = Utils.SendSystemMessage(String(channelId), controlBody, { suppressNotifications: true });
     if (sent && typeof sent.then === 'function') await sent;
     return controlBody;
   }
 
-  function pqRatchetControlFresh(info, label = 'PQ ratchet control') {
+  function pqRatchetControlFresh(info, label = 'PQ ratchet control', allowOfflineHistory = false) {
     const now = Date.now(), generatedAt = Number(info?.generatedAt || 0);
-    if (!Number.isSafeInteger(generatedAt) || generatedAt <= 0 || generatedAt > now + 60_000 || now - generatedAt > SDC_PQ_RATCHET_CONTROL_TTL_MS)
-      throw new Error(`${label} timestamp outside live window`);
+    const maxAge = allowOfflineHistory ? SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS : SDC_PQ_RATCHET_CONTROL_TTL_MS;
+    if (!Number.isSafeInteger(generatedAt) || generatedAt <= 0 || generatedAt > now + 60_000 || now - generatedAt > maxAge)
+      throw new Error(`${label} timestamp outside ${allowOfflineHistory ? 'offline retention' : 'live'} window`);
+  }
+
+  function pqRatchetDeferredAckReady(state) {
+    if (!state || state.role !== 'RESPONDER' || state.pqDeferredAck !== true || !pqRatchetLive(state)) return false;
+    return Number(state.pqDeferredAckEpoch || 0) > 0 &&
+      Number(state.pqDeferredAckEpoch || 0) === Number(state.pqLastAckEpoch || 0) &&
+      String(state.pqDeferredAckRefreshId || '') === String(state.pqLastAckRefreshId || '') &&
+      !!state.pqLastAckTag && !!state.pqLastAckNextKemKeyId && !!state.pqLastAckNextKemPublic;
+  }
+
+  async function sendDeferredPqRatchetAckForState(state, reason = 'user-send-terminal') {
+    if (!pqRatchetDeferredAckReady(state)) return false;
+    assertPqRatchetCurrentLocalSessionBinding(state, state.channelId, pqRatchetSessionBindingTag(state), 'deferred PQ ACK');
+    const local = await ensureLocalDeviceIdentity();
+    if (String(state.localDeviceId || '') !== String(local.deviceId || '')) return false;
+    const confirmationTag = Utils.Base64urlToBytes(String(state.pqLastAckTag || ''));
+    const nextKemPublicKey = Utils.Base64urlToBytes(String(state.pqLastAckNextKemPublic || ''));
+    try {
+      const ackPayload = encodePqRatchetAckPayload({
+        generatedAt: Date.now(), channelId: String(state.channelId),
+        senderAccountId: String(state.localAccountId), recipientAccountId: String(state.remoteAccountId),
+        senderDeviceId: String(state.localDeviceId), recipientDeviceId: String(state.remoteDeviceId),
+        sessionId: String(state.sessionId), kexGeneration: pqRatchetSessionBindingTag(state),
+        epoch: Number(state.pqDeferredAckEpoch), refreshId: String(state.pqDeferredAckRefreshId),
+        confirmationTag, nextKemKeyId: String(state.pqLastAckNextKemKeyId), nextKemPublicKey,
+      });
+      await sendCompactPqRatchetControl(state.channelId, 'PQ RATCHET ACK', ackPayload);
+      await withRatchetSessionLock(state, async () => {
+        if (Number(state.pqDeferredAckEpoch || 0) === Number(state.pqLastAckEpoch || 0) &&
+            String(state.pqDeferredAckRefreshId || '') === String(state.pqLastAckRefreshId || '')) {
+          const ackEpoch = Number(state.pqDeferredAckEpoch || 0);
+          const acknowledgedAt = Date.now();
+          // Once the ACK has been accepted by Discord's send path, the old root
+          // no longer needs indefinite retention. Re-enter the normal bounded
+          // historical grace period starting now.
+          pqRatchetReleasePreviousRootAfterDeferredAck(state, ackEpoch, acknowledgedAt);
+          state.pqDeferredAck = false;
+          state.pqDeferredAckAt = 0;
+          state.pqDeferredAckEpoch = 0;
+          state.pqDeferredAckRefreshId = '';
+          state.pqLastAckSentAt = acknowledgedAt;
+          state.pqOutboundConfirmationSource = 'ack-sent-on-local-user-activity-awaiting-peer-proof';
+          state.updatedAt = acknowledgedAt;
+        }
+      });
+      await persistRatchetSessions();
+      console.info('[SDC][PQ][v70.10.1] deferred PQ ACK emitted immediately before protected user message', {
+        channelId: String(state.channelId), sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
+        epoch: Number(state.pqLastAckEpoch || 0), reason: String(reason || ''), suppressNotifications: true,
+      });
+      return true;
+    } finally {
+      try { confirmationTag.fill(0); nextKemPublicKey.fill(0); } catch (_) {}
+    }
+  }
+
+  async function flushDeferredPqRatchetAcksForUserSend(channelId, peerId, reason = 'user-send-terminal') {
+    channelId = String(channelId || '');
+    peerId = String(peerId || ratchetPeerAccountId(channelId) || '');
+    if (!channelId || !peerId) return { attempted: 0, sent: 0, failed: 0 };
+    await ensureRatchetStoreLoaded();
+    const states = findLiveRatchetTextSessions(channelId, peerId).filter((state) =>
+      state.role === 'RESPONDER' && pqRatchetDeferredAckReady(state) && ratchetSessionIsEligibleLive(state)
+    );
+    let sent = 0, failed = 0;
+    for (const state of states) {
+      try { if (await sendDeferredPqRatchetAckForState(state, reason)) sent += 1; }
+      catch (error) {
+        failed += 1;
+        console.warn('[SDC][PQ][v70.10.1] deferred ACK remains pending; user message may use frozen offline PQ transport', {
+          channelId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
+          reason: error?.message || String(error),
+        });
+      }
+    }
+    return { attempted: states.length, sent, failed };
   }
 
   function peekPqRatchetControlMetadata(sysmsg, type) {
@@ -29900,7 +30112,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // one-time initial classical in-flight grace. Retries must never extend it.
       pending.controlBody = controlBody; state.updatedAt = now;
       await persistRatchetSessions();
-      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody);
+      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody, { suppressNotifications: true });
       if (sent && typeof sent.then === 'function') await sent;
       return true;
     }
@@ -29965,7 +30177,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       state.updatedAt = now;
       await persistRatchetSessions();
-      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody); if (sent && typeof sent.then === 'function') await sent;
+      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody, { suppressNotifications: true }); if (sent && typeof sent.then === 'function') await sent;
       console.log('[SDC][PQ][v69.2.6] PQ ratchet INIT sent', {
         channelId: state.channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch,
         kemSource: epoch === 1 ? 'SIGNED_DEVICE_PREKEY' : 'ONE_TIME_SESSION_KEM_RATCHET',
@@ -29977,12 +30189,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function handlePqRatchetInit(message, sysmsg, oldMessage = false) {
-    if (oldMessage) return false;
     const parsed = parsePqRatchetControlEnvelope(sysmsg, 'PQ RATCHET INIT'); const info = parsed.info;
     const senderId = String(message?.author?.id || ''), ownId = String(Discord.getCurrentUser()?.id || ''), channelId = String(message?.channel_id || '');
     if (senderId === ownId) return false;
     if (info.senderAccountId !== senderId || info.recipientAccountId !== ownId || info.channelId !== channelId) throw new Error('PQ ratchet INIT account/channel context mismatch');
-    pqRatchetControlFresh(info, 'PQ ratchet INIT');
+    pqRatchetControlFresh(info, 'PQ ratchet INIT', oldMessage === true);
     await verifySignedDeviceControl(senderId, parsed.clearBytes, parsed.signatureBytes, null, 'pq-ratchet-init', false);
     const local = await ensureLocalDeviceIdentity();
     if (info.recipientDeviceId !== local.deviceId) return true;
@@ -29999,10 +30210,23 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // v70.3.8: receiving a duplicate INIT proves the initiator still needs
         // convergence. Stop responder outbound PQ until peer hybrid traffic proves
         // that this ACK actually reached and was installed by the initiator.
-        if (state.role === 'RESPONDER' && pqRatchetLive(state)) {
+        if (!oldMessage && state.role === 'RESPONDER' && pqRatchetLive(state)) {
+          // Only a genuinely new live retry may reopen the peer-proof gate. Merely
+          // scrolling/reloading the already-persisted offline INIT must be strictly
+          // idempotent and cannot undo a later confirmation after restart.
           state.pqOutboundConfirmed = false;
           state.pqOutboundConfirmedAt = 0;
           state.pqOutboundConfirmationSource = 'duplicate-init-awaiting-peer-proof';
+          if (Number(info.generatedAt || 0) > Number(state.pqLastAckSentAt || 0)) {
+            state.pqDeferredAck = true;
+            state.pqDeferredAckAt = Date.now();
+            state.pqDeferredAckEpoch = Number(info.epoch);
+            state.pqDeferredAckRefreshId = String(info.refreshId);
+            // A live duplicate means the initiator is still on the old confirmed
+            // epoch. Keep that exact previous root available until our next human
+            // send emits the replacement ACK; historical re-renders never re-arm it.
+            pqRatchetHoldPreviousRootUntilDeferredAck(state, info.epoch);
+          }
           state.updatedAt = Date.now();
         }
         ackSpec = {
@@ -30073,8 +30297,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           working.pqOutboundConfirmed = false;
           working.pqOutboundConfirmedAt = 0;
           working.pqOutboundConfirmationSource = rebindInitialEpoch
-            ? 'epoch1-rebound-awaiting-peer-proof'
-            : 'initial-ack-sent-awaiting-peer-proof';
+            ? 'epoch1-rebound-ack-deferred-until-user-send'
+            : 'init-accepted-ack-deferred-until-user-send';
           if (usingSessionNextKem) {
             try { working.pqLocalNextKemSeed?.fill?.(0); } catch (_) {}
           }
@@ -30084,6 +30308,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           working.pqLastAckTag = Utils.BytesToBase64url(tag);
           working.pqLastAckRefreshId = String(info.refreshId);
           working.pqLastAckEpoch = Number(info.epoch);
+          working.pqDeferredAck = true;
+          working.pqDeferredAckAt = Date.now();
+          working.pqDeferredAckEpoch = Number(info.epoch);
+          working.pqDeferredAckRefreshId = String(info.refreshId);
+          // The peer cannot advance until we eventually send ACK. Pin the prior
+          // confirmed epoch for exactly that waiting period so several days of
+          // offline/read-only use cannot age it out under the normal 24 h TTL.
+          pqRatchetHoldPreviousRootUntilDeferredAck(working, info.epoch);
           working.pqLastAckNextKemKeyId = String(nextKem.keyId);
           working.pqLastAckNextKemPublic = Utils.BytesToBase64url(nextKem.publicBytes);
           ratchetCommitState(state, working);
@@ -30107,17 +30339,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (!ackSpec) throw new Error('PQ ratchet INIT produced no ACK state');
     try {
       await persistRatchetSessions();
-      markPqRatchetDeviceLive(state, ackSpec.duplicate ? 'pq-ratchet-init-duplicate-ack' : 'pq-ratchet-init-accepted');
-      const ackPayload = encodePqRatchetAckPayload({
-        generatedAt: Date.now(), channelId, senderAccountId: ownId, recipientAccountId: senderId,
-        senderDeviceId: local.deviceId, recipientDeviceId: info.senderDeviceId, sessionId: state.sessionId,
-        kexGeneration: pqRatchetSessionBindingTag(state), epoch: info.epoch, refreshId: info.refreshId,
-        confirmationTag: ackSpec.confirmationTag, nextKemKeyId: ackSpec.nextKemKeyId, nextKemPublicKey: ackSpec.nextKemPublicKey,
-      });
-      await sendCompactPqRatchetControl(channelId, 'PQ RATCHET ACK', ackPayload);
-      if (!ackSpec.duplicate) console.log('[SDC][PQ][v69.2.6] PQ ratchet epoch accepted; next one-time KEM key armed', {
-        channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch: info.epoch, nextKemKeyId: ackSpec.nextKemKeyId,
-      });
+      markPqRatchetDeviceLive(state, ackSpec.duplicate ? 'pq-ratchet-init-duplicate-ack-deferred' : 'pq-ratchet-init-accepted-ack-deferred');
+      // v70.10.1: receiving an INIT is state preparation, not user-visible network
+      // activity. The authenticated ACK material is persisted above and emitted
+      // only at the terminal boundary of this installation's next protected user
+      // message. An offline peer may therefore reconnect days later without
+      // generating a notification-only acknowledgement.
+      if (!ackSpec.duplicate || state.pqDeferredAck === true) {
+        console.info('[SDC][PQ][v70.10.1] PQ ratchet INIT accepted; ACK deferred until local user activity', {
+          channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch: info.epoch,
+          nextKemKeyId: ackSpec.nextKemKeyId, offlineHistory: oldMessage === true,
+        });
+      }
       return true;
     } finally {
       try { ackSpec.confirmationTag?.fill?.(0); ackSpec.nextKemPublicKey?.fill?.(0); } catch (_) {}
@@ -30125,12 +30358,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function handlePqRatchetAck(message, sysmsg, oldMessage = false) {
-    if (oldMessage) return false;
     const parsed = parsePqRatchetControlEnvelope(sysmsg, 'PQ RATCHET ACK'); const info = parsed.info;
     const senderId = String(message?.author?.id || ''), ownId = String(Discord.getCurrentUser()?.id || ''), channelId = String(message?.channel_id || '');
     if (senderId === ownId) return false;
     if (info.senderAccountId !== senderId || info.recipientAccountId !== ownId || info.channelId !== channelId) throw new Error('PQ ratchet ACK account/channel context mismatch');
-    pqRatchetControlFresh(info, 'PQ ratchet ACK');
+    pqRatchetControlFresh(info, 'PQ ratchet ACK', oldMessage === true);
     await verifySignedDeviceControl(senderId, parsed.clearBytes, parsed.signatureBytes, null, 'pq-ratchet-ack', false);
     const local = await ensureLocalDeviceIdentity(); if (info.recipientDeviceId !== local.deviceId) return true;
     const state = findRatchetSession(info.sessionId, channelId, senderId, info.senderDeviceId);
@@ -30200,6 +30432,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   async function maybeSchedulePqRatchetSessionUpgrade(channelId, peerId, reason = 'automatic', delayMs = 80, force = false) {
     if (!SDC_PQ_RATCHET_ACTIVATED || DuressRuntime.active) return false;
+    // v70.10.1: no automatic network control is emitted from receive events,
+    // channel selection, timers or post-encryption callbacks. Genuine user sends
+    // are handled at the terminal MessageQueue boundary so INIT/ACK always precede
+    // the user's already-built ciphertext. Explicit force remains available to
+    // diagnostics/manual recovery without reintroducing background traffic.
+    if (!force) {
+      PqQuietControlStats.backgroundRunsSuppressed += 1;
+      return false;
+    }
     // v70.3.2 privacy invariant: merely VIEWING/SELECTING a conversation must
     // never retransmit a persisted PQ INIT or start a fresh PQ control exchange.
     // Genuine crypto activity has separate event-driven and maintenance paths.
@@ -30292,9 +30533,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     PqUserSendRecoveryStats.lastPeerId = peerId;
     PqUserSendRecoveryStats.lastError = null;
 
-    // v70.3.8: one genuine user send may retransmit the exact persisted INIT,
-    // but never more than once per DM/device cooldown. No forced DEVICE/PQ bundle
-    // and no reciprocal announcement ping-pong is emitted here.
+    // v70.10.1: a genuine user send may START a missing PQ negotiation for a
+    // quiet-capable peer, but an already-persisted INIT is never retransmitted merely
+    // because the peer is offline or has not replied. Discord is the durable carrier;
+    // the cooldown remains only as a bound around the user-send recovery attempt.
     const now = Date.now();
     const retryKey = pqUserSendRetryKey(channelId, peerId);
     const retryAllowed = now - Number(PqUserSendRetryAt.get(retryKey) || 0) >= SDC_PQ_USER_SEND_RETRY_COOLDOWN_MS;
@@ -30303,10 +30545,29 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       PqUserSendRetryAt.set(retryKey, now);
       for (const state of blocked) {
         if (state.role !== 'INITIATOR' || pqRatchetLive(state)) continue;
+        const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
+        if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
+          // Mixed-version safety: an older responder would ACK immediately and
+          // recreate the notification-only traffic v70.10 is designed to remove.
+          // Keep using the already-authenticated offline PQ route until that exact
+          // device advertises the signed deferred-ACK capability.
+          PqQuietControlStats.legacyPeerRefreshSuppressed += 1;
+          continue;
+        }
+        if (state.pqPending) {
+          // Discord already stores the authenticated INIT for offline delivery.
+          // Never resend the same pending proposal merely because the peer is
+          // offline or has not replied yet.
+          PqQuietControlStats.pendingInitRetriesSuppressed += 1;
+          continue;
+        }
         try {
           if (await startOrRefreshPqRatchetForState(state, false)) {
+            await markPqPendingQuietDelivery(state, 'user-send-live-recovery');
             initiated += 1;
             PqUserSendRecoveryStats.initiatorControls += 1;
+            PqQuietControlStats.initControlsSent += 1;
+            PqQuietControlStats.lastControlAt = Date.now();
           }
         } catch (error) {
           console.warn('[SDC][PQ][v70.3.8] bounded lost-ACK recovery INIT deferred', {
@@ -30361,11 +30622,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const source = Array.isArray(states) ? states : Array.from(RatchetSessions.values());
     const initiators = source.filter((state) => ratchetSessionIsEligibleLive(state) && state.role === 'INITIATOR');
     return {
+      mode: 'USER_ACTIVITY_ONLY',
       maintenanceActive: !!PqRatchetMaintenanceTimer,
+      backgroundNetworkMaintenance: SDC_PQ_RATCHET_BACKGROUND_MAINTENANCE_ENABLED === true,
       maintenanceIntervalMs: SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS,
       refreshMessages: SDC_PQ_RATCHET_REFRESH_MESSAGES,
       refreshMaxAgeMs: SDC_PQ_RATCHET_REFRESH_MAX_AGE_MS,
+      offlineControlMaxAgeMs: SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS,
+      quietCapabilityVersion: SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION,
       stats: { ...PqRatchetMaintenanceStats },
+      quietStats: { ...PqQuietControlStats },
       initiatorSessions: initiators.map((state) => {
         const last = Number(state.pqLastRefreshAt || state.pqActivatedAt || now);
         const messages = Number(state.pqMessagesSinceRefresh || 0);
@@ -30391,58 +30657,36 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
 
-  async function runPqRatchetMaintenance(reason = 'interval') {
+  async function runPqRatchetMaintenance(reason = 'diagnostic-only') {
+    // v70.10.1: retained as a compatibility/diagnostic surface only. It performs
+    // ZERO network I/O. Due state is reported and consumed lazily by the next
+    // genuine protected user send at MessageQueue.
     const now = Date.now();
     PqRatchetMaintenanceStats.runs += 1;
     PqRatchetMaintenanceStats.lastRunAt = now;
-    PqRatchetMaintenanceStats.lastReason = String(reason || 'interval');
+    PqRatchetMaintenanceStats.lastReason = String(reason || 'diagnostic-only');
     PqRatchetMaintenanceStats.lastError = null;
-    if (!SDC_PQ_RATCHET_ACTIVATED || !SDC_PQ_NETWORK_APPLICATION_ACTIVATED || DuressRuntime.active) {
-      PqRatchetMaintenanceStats.eligibleInitiatorSessions = 0;
-      PqRatchetMaintenanceStats.dueSessions = 0;
-      return { skipped: true, reason: DuressRuntime.active ? 'DURESS_RUNTIME' : 'PQ_RATCHET_DISABLED', controlsStarted: 0 };
-    }
-    let eligible = 0, due = 0, started = 0;
+    PqQuietControlStats.backgroundRunsSuppressed += 1;
     try {
       await ensureRatchetStoreLoaded();
-      const states = Array.from(RatchetSessions.values()).filter((state) => ratchetSessionIsEligibleLive(state) && state.role === 'INITIATOR' && pqRatchetLive(state));
-      eligible = states.length;
-      for (const state of states) {
-        if (!pqRatchetRefreshReason(state, now)) continue;
-        due += 1;
-        try {
-          if (await startOrRefreshPqRatchetForState(state, false)) {
-            started += 1;
-            PqRatchetMaintenanceStats.lastStartedAt = Date.now();
-          }
-        } catch (error) {
-          PqRatchetMaintenanceStats.errors += 1;
-          PqRatchetMaintenanceStats.lastError = error?.message || String(error);
-          console.warn('[SDC][PQ][v69.2.6] automatic PQ ratchet maintenance deferred', {
-            reason, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, error: PqRatchetMaintenanceStats.lastError,
-          });
-        }
-      }
-      PqRatchetMaintenanceStats.eligibleInitiatorSessions = eligible;
-      PqRatchetMaintenanceStats.dueSessions = due;
-      PqRatchetMaintenanceStats.controlsStarted += started;
-      return { skipped: false, eligibleInitiatorSessions: eligible, dueSessions: due, controlsStarted: started };
+      const states = Array.from(RatchetSessions.values()).filter((state) =>
+        ratchetSessionIsEligibleLive(state) && state.role === 'INITIATOR' && pqRatchetLive(state)
+      );
+      const due = states.filter((state) => !!pqRatchetRefreshReason(state, now));
+      PqRatchetMaintenanceStats.eligibleInitiatorSessions = states.length;
+      PqRatchetMaintenanceStats.dueSessions = due.length;
+      return { skipped: true, reason: 'QUIET_USER_ACTIVITY_ONLY', eligibleInitiatorSessions: states.length, dueSessions: due.length, controlsStarted: 0 };
     } catch (error) {
       PqRatchetMaintenanceStats.errors += 1;
       PqRatchetMaintenanceStats.lastError = error?.message || String(error);
-      console.warn('[SDC][PQ][v69.2.6] automatic PQ ratchet maintenance failed', { reason, error: PqRatchetMaintenanceStats.lastError });
-      return { skipped: false, eligibleInitiatorSessions: eligible, dueSessions: due, controlsStarted: started, error: PqRatchetMaintenanceStats.lastError };
+      return { skipped: true, reason: 'QUIET_USER_ACTIVITY_ONLY', controlsStarted: 0, error: PqRatchetMaintenanceStats.lastError };
     }
   }
 
   function startPqRatchetMaintenanceTimer() {
-    if (PqRatchetMaintenanceTimer || !SDC_PQ_RATCHET_ACTIVATED || !SDC_PQ_NETWORK_APPLICATION_ACTIVATED) return !!PqRatchetMaintenanceTimer;
-    PqRatchetMaintenanceTimer = setInterval(() => {
-      runPqRatchetMaintenance('interval').catch(() => {});
-    }, SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS);
-    // A single startup pass closes the restart/low-traffic gap without waiting a full minute.
-    setTimeout(() => { if (PqRatchetMaintenanceTimer) runPqRatchetMaintenance('startup').catch(() => {}); }, 1500);
-    return true;
+    // Intentionally disabled: no setInterval, no startup pass, no network traffic.
+    stopPqRatchetMaintenanceTimer();
+    return false;
   }
 
   function stopPqRatchetMaintenanceTimer() {
@@ -30450,6 +30694,199 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       try { clearInterval(PqRatchetMaintenanceTimer); } catch (_) {}
       PqRatchetMaintenanceTimer = null;
     }
+  }
+
+  async function ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, source = 'protected-user-intent') {
+    // v70.10.1: publish capability BEFORE Chat Control consumes/reserves any SDC4
+    // chain state. This is intentionally user-activity bound: merely opening a DM,
+    // receiving history or loading the plugin remains completely network-passive.
+    channelId = String(channelId || '');
+    const channel = channelId ? Discord.getChannel(channelId) : null;
+    if (!channel || channel.type !== 1 || !ratchetV4IsRequired(channelId))
+      return { applicable: false, sent: false, reason: 'not-required-dm' };
+    const peerId = String(ratchetPeerAccountId(channelId) || '');
+    const peerIdentity = peerId ? getPeerIdentityRecord(peerId) : null;
+    if (!peerId || !peerIdentity?.publicKey)
+      return { applicable: false, sent: false, reason: 'peer-identity-not-pinned' };
+
+    PqQuietControlStats.capabilityIntentChecks += 1;
+    try {
+      const local = await ensureLocalDeviceIdentity();
+      if (!local.announcedQuietPqZeroTouch || typeof local.announcedQuietPqZeroTouch !== 'object')
+        local.announcedQuietPqZeroTouch = {};
+      const alreadyZeroTouchPublished = Number(local.announcedQuietPqZeroTouch[channelId] || 0) >= SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION;
+      // v70.10.0 could persist announcedQuietPqControl=1 before this pre-build
+      // migration hook existed. Force only the signed DEVICE ANNOUNCE once so a
+      // stale local idempotence marker cannot strand the peer at capability 0.
+      // PQ PREKEY/V692 announcements keep their own ordinary idempotence.
+      const sent = await sendDeviceAnnouncement(
+        channelId,
+        false,
+        alreadyZeroTouchPublished ? null : { forceDeviceAnnouncementOnly: true }
+      );
+      if (!alreadyZeroTouchPublished && sent === true) {
+        local.announcedQuietPqZeroTouch[channelId] = SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION;
+        await persistLocalDeviceMetadata();
+        PqQuietControlStats.capabilityAnnouncementsSent += 1;
+        PqQuietControlStats.lastControlAt = Date.now();
+      }
+      return {
+        applicable: true, sent: sent === true, peerId, source: String(source || ''),
+        zeroTouchPublished: alreadyZeroTouchPublished || sent === true,
+      };
+    } catch (error) {
+      // Capability publication is best-effort at this boundary. Existing frozen
+      // SDC4/SDC4Q fail-closed rules remain authoritative; never downgrade merely
+      // because an announcement could not be queued.
+      PqQuietControlStats.lastError = error?.message || String(error);
+      console.debug('[SDC][PQ][v70.10.3] zero-touch quiet capability announcement deferred', {
+        channelId, peerId, source: String(source || ''), reason: PqQuietControlStats.lastError,
+      });
+      return { applicable: true, sent: false, peerId, source: String(source || ''), error: PqQuietControlStats.lastError };
+    }
+  }
+
+  async function markPqPendingQuietDelivery(state, source = 'quiet-user-send') {
+    if (!state?.pqPending) return false;
+    let changed = false;
+    await withRatchetSessionLock(state, async () => {
+      const pending = state.pqPending;
+      if (!pending) return;
+      if (Number(pending.quietDeliveryCapabilityVersion || 0) >= SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) return;
+      pending.quietDeliveryCapabilityVersion = SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION;
+      pending.quietDeliveryAt = Date.now();
+      pending.quietDeliverySource = String(source || 'quiet-user-send');
+      state.updatedAt = pending.quietDeliveryAt;
+      changed = true;
+    });
+    if (changed) await persistRatchetSessions();
+    return changed;
+  }
+
+  async function resumeInheritedPqPendingForQuietPeer(state, peerId, reason = 'quiet-user-send') {
+    const pending = state?.pqPending;
+    if (!pending || state?.role !== 'INITIATOR') return false;
+    const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
+    if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) return false;
+    if (Number(pending.quietDeliveryCapabilityVersion || 0) >= SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) return false;
+
+    // A pending INIT created before the Quiet capability existed may or may not
+    // already be present in the peer's Discord history. Re-send the SAME pending
+    // proposal once rather than guessing and discarding it. The exact refreshId,
+    // ciphertext and candidate root stay unchanged; a peer that already installed
+    // it treats the retry idempotently and still defers ACK until human activity.
+    PqQuietControlStats.inheritedPendingResumeAttempts += 1;
+    try {
+      const sent = await startOrRefreshPqRatchetForState(state, false);
+      if (!sent) return false;
+      await markPqPendingQuietDelivery(state, `inherited-pending-resume:${String(reason || '')}`);
+      PqQuietControlStats.inheritedPendingResumesSent += 1;
+      PqQuietControlStats.initControlsSent += 1;
+      PqQuietControlStats.lastControlAt = Date.now();
+      console.info('[SDC][PQ][v70.10.1] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
+        channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
+        remoteDeviceId: String(state.remoteDeviceId), pendingEpoch: Number(state.pqPending?.epoch || 0) || null,
+        suppressNotifications: true,
+      });
+      return true;
+    } catch (error) {
+      PqQuietControlStats.inheritedPendingResumeFailures += 1;
+      PqQuietControlStats.lastError = error?.message || String(error);
+      console.warn('[SDC][PQ][v70.10.1] inherited PQ pending resume deferred; confirmed epoch remains usable', {
+        channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
+        reason: PqQuietControlStats.lastError,
+      });
+      return false;
+    }
+  }
+
+  function pqQuietUserTransportEligible(channelId, message) {
+    const channel = Discord.getChannel(String(channelId || ''));
+    if (!channel || channel.type !== 1 || !ratchetV4IsRequired(channelId)) return false;
+    const content = String(message?.content || '');
+    return content.startsWith(SDC4_WIRE_PREFIX) ||
+      content.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ||
+      content.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX) ||
+      content.startsWith(SDC4_FILE_FS_DETACHED_PREFIX);
+  }
+
+  async function preparePqQuietControlsBeforeUserEnqueue(channelId, message, reason = 'MessageQueue-user-send') {
+    channelId = String(channelId || '');
+    if (!pqQuietUserTransportEligible(channelId, message)) return { applicable: false, ackSent: 0, initSent: 0 };
+    const peerId = String(ratchetPeerAccountId(channelId) || '');
+    if (!peerId) return { applicable: false, ackSent: 0, initSent: 0 };
+    await ensureRatchetStoreLoaded();
+
+    PqQuietControlStats.terminalUserSends += 1;
+    PqQuietControlStats.lastUserSendAt = Date.now();
+    PqQuietControlStats.lastChannelId = channelId;
+    PqQuietControlStats.lastPeerId = peerId;
+    PqQuietControlStats.lastError = null;
+
+    // Defense-in-depth: normal and Chat Control paths publish this before crypto
+    // construction, but terminal submission repeats only the idempotent check so
+    // alternate Discord send paths cannot bypass zero-touch capability convergence.
+    await ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, 'terminal-user-send');
+
+    // ACK first: a responder that received INIT while offline stays completely
+    // network-passive until the human actually sends something. Sending ACK here
+    // guarantees that, under normal queue success, the real user message is the
+    // final Discord row rather than a notification-only acknowledgement.
+    const ackResult = await flushDeferredPqRatchetAcksForUserSend(channelId, peerId, reason);
+    PqQuietControlStats.ackControlsSent += Number(ackResult.sent || 0);
+    PqQuietControlStats.ackSendFailures += Number(ackResult.failed || 0);
+    if (ackResult.sent) PqQuietControlStats.lastControlAt = Date.now();
+
+    // Then lazily initiate any due refresh owned by this installation. The user
+    // ciphertext is already built under the currently-confirmed epoch. For refresh
+    // epochs the responder pins exactly that old confirmed root (still under the
+    // hard previous-root count bound) until its deferred ACK is actually emitted,
+    // so INIT can safely precede this message even across several idle days.
+    let initSent = 0;
+    const states = findLiveRatchetTextSessions(channelId, peerId).filter((state) =>
+      state.role === 'INITIATOR' && ratchetSessionIsEligibleLive(state) && pqRatchetLive(state)
+    );
+
+    // v70.10.1 migration: resume one inherited pre-Quiet pending INIT exactly once
+    // after the exact recipient device has advertised deferred-ACK support. This is
+    // still bound to this genuine terminal user send and occurs before the message.
+    for (const state of states) {
+      if (await resumeInheritedPqPendingForQuietPeer(state, peerId, reason)) initSent += 1;
+    }
+
+    for (const state of states) {
+      const dueReason = pqRatchetRefreshReason(state, Date.now());
+      if (!dueReason || state.pqPending) continue;
+      const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
+      if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
+        PqQuietControlStats.legacyPeerRefreshSuppressed += 1;
+        console.debug('[SDC][PQ][v70.10.1] quiet refresh held until peer advertises deferred-ACK capability', {
+          channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId), dueReason,
+        });
+        continue;
+      }
+      try {
+        if (await startOrRefreshPqRatchetForState(state, false)) {
+          await markPqPendingQuietDelivery(state, `lazy-refresh:${String(reason || '')}`);
+          initSent += 1;
+          PqQuietControlStats.initControlsSent += 1;
+          PqQuietControlStats.lastControlAt = Date.now();
+          console.info('[SDC][PQ][v70.10.1] lazy PQ refresh INIT emitted immediately before protected user message', {
+            channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
+            dueReason, suppressNotifications: true,
+          });
+        }
+      } catch (error) {
+        // Refresh is opportunistic while the prior confirmed epoch remains valid.
+        // Do not destroy an already-built user ciphertext because a maintenance
+        // control could not be queued; next genuine user activity can try again.
+        PqQuietControlStats.lastError = error?.message || String(error);
+        console.warn('[SDC][PQ][v70.10.1] lazy refresh deferred; current confirmed epoch remains usable', {
+          channelId, peerId, sessionId: String(state.sessionId), reason: PqQuietControlStats.lastError,
+        });
+      }
+    }
+    return { applicable: true, ackSent: Number(ackResult.sent || 0), ackFailed: Number(ackResult.failed || 0), initSent };
   }
 
   async function forcePqRatchetForCurrentDm(refresh = false) {
@@ -31044,6 +31481,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             announcedChannels: legacy.announcedChannels && typeof legacy.announcedChannels === 'object' ? legacy.announcedChannels : {},
             announcedPrekeys: legacy.announcedPrekeys && typeof legacy.announcedPrekeys === 'object' ? legacy.announcedPrekeys : {},
             announcedCompactWire: legacy.announcedCompactWire && typeof legacy.announcedCompactWire === 'object' ? legacy.announcedCompactWire : {},
+            announcedQuietPqControl: {},
+            announcedQuietPqZeroTouch: {},
             announcedPqPrekeys: {},
             pendingSyncRequests: legacy.pendingSyncRequests || {},
             answeredSyncRequests: legacy.answeredSyncRequests || {},
@@ -31115,6 +31554,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             announcedCompactWire: stored.announcedCompactWire && typeof stored.announcedCompactWire === 'object'
               ? stored.announcedCompactWire
               : {},
+            announcedQuietPqControl: stored.announcedQuietPqControl && typeof stored.announcedQuietPqControl === 'object'
+              ? stored.announcedQuietPqControl
+              : {},
+            announcedQuietPqZeroTouch: stored.announcedQuietPqZeroTouch && typeof stored.announcedQuietPqZeroTouch === 'object'
+              ? stored.announcedQuietPqZeroTouch
+              : {},
             announcedPqPrekeys: stored.announcedPqPrekeys && typeof stored.announcedPqPrekeys === 'object'
               ? stored.announcedPqPrekeys
               : {},
@@ -31171,6 +31616,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         announcedChannels: {},
         announcedPrekeys: {},
         announcedCompactWire: {},
+        announcedQuietPqControl: {},
+        announcedQuietPqZeroTouch: {},
         announcedPqPrekeys: {},
         pendingSyncRequests: {},
         answeredSyncRequests: {},
@@ -31189,6 +31636,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         announcedChannels: localRecord.announcedChannels,
         announcedPrekeys: localRecord.announcedPrekeys,
         announcedCompactWire: localRecord.announcedCompactWire,
+        announcedQuietPqControl: localRecord.announcedQuietPqControl,
+        announcedQuietPqZeroTouch: localRecord.announcedQuietPqZeroTouch,
         announcedPqPrekeys: localRecord.announcedPqPrekeys,
       };
       registerDeviceRecord(ownId, {
@@ -31217,6 +31666,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     stored.announcedChannels = LocalDevice.announcedChannels || {};
     stored.announcedPrekeys = LocalDevice.announcedPrekeys || {};
     stored.announcedCompactWire = LocalDevice.announcedCompactWire || {};
+    stored.announcedQuietPqControl = LocalDevice.announcedQuietPqControl || {};
+    stored.announcedQuietPqZeroTouch = LocalDevice.announcedQuietPqZeroTouch || {};
     stored.announcedPqPrekeys = LocalDevice.announcedPqPrekeys || {};
     const entries = Object.entries(stored.announcedChannels)
       .sort(([, a], [, b]) => Number(b) - Number(a))
@@ -31226,6 +31677,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     stored.announcedPrekeys = Object.fromEntries(prekeyEntries);
     const compactEntries = Object.entries(stored.announcedCompactWire || {}).slice(-256);
     stored.announcedCompactWire = Object.fromEntries(compactEntries);
+    const quietEntries = Object.entries(stored.announcedQuietPqControl || {}).slice(-256);
+    stored.announcedQuietPqControl = Object.fromEntries(quietEntries);
+    const quietZeroTouchEntries = Object.entries(stored.announcedQuietPqZeroTouch || {}).slice(-256);
+    stored.announcedQuietPqZeroTouch = Object.fromEntries(quietZeroTouchEntries);
     const pqEntries = Object.entries(stored.announcedPqPrekeys || {}).slice(-256);
     stored.announcedPqPrekeys = Object.fromEntries(pqEntries);
     prunePendingDeviceSyncRequests();
@@ -31685,6 +32140,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // announcement. Older clients ignore this optional field; current clients use it
       // only for minimum-version admission and never as cryptographic key material.
       clientVersion: SDC_PUBLIC_RELEASE_VERSION,
+      // v70.10.2+: compact identity-signed capability. The v70.10.0/1 object form
+      // consumed enough Base64/canonical-JSON budget to push a normal DEVICE ANNOUNCE
+      // above our 1950-char Discord safety ceiling. The integer carries the same single
+      // negotiated fact: this device supports USER_ACTIVITY_ONLY_DEFERRED_ACK controls.
+      quietPqControlVersion: SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION,
       // v68.0.13: this exact capability object is covered by the account-identity
       // signature in sendSignedDeviceControl(). Older clients ignore the extra field.
       headerEncryptionCapability: localHeaderEncryptionReceiveCapability(),
@@ -31694,8 +32154,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
 
-  async function sendDeviceAnnouncement(channelId, force = false) {
+  async function sendDeviceAnnouncement(channelId, force = false, options = null) {
     if (DuressRuntime.active) return false;
+    const forceDeviceAnnouncementOnly = options?.forceDeviceAnnouncementOnly === true;
     const local = await ensureLocalDeviceIdentity();
     const accountId = String(Discord.getCurrentUser().id);
     if (isDeviceRevoked(accountId, local.deviceId))
@@ -31712,10 +32173,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (!prekeyId) throw new Error('Current signed async prekey is unavailable');
     if (!local.announcedPrekeys || typeof local.announcedPrekeys !== 'object') local.announcedPrekeys = {};
     if (!local.announcedCompactWire || typeof local.announcedCompactWire !== 'object') local.announcedCompactWire = {};
+    if (!local.announcedQuietPqControl || typeof local.announcedQuietPqControl !== 'object') local.announcedQuietPqControl = {};
     const previousPrekey = String(local.announcedPrekeys[channelKey] || '');
     const previousLast = Number(local.announcedChannels?.[channelKey] || 0);
     const previousCompactWire = Number(local.announcedCompactWire[channelKey] || 0);
-    if (!force && previousPrekey === prekeyId && previousCompactWire === 1) {
+    const previousQuietPqControl = Number(local.announcedQuietPqControl[channelKey] || 0);
+    if (!force && !forceDeviceAnnouncementOnly && previousPrekey === prekeyId && previousCompactWire === 1 &&
+        previousQuietPqControl === SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
       try { return await sendPqPrekeyAnnouncement(channelId, false, local, asyncPrekey); }
       catch (error) { console.warn('[SDC][PQ][v69.0.5] PQ announcement deferred; classical DEVICE ANNOUNCE remains valid', error); return false; }
     }
@@ -31725,12 +32189,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     local.announcedChannels[channelKey] = now;
     local.announcedPrekeys[channelKey] = prekeyId;
     local.announcedCompactWire[channelKey] = 1;
+    local.announcedQuietPqControl[channelKey] = SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION;
     try {
       const announcement = await buildLocalDeviceAnnouncement(channelId, local, asyncPrekey);
       await persistLocalDeviceMetadata();
       await sendSignedDeviceControl(channelId, 'DEVICE ANNOUNCE', announcement);
-      try { await sendPqPrekeyAnnouncement(channelId, force, local, asyncPrekey); }
-      catch (error) { console.warn('[SDC][PQ][v69.0.5] PQ announcement deferred; frozen classical announcement succeeded', error); }
+      // A newer live DEVICE ANNOUNCE intentionally makes peers suspend cached v69.2
+      // capability until a fresh signed PQ proof follows. Zero-touch Quiet publication
+      // therefore forces that proof once as well; otherwise capability convergence could
+      // accidentally leave SDC4Q disabled on mixed/current peers.
+      try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey); }
+      catch (error) { console.warn('[SDC][PQ][v70.10.3] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
       return true;
     } catch (error) {
       if (previousLast > 0) local.announcedChannels[channelKey] = previousLast;
@@ -31739,6 +32208,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       else delete local.announcedPrekeys[channelKey];
       if (previousCompactWire) local.announcedCompactWire[channelKey] = previousCompactWire;
       else delete local.announcedCompactWire[channelKey];
+      if (previousQuietPqControl) local.announcedQuietPqControl[channelKey] = previousQuietPqControl;
+      else delete local.announcedQuietPqControl[channelKey];
       try { await persistLocalDeviceMetadata(); } catch (_) {}
       throw error;
     } finally {
@@ -31815,6 +32286,25 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // is therefore blocked for new recipient membership. Historical rows may fill a
     // previously unknown version but never erase a newer signed observation.
     const incomingClientVersion = normalizeSdcClientVersion(info.clientVersion);
+    let incomingQuietPqControlVersion = 0;
+    if (info.quietPqControlVersion != null) {
+      // v70.10.2+ compact form. Reject malformed/non-exact claims rather than silently
+      // accepting future/partial semantics under the current deferred-ACK policy.
+      const compactVersion = Number(info.quietPqControlVersion || 0);
+      if (compactVersion !== SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION)
+        throw new Error('Malformed signed quiet PQ compact capability');
+      incomingQuietPqControlVersion = compactVersion;
+    } else if (info.quietPqControlCapability != null) {
+      // Migration reader for v70.10.0/1 verbose announcements. This remains read-only
+      // compatibility; v70.10.2+ emits only the compact integer above.
+      const cap = info.quietPqControlCapability;
+      if (!cap || typeof cap !== 'object' ||
+          Number(cap.version || 0) !== SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION ||
+          String(cap.mode || '') !== 'USER_ACTIVITY_ONLY_DEFERRED_ACK' ||
+          cap.suppressNotifications !== true)
+        throw new Error('Malformed signed quiet PQ control capability');
+      incomingQuietPqControlVersion = Number(cap.version);
+    }
     const previousVersionAt = Number(record.sdcClientVersionSeenAt || 0);
     const applyVersionObservation = !oldMessage || incomingAnnouncementAt >= previousVersionAt;
     if (applyVersionObservation) {
@@ -31822,6 +32312,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       record.sdcClientVersionSeenAt = incomingAnnouncementAt || Date.now();
       record.sdcMinimumVersion = SDC_MINIMUM_SUPPORTED_VERSION;
       record.sdcMinimumVersionCompatible = sdcClientVersionMeetsMinimum(incomingClientVersion);
+      record.quietPqControlVersion = incomingQuietPqControlVersion;
+      record.quietPqControlSeenAt = incomingAnnouncementAt || Date.now();
     }
     // v69.2.1 mixed-version rollback hardening: a newer live identity-signed
     // DEVICE ANNOUNCE from the same device is proof that our cached SDC4Q
@@ -34353,7 +34845,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         stickyHybridStateRequiresLive: pqRatchetStickyRequiredForState(stickyUnavailable) === true && pqRatchetLive(stickyUnavailable) === false,
         currentClassicalTrafficBlockedAfterStickyPq: pqRatchetClassicalHistoryAllowed(stickyUnavailable, currentTraffic) === false,
         boundedPreActivationHistoryDrainAllowed: pqRatchetClassicalHistoryAllowed(stickyUnavailable, preActivationTraffic) === true,
-        maintenanceCadenceBounded: SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS > 0 && SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS <= 60_000,
+        backgroundMaintenanceDisabled:
+          SDC_PQ_RATCHET_BACKGROUND_MAINTENANCE_ENABLED === false &&
+          SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS === 0 &&
+          String(startPqRatchetMaintenanceTimer || '').includes('return false'),
+        lazyAgeRefreshBounded: SDC_PQ_RATCHET_REFRESH_MAX_AGE_MS === 24 * 60 * 60 * 1000,
+        offlineControlRetentionBounded: SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS === 30 * 24 * 60 * 60 * 1000,
+        quietCapabilityVersioned: SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION === 1,
         classicalIdentityAuthClaimHonest: initiator.pqPostQuantumIdentityAuthentication === false && initiator.pqAuthentication === 'P521_ACCOUNT_IDENTITY_SIGNED_MLKEM_DEVICE_PREKEY',
       };
       ratchetEraseMutableSecrets(initiator); ratchetEraseMutableSecrets(responder); ratchetEraseMutableSecrets(restored);
@@ -36724,6 +37222,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       'pqLocalNextKemSeed','pqLocalNextKemKeyId','pqLocalNextKemPublic','pqRemoteNextKemKeyId','pqRemoteNextKemPublic',
       'pqLastAckNextKemKeyId','pqLastAckNextKemPublic',
       'pqAuthentication','pqPostQuantumIdentityAuthentication','pqLastAckTag','pqLastAckRefreshId','pqLastAckEpoch',
+      'pqDeferredAck','pqDeferredAckAt','pqDeferredAckEpoch','pqDeferredAckRefreshId','pqLastAckSentAt',
       'pqOutboundConfirmed','pqOutboundConfirmedAt','pqOutboundConfirmationSource'
     ];
     for (const key of keep) target[key] = next[key];
@@ -37003,6 +37502,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const encodeRoot = (entry) => ({
       epoch: Number(entry.epoch || 0), rootKey: Utils.BytesToBase64url(entry.rootKey),
       activatedAt: Number(entry.activatedAt || 0), expiresAt: Number(entry.expiresAt || 0), refreshId: String(entry.refreshId || ''),
+      holdUntilAckEpoch: Number(entry.holdUntilAckEpoch || 0),
     });
     const pending = state.pqPending ? {
       epoch: Number(state.pqPending.epoch || 0), refreshId: String(state.pqPending.refreshId || ''),
@@ -37010,6 +37510,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       backend: String(state.pqPending.backend || ''), bindingVersion: Number(state.pqPending.bindingVersion || 0), sessionBindingTag: Number(state.pqPending.sessionBindingTag || 0), rootKey: Utils.BytesToBase64url(state.pqPending.rootKey),
       confirmKey: Utils.BytesToBase64url(state.pqPending.confirmKey), ciphertext: Utils.BytesToBase64url(state.pqPending.ciphertext),
       controlBody: String(state.pqPending.controlBody || ''),
+      quietDeliveryCapabilityVersion: Number(state.pqPending.quietDeliveryCapabilityVersion || 0),
+      quietDeliveryAt: Number(state.pqPending.quietDeliveryAt || 0),
+      quietDeliverySource: String(state.pqPending.quietDeliverySource || ''),
     } : null;
     return {
       version: Number(state.pqVersion || 0), mode: String(state.pqMode || 'NONE'), required: state.pqRequired === true,
@@ -37026,6 +37529,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       authentication: String(state.pqAuthentication || ''),
       postQuantumIdentityAuthentication: state.pqPostQuantumIdentityAuthentication === true,
       lastAckTag: String(state.pqLastAckTag || ''), lastAckRefreshId: String(state.pqLastAckRefreshId || ''), lastAckEpoch: Number(state.pqLastAckEpoch || 0),
+      deferredAck: state.pqDeferredAck === true,
+      deferredAckAt: Number(state.pqDeferredAckAt || 0),
+      deferredAckEpoch: Number(state.pqDeferredAckEpoch || 0),
+      deferredAckRefreshId: String(state.pqDeferredAckRefreshId || ''),
+      lastAckSentAt: Number(state.pqLastAckSentAt || 0),
       outboundConfirmed: state.pqOutboundConfirmed === true,
       outboundConfirmedAt: Number(state.pqOutboundConfirmedAt || 0),
       outboundConfirmationSource: String(state.pqOutboundConfirmationSource || ''),
@@ -37050,6 +37558,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     out.pqAuthentication = String(obj.authentication || '');
     out.pqPostQuantumIdentityAuthentication = obj.postQuantumIdentityAuthentication === true;
     out.pqLastAckTag = String(obj.lastAckTag || ''); out.pqLastAckRefreshId = String(obj.lastAckRefreshId || ''); out.pqLastAckEpoch = Number(obj.lastAckEpoch || 0);
+    out.pqDeferredAck = obj.deferredAck === true;
+    out.pqDeferredAckAt = Number(obj.deferredAckAt || 0);
+    out.pqDeferredAckEpoch = Number(obj.deferredAckEpoch || 0);
+    out.pqDeferredAckRefreshId = String(obj.deferredAckRefreshId || '');
+    out.pqLastAckSentAt = Number(obj.lastAckSentAt || 0);
+    // Pre-v70.10 persisted states had already emitted ACK immediately; absence of
+    // the new explicit marker must therefore migrate to "not deferred".
+    if (!Object.prototype.hasOwnProperty.call(obj, 'deferredAck')) {
+      out.pqDeferredAck = false;
+      out.pqDeferredAckAt = 0;
+      out.pqDeferredAckEpoch = 0;
+      out.pqDeferredAckRefreshId = '';
+    }
     const hasPersistedOutboundConfirmation = Object.prototype.hasOwnProperty.call(obj, 'outboundConfirmed');
     out.pqOutboundConfirmed = hasPersistedOutboundConfirmation ? obj.outboundConfirmed === true : true;
     out.pqOutboundConfirmedAt = Number(obj.outboundConfirmedAt || 0);
@@ -37057,6 +37578,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     out.pqPreviousRoots = (Array.isArray(obj.previousRoots) ? obj.previousRoots : []).slice(0, SDC_PQ_RATCHET_MAX_PREVIOUS_EPOCHS).map((entry) => ({
       epoch: Number(entry.epoch || 0), rootKey: decode32(entry.rootKey, 'persisted previous PQ root'),
       activatedAt: Number(entry.activatedAt || 0), expiresAt: Number(entry.expiresAt || 0), refreshId: String(entry.refreshId || ''),
+      holdUntilAckEpoch: Number(entry.holdUntilAckEpoch || 0),
     }));
     if (obj.pending) out.pqPending = {
       epoch: Number(obj.pending.epoch || 0), refreshId: String(obj.pending.refreshId || ''), targetPqPrekeyId: String(obj.pending.targetPqPrekeyId || ''),
@@ -37065,6 +37587,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       rootKey: decode32(obj.pending.rootKey, 'persisted pending PQ root'), confirmKey: decode32(obj.pending.confirmKey, 'persisted pending PQ confirm key'),
       ciphertext: ratchetCopyBytes(Utils.Base64urlToBytes(String(obj.pending.ciphertext || '')), SDC_PQ_CIPHERTEXT_BYTES, 'persisted ML-KEM ciphertext'),
       controlBody: String(obj.pending.controlBody || ''),
+      quietDeliveryCapabilityVersion: Number(obj.pending.quietDeliveryCapabilityVersion || 0),
+      quietDeliveryAt: Number(obj.pending.quietDeliveryAt || 0),
+      quietDeliverySource: String(obj.pending.quietDeliverySource || ''),
     };
     for (const [id, pub, label] of [
       [out.pqLocalNextKemKeyId, out.pqLocalNextKemPublic, 'local next KEM'],
@@ -37564,6 +38089,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         outboundConfirmed: state.role === 'RESPONDER' ? state.pqOutboundConfirmed === true : true,
         outboundConfirmedAt: Number(state.pqOutboundConfirmedAt || 0) || null,
         outboundConfirmationSource: String(state.pqOutboundConfirmationSource || '') || null,
+        deferredAck: state.pqDeferredAck === true,
+        deferredAckAt: Number(state.pqDeferredAckAt || 0) || null,
+        deferredAckEpoch: Number(state.pqDeferredAckEpoch || 0) || null,
+        deferredAckRefreshId: String(state.pqDeferredAckRefreshId || '') || null,
+        lastAckSentAt: Number(state.pqLastAckSentAt || 0) || null,
       },
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
@@ -46824,17 +47354,33 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     }
 
-    // v69.1: compact PQ ratchet controls have their own generatedAt/refreshId
-    // replay scope. Like classical SDC4 controls, only current-runtime deliveries
-    // may mutate live ratchet state; Discord history is kept inert.
+    // v70.10.1: PQ INIT/ACK is a persistent offline control plane. Current-runtime
+    // controls keep the narrow live TTL; older rows may be consumed idempotently
+    // for a bounded offline window only. Full handlers still require the exact
+    // current session/KEX/device binding and identity signature, so an obsolete
+    // generation cannot be resurrected by scrolling history. Controls beyond the
+    // offline window remain inert presentation-only history.
     if (isPqRatchetControl && message.author != null) {
       const meta = peekPqRatchetControlMetadata(sysmsg, earlyMessageType);
       const generatedAt = Number(meta?.generatedAt || 0);
-      const runtimeFresh = !!meta && generatedAt >= SDC_RUNTIME_STARTED_AT - 30_000 &&
-        generatedAt <= Date.now() + 60_000 && Date.now() - generatedAt <= SDC_PQ_RATCHET_CONTROL_TTL_MS;
-      const firstDelivery = runtimeFresh ? consumePqRatchetControlOnce(message, sysmsg, earlyMessageType) : false;
-      if (!runtimeFresh || !firstDelivery) oldMessage = true;
-      else oldMessage = false;
+      const now = Date.now();
+      const timestampSane = !!meta && generatedAt > 0 && generatedAt <= now + 60_000;
+      const runtimeFresh = timestampSane && generatedAt >= SDC_RUNTIME_STARTED_AT - 30_000 &&
+        now - generatedAt <= SDC_PQ_RATCHET_CONTROL_TTL_MS;
+      const offlineFresh = timestampSane && !runtimeFresh &&
+        now - generatedAt <= SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS;
+      const firstDelivery = (runtimeFresh || offlineFresh)
+        ? consumePqRatchetControlOnce(message, sysmsg, earlyMessageType, now)
+        : false;
+      if ((runtimeFresh || offlineFresh) && firstDelivery) {
+        oldMessage = false;
+        if (offlineFresh) {
+          message._sdc_pq_offline_history = true;
+          PqQuietControlStats.offlineControlsAccepted += 1;
+        } else try { delete message._sdc_pq_offline_history; } catch (_) {}
+      } else {
+        oldMessage = true;
+      }
     }
 
     // v67.1.110: strict KEX v3 already has its own authenticated replay model
@@ -48138,12 +48684,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               });
               return true;
             }
-            await handlePqRatchetInit(message, sysmsg, false);
+            await handlePqRatchetInit(message, sysmsg, message?._sdc_pq_offline_history === true);
             renderSdcVisualCryptoControl(message, 'Post-quantique', 'RATCHET INIT', {
               bucket: 'ratchet',
               status: 'progress',
               direction: sdcVisualControlDirection(message, false),
-              detail: 'rafraîchissement ML-KEM authentifié',
+              detail: message?._sdc_pq_offline_history === true ? 'contrôle offline authentifié · ACK différé jusqu’à votre prochaine réponse' : 'rafraîchissement ML-KEM authentifié · ACK différé jusqu’à la prochaine réponse',
             });
           } catch (error) {
             console.error('[SDC][PQ][v69.2.6] PQ ratchet INIT rejected', error);
@@ -48167,12 +48713,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               });
               return true;
             }
-            await handlePqRatchetAck(message, sysmsg, false);
+            await handlePqRatchetAck(message, sysmsg, message?._sdc_pq_offline_history === true);
             renderSdcVisualCryptoControl(message, 'Post-quantique', 'RATCHET ACK', {
               bucket: 'ratchet',
               status: 'success',
               direction: sdcVisualControlDirection(message, false),
-              detail: 'époque PQ confirmée',
+              detail: message?._sdc_pq_offline_history === true ? 'ACK offline authentifié · époque PQ confirmée' : 'époque PQ confirmée',
             });
           } catch (error) {
             console.error('[SDC][PQ][v69.2.6] PQ ratchet ACK rejected', error);
@@ -49082,26 +49628,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       throw error;
     }
 
-    // v68.5.5 lazy announce policy. Viewing a DM is passive; only actual encrypted
-    // activity may advertise this installation. A prekey rotation clears the per-
-    // channel marker, so this emits at most once per prekey epoch unless forced.
-    if (applicationEncryptionRequested) {
-      try {
-        const selected = Discord.getChannel(String(channelId));
-        if (selected?.type === 1) {
-          const peerId = String(selected.recipients?.[0] || ratchetPeerAccountId(channelId) || '');
-          const peer = peerId ? getPeerIdentityRecord(peerId) : null;
-          if (peer?.publicKey) {
-            await sendDeviceAnnouncement(channelId, false);
-          }
-        }
-      } catch (error) {
-        console.debug('[SDC][ASYNC][v68.5.5] lazy device/prekey announcement skipped/deferred', {
-          channelId: String(channelId || ''),
-          reason: error?.message || String(error),
-        });
-      }
-    }
+    // v70.10.1 zero-touch migration. Genuine encrypted user intent publishes this
+    // installation's signed Quiet capability BEFORE any SDC4/PQ construction.
+    // Merely viewing/selecting the DM remains fully passive.
+    if (applicationEncryptionRequested)
+      await ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, 'normal-composer-before-crypto');
 
     // v70.9.5: normal composer path gets the same portable-import restoration
     // gate as Chat Control. This is not a protocol downgrade or a new handshake;
@@ -62382,6 +62913,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           }
         }
 
+        // v70.10.3: ordinary Chat Control text deliberately bypasses detour_enqueue and
+        // submits the already-final ciphertext straight to Discord. Run the same Quiet-PQ
+        // terminal boundary here so deferred ACK / lazy INIT controls are queued BEFORE
+        // the human message on this direct path too. This sees ciphertext only.
+        await preparePqQuietControlsBeforeUserEnqueue(
+          channelId,
+          messageObject,
+          'secure-input-direct-final-before-original-enqueue'
+        );
+
         const result = await Discord.original_enqueue.apply(
           Discord.enqueueTarget,
           [channelId, messageObject, undefined, options]
@@ -67621,6 +68162,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             const offlineFileDescriptorIds = fileFsDescriptorsForRequest.map((row) => String(row.i)).sort();
 
             const peerId = ratchetPeerAccountId(active.channelId);
+            // v70.10.1 zero-touch convergence must run before ANY SDC4 reservation
+            // or offline-grant decision. It sees no plaintext and is triggered only
+            // by this authenticated sandbox user-send request.
+            await ensureQuietPqCapabilityBeforeProtectedUserBuild(
+              active.channelId,
+              'secure-input-before-sdc4-reservation'
+            );
             // v70.3.8: Secure Input must not emit a forced readiness bundle per
             // keypress/send attempt. Existing device/PQ announcements are driven by
             // the validated lifecycle; here we only perform one bounded lost-ACK
@@ -69956,7 +70504,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.9.5',
+      build: 'v70.10.3',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -70020,6 +70568,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           version: version || null,
           compatible,
           versionState: compatible ? 'COMPATIBLE' : (version == null ? 'UNKNOWN' : 'EXPLICIT_LEGACY'),
+          quietPqControlVersion: isCurrentLocal
+            ? SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION
+            : Number(record.quietPqControlVersion || 0),
+          quietPqReady: isCurrentLocal || Number(record.quietPqControlVersion || 0) >= SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION,
           currentInstallation: isCurrentLocal,
           lastSeen: Number(record.lastSeen || 0) || null,
         };
@@ -70073,13 +70625,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           membershipSource: epoch.enabled ? 'current-kex-device-membership' : 'active-device-registry',
           kexGeneration: Number(epoch.generation || 0) || null,
           recipientDeviceIds: recipientIds,
+          recipientQuietPqCapabilities: recipientIds.map((deviceId) => ({
+            deviceId,
+            quietPqControlVersion: Number(registry.devices?.[deviceId]?.quietPqControlVersion || 0),
+            quietPqReady: Number(registry.devices?.[deviceId]?.quietPqControlVersion || 0) >= SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION,
+          })),
           blockingDevices,
           staleNonBlockingDevices: epoch.enabled ? staleNonBlockingDevices : [],
         };
       }
     } catch (_) {}
     return {
-      build: 'v70.9.5',
+      build: 'v70.10.3',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -70105,7 +70662,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.9.5',
+    build: 'v70.10.3',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -70142,6 +70699,25 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       String(ensurePortableImportConvergenceForChannel || '').includes('ensureRatchetV4Live'),
     portableExportOmitsInstallationReconvergenceMarker:
       String(Utils.DownloadDb || '').includes('delete exportData.portableImportConvergence'),
+    quietPqUserActivityOnly:
+      SDC_PQ_RATCHET_BACKGROUND_MAINTENANCE_ENABLED === false &&
+      SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS === 0 &&
+      String(preparePqQuietControlsBeforeUserEnqueue || '').includes('flushDeferredPqRatchetAcksForUserSend'),
+    deferredPqAckBeforeUserMessage:
+      String(handlePqRatchetInit || '').includes('ACK deferred until local user activity') &&
+      String(Discord.detour_enqueue || '').includes('preparePqQuietControlsBeforeUserEnqueue'),
+    automaticControlsSuppressNotifications:
+      SDC_DISCORD_SUPPRESS_NOTIFICATIONS_FLAG === 4096 &&
+      String(Utils.SendSystemMessage || '').includes('suppressNotifications'),
+    mixedVersionQuietRefreshCapabilityGated:
+      String(buildLocalDeviceAnnouncement || '').includes('quietPqControlVersion') &&
+      String(acceptDeviceAnnouncement || '').includes('quietPqControlCapability') &&
+      String(preparePqQuietControlsBeforeUserEnqueue || '').includes('quietPqControlVersion'),
+    zeroTouchQuietCapabilityBeforeCryptoBuild:
+      String(ensureQuietPqCapabilityBeforeProtectedUserBuild || '').includes('sendDeviceAnnouncement') &&
+      String(SecureComposer?.messageListener || '').includes('secure-input-before-sdc4-reservation'),
+    inheritedPendingQuietResumeBounded:
+      String(resumeInheritedPqPendingForQuietPeer || '').includes('quietDeliveryCapabilityVersion'),
     note: SdcUiI18n.pick(
       'Presentation/storage-orchestration corrective; Classical, PQ and GROUP protocol semantics remain frozen.',
       'Correctif de présentation/orchestration du stockage ; les sémantiques protocolaires Classical, PQ et GROUP restent gelées.'
@@ -70166,16 +70742,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.9.5',
+      build: 'v70.10.3',
       portableAccountIdentity: true,
       portableDevicePrivateKey: false,
       portableMutableRatchetState: false,
+      portablePqPendingOrDeferredAckState: false,
+      automaticQuietCapabilityReadvertisementAfterImport: true,
       encryptedReadableHistoryPortableWhenExported: true,
       importedAt: Number(state?.importedAt || 0) || null,
       postImportDeviceConvergenceActive: !!state,
       convergedChannels: state ? Object.keys(state.convergedChannels || {}).length : 0,
       currentChannel,
-      behavior: 'FIRST PROTECTED DM USE AFTER IMPORT -> SIGNED DEVICE ANNOUNCE -> REQUIRED SDC4 COVERAGE RECONSTRUCTION',
+      behavior: 'FIRST PROTECTED DM SEND AFTER IMPORT -> NEW INSTALLATION DEVICE -> SIGNED QUIET CAPABILITY BEFORE CRYPTO BUILD -> AUTOMATIC REQUIRED SDC4 COVERAGE RECONSTRUCTION',
       note: SdcUiI18n.pick(
         'A portable backup restores the account identity and encrypted keys/history, but never clones an installation device private key or live ratchet state.',
         'Une sauvegarde portable restaure l’identité de compte ainsi que les clés/l’historique chiffrés, mais ne clone jamais la clé privée d’un appareil ni un état ratchet actif.'
@@ -70183,8 +70761,123 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   };
 
+  window.SdcPqQuietMaintenanceStatus = async () => {
+    let currentDm = null;
+    try {
+      const channelId = String(Cache.channelId || Discord.getChannelId?.() || '');
+      const channel = channelId ? Discord.getChannel(channelId) : null;
+      if (channel?.type === 1) {
+        const peerId = String(ratchetPeerAccountId(channelId) || '');
+        await ensureRatchetStoreLoaded();
+        const sessions = findLiveRatchetTextSessions(channelId, peerId).map((state) => {
+          const remote = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
+          return {
+            sessionId: String(state.sessionId),
+            role: String(state.role || ''),
+            localDeviceId: String(state.localDeviceId || ''),
+            remoteDeviceId: String(state.remoteDeviceId || ''),
+            epoch: Number(state.pqEpoch || 0),
+            pendingEpoch: Number(state.pqPending?.epoch || 0) || null,
+            pendingQuietDeliveryCapabilityVersion: Number(state.pqPending?.quietDeliveryCapabilityVersion || 0),
+            pendingQuietDeliveryAt: Number(state.pqPending?.quietDeliveryAt || 0) || null,
+            pendingQuietDeliverySource: String(state.pqPending?.quietDeliverySource || ''),
+            deferredAck: state.pqDeferredAck === true,
+            deferredAckEpoch: Number(state.pqDeferredAckEpoch || 0) || null,
+            heldPreviousEpochs: (Array.isArray(state.pqPreviousRoots) ? state.pqPreviousRoots : [])
+              .filter((entry) => pqRatchetPreviousRootHeldForDeferredAck(state, entry))
+              .map((entry) => Number(entry.epoch || 0)),
+            remoteQuietCapabilityVersion: Number(remote?.quietPqControlVersion || 0),
+            refreshDueReason: pqRatchetRefreshReason(state, Date.now()),
+          };
+        });
+        currentDm = { channelId, peerId, sessions };
+      }
+    } catch (error) {
+      currentDm = { error: error?.message || String(error) };
+    }
+    const gates = {
+      noBackgroundPqTimer:
+        SDC_PQ_RATCHET_BACKGROUND_MAINTENANCE_ENABLED === false &&
+        SDC_PQ_RATCHET_MAINTENANCE_INTERVAL_MS === 0 && !PqRatchetMaintenanceTimer,
+      schedulerNetworkPassive:
+        String(maybeSchedulePqRatchetSessionUpgrade || '').includes('backgroundRunsSuppressed') &&
+        String(startPqRatchetMaintenanceTimer || '').includes('return false'),
+      refreshBoundToTerminalUserSend:
+        String(preparePqQuietControlsBeforeUserEnqueue || '').includes('startOrRefreshPqRatchetForState') &&
+        String(Discord.detour_enqueue || '').includes('preparePqQuietControlsBeforeUserEnqueue') &&
+        String(SecureComposer?.submitTransport || '').includes('preparePqQuietControlsBeforeUserEnqueue'),
+      directFinalSecureInputQuietBoundary:
+        String(SecureComposer?.submitTransport || '').includes('secure-input-direct-final-before-original-enqueue') &&
+        String(SecureComposer?.submitTransport || '').indexOf('preparePqQuietControlsBeforeUserEnqueue') <
+        String(SecureComposer?.submitTransport || '').indexOf('Discord.original_enqueue.apply'),
+      ackDeferredUntilRecipientUserSend:
+        String(handlePqRatchetInit || '').includes('pqDeferredAck = true') &&
+        String(sendDeferredPqRatchetAckForState || '').includes('user-send'),
+      ackQueuedBeforeUserMessage:
+        String(preparePqQuietControlsBeforeUserEnqueue || '').indexOf('flushDeferredPqRatchetAcksForUserSend') <
+        String(preparePqQuietControlsBeforeUserEnqueue || '').indexOf('startOrRefreshPqRatchetForState'),
+      deferredAckPinsOldEpochUntilAck:
+        pqRatchetDeferredAckRootRetentionSelfTest() &&
+        String(pqRatchetStateToPersisted || '').includes('holdUntilAckEpoch') &&
+        String(pqRatchetRestorePersisted || '').includes('holdUntilAckEpoch'),
+      boundedHeldRootCount: SDC_PQ_RATCHET_MAX_PREVIOUS_EPOCHS === 2,
+      pendingInitNotRetransmittedByUserRecovery:
+        String(ensurePqRatchetLiveForUserSend || '').includes('pendingInitRetriesSuppressed'),
+      offlineControlsBoundedAndAuthenticated:
+        SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS === 30 * 24 * 60 * 60 * 1000 &&
+        String(handlePqRatchetInit || '').includes('verifySignedDeviceControl') &&
+        String(handlePqRatchetAck || '').includes('verifySignedDeviceControl'),
+      automaticControlsUseSuppressNotifications:
+        SDC_DISCORD_SUPPRESS_NOTIFICATIONS_FLAG === 4096 &&
+        String(sendCompactPqRatchetControl || '').includes('suppressNotifications: true'),
+      mixedVersionRefreshIsCapabilityGated:
+        String(buildLocalDeviceAnnouncement || '').includes('quietPqControlVersion') &&
+        String(acceptDeviceAnnouncement || '').includes('quietPqControlCapability') &&
+        String(preparePqQuietControlsBeforeUserEnqueue || '').includes('legacyPeerRefreshSuppressed'),
+      compactQuietCapabilityEncoding:
+        String(buildLocalDeviceAnnouncement || '').includes('quietPqControlVersion: SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION') &&
+        !String(buildLocalDeviceAnnouncement || '').includes("mode: 'USER_ACTIVITY_ONLY_DEFERRED_ACK'"),
+      legacyVerboseQuietCapabilityStillAccepted:
+        String(acceptDeviceAnnouncement || '').includes('info.quietPqControlCapability') &&
+        String(acceptDeviceAnnouncement || '').includes('info.quietPqControlVersion'),
+      zeroTouchAnnouncementRefreshesPqProof:
+        String(sendDeviceAnnouncement || '').includes('force || forceDeviceAnnouncementOnly'),
+      zeroTouchCapabilityBeforeSecureInputReservation:
+        String(SecureComposer?.messageListener || '').indexOf('ensureQuietPqCapabilityBeforeProtectedUserBuild') <
+        String(SecureComposer?.messageListener || '').indexOf('reserveSandboxSdc4Grant') &&
+        String(ensureQuietPqCapabilityBeforeProtectedUserBuild || '').includes('announcedQuietPqZeroTouch') &&
+        String(sendDeviceAnnouncement || '').includes('forceDeviceAnnouncementOnly'),
+      inheritedPendingResumedOnceAfterCapability:
+        String(resumeInheritedPqPendingForQuietPeer || '').includes('quietDeliveryCapabilityVersion') &&
+        String(preparePqQuietControlsBeforeUserEnqueue || '').includes('resumeInheritedPqPendingForQuietPeer'),
+      quietPendingDeliveryMarkerPersisted:
+        String(pqRatchetStateToPersisted || '').includes('quietDeliveryCapabilityVersion') &&
+        String(pqRatchetRestorePersisted || '').includes('quietDeliveryCapabilityVersion'),
+      portableDbDoesNotCloneMutableRatchet:
+        String(Utils.DownloadDb || '').includes('portableRatchetState: false') &&
+        String(Utils.DownloadDb || '').includes('delete exportData.portableImportConvergence'),
+      protocolStacksStillFrozen:
+        SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
+    };
+    return {
+      build: 'v70.10.3',
+      ok: Object.values(gates).every(Boolean),
+      policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
+      backgroundNetworkMaintenance: false,
+      refreshEveryMessages: SDC_PQ_RATCHET_REFRESH_MESSAGES,
+      lazyRefreshMaxAgeMs: SDC_PQ_RATCHET_REFRESH_MAX_AGE_MS,
+      offlineControlMaxAgeMs: SDC_PQ_RATCHET_OFFLINE_CONTROL_MAX_AGE_MS,
+      suppressNotificationsFlag: SDC_DISCORD_SUPPRESS_NOTIFICATIONS_FLAG,
+      quietCapabilityVersion: SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION,
+      timelinePolicy: 'CONTROLS REMAIN REAL/VISIBLE DISCORD ROWS; QUIET FLAG + CONTROL-BEFORE-USER ORDERING; NO INVISIBLE CARRIER',
+      gates,
+      runtime: { ...PqQuietControlStats },
+      currentDm,
+    };
+  };
+
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.9.5',
+    build: 'v70.10.3',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -72242,6 +72935,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               channelId,
               transport: String(message?.content || '').startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX) ? 'SDC4QF' : (String(message?.content || '').startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ? 'SDC4Q' : 'UNKNOWN'),
             });
+            await preparePqQuietControlsBeforeUserEnqueue(channelId, message, 'trusted-final-hybrid-before-original-enqueue');
             return Discord.original_enqueue.apply(Discord.enqueueTarget, args);
           }
 
@@ -72251,6 +72945,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (TrustedSystemMessageObjects.has(message)) {
             TrustedSystemMessageObjects.delete(message);
             if (message._sdc_system_message) delete message._sdc_system_message;
+            if (message._sdc_suppress_notifications) delete message._sdc_suppress_notifications;
             console.debug('[SDC][CONTROL][v67.1.110] trusted system message queued outside Secure Input', {
               channelId,
               type: /\*type\*:\s*`([^`]+)`/.exec(String(message.content || ''))?.[1] || 'SYSTEM',
@@ -72428,6 +73123,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             'MessageQueue-immediately-before-offline-file-original-enqueue'
           );
           delete message._sdc_offline_file_recipient_ids;
+        }
+
+        // v70.10.1 terminal quiet-control boundary. The encrypted application
+        // message is fully built and all recipient/revocation checks above passed.
+        // Any deferred ACK or lazy refresh INIT is therefore queued NOW, before
+        // the user message, never from an idle timer or receive callback.
+        if (channelId && message) {
+          await preparePqQuietControlsBeforeUserEnqueue(
+            channelId,
+            message,
+            'MessageQueue-immediately-before-original-enqueue'
+          );
         }
 
         // Appeler la fonction originale et retourner sa Promise.
