@@ -1,13 +1,13 @@
 /**
  * @name FollowUser
  * @author Sleek
- * @version 2.0.0
+ * @version 2.0.1
  * @description Remote payload for FollowUserLoader. Follow users between voice channels or pin/follow a specific voice channel.
  */
 
 module.exports = class FollowUser {
     getName() { return "FollowUser"; }
-    getVersion() { return "2.0.0"; }
+    getVersion() { return "2.1.0"; }
 
     constructor() {
         this.currentUser = null;
@@ -16,6 +16,9 @@ module.exports = class FollowUser {
         this.modalObserver = null;
 
         this.voiceStateStore = null;
+        this.channelStore = null;
+        this.permissionStore = null;
+        this.permissionBits = null;
         this.channelActions = null;
         this.userStore = null;
         this.selectedChannelStore = null;
@@ -23,6 +26,9 @@ module.exports = class FollowUser {
         this._unpatchUserContext = null;
         this._unpatchChannelContext = null;
         this._started = false;
+        this._waiting = null;
+        this._lastTargetChannelId = null;
+        this._lastJoinAttempt = {channelId: null, at: 0};
     }
 
     start() {
@@ -37,6 +43,7 @@ module.exports = class FollowUser {
         this.stopFollowInterval();
         this.currentUser = null;
         this.currentChannel = null;
+        this.clearWaitingState();
 
         for (const unpatch of [this._unpatchUserContext, this._unpatchChannelContext]) {
             if (typeof unpatch === "function") {
@@ -116,13 +123,9 @@ module.exports = class FollowUser {
         const children = menu.props.children;
         if (this.reactTreeContainsId(children, id)) return;
 
-        if (Array.isArray(children)) {
-            children.push(group);
-        } else if (children == null) {
-            menu.props.children = [group];
-        } else {
-            menu.props.children = [children, group];
-        }
+        if (Array.isArray(children)) children.push(group);
+        else if (children == null) menu.props.children = [group];
+        else menu.props.children = [children, group];
     }
 
     reactTreeContainsId(node, id, depth = 0) {
@@ -136,11 +139,8 @@ module.exports = class FollowUser {
     isVoiceChannel(channel) {
         if (!channel) return false;
         if (channel.type === 2 || channel.type === 13) return true; // GUILD_VOICE / GUILD_STAGE_VOICE
-        try {
-            return Boolean(channel.isGuildVocal?.() || channel.isVocal?.());
-        } catch (_) {
-            return false;
-        }
+        try { return Boolean(channel.isGuildVocal?.() || channel.isVocal?.()); }
+        catch (_) { return false; }
     }
 
     // ------------------------------------------------------------------
@@ -155,6 +155,7 @@ module.exports = class FollowUser {
 
         this.currentChannel = null;
         this.currentUser = userId;
+        this.clearWaitingState();
         if (!this.startFollowInterval()) {
             this.currentUser = null;
             return;
@@ -170,6 +171,7 @@ module.exports = class FollowUser {
 
         this.currentUser = null;
         this.currentChannel = channelId;
+        this.clearWaitingState();
         if (!this.startFollowInterval()) {
             this.currentChannel = null;
             return;
@@ -180,35 +182,55 @@ module.exports = class FollowUser {
     stopFollowing(message = null) {
         this.currentUser = null;
         this.currentChannel = null;
+        this.clearWaitingState();
         this.stopFollowInterval();
         if (message) BdApi.UI.showToast(message, {type: "info"});
     }
 
+    clearWaitingState() {
+        this._waiting = null;
+        this._lastTargetChannelId = null;
+    }
+
     // ------------------------------------------------------------------
-    // Discord voice modules
+    // Discord modules / permissions
     // ------------------------------------------------------------------
 
     resolveVoiceModules() {
         const W = BdApi.Webpack;
 
-        this.voiceStateStore =
-            this.voiceStateStore ||
-            W.getStore?.("VoiceStateStore") ||
-            W.getByKeys?.("getVoiceStateForUser");
-
-        this.userStore =
-            this.userStore ||
-            W.getStore?.("UserStore") ||
-            W.getByKeys?.("getCurrentUser", "getUser");
-
-        this.selectedChannelStore =
-            this.selectedChannelStore ||
-            W.getStore?.("SelectedChannelStore") ||
-            W.getByKeys?.("getVoiceChannelId");
-
+        this.voiceStateStore = this.voiceStateStore || W.getStore?.("VoiceStateStore") || W.getByKeys?.("getVoiceStateForUser");
+        this.channelStore = this.channelStore || W.getStore?.("ChannelStore") || W.getByKeys?.("getChannel", "getDMFromUserId");
+        this.permissionStore = this.permissionStore || W.getStore?.("PermissionStore") || W.getByKeys?.("can", "canManageUser");
+        this.userStore = this.userStore || W.getStore?.("UserStore") || W.getByKeys?.("getCurrentUser", "getUser");
+        this.selectedChannelStore = this.selectedChannelStore || W.getStore?.("SelectedChannelStore") || W.getByKeys?.("getVoiceChannelId");
+        this.permissionBits = this.permissionBits || this.findPermissionBits();
         this.channelActions = this.channelActions || this.findVoiceSelectorActions();
 
         return Boolean(this.channelActions);
+    }
+
+    findPermissionBits() {
+        const W = BdApi.Webpack;
+        let bits = null;
+
+        try {
+            bits = W.getByKeys?.("VIEW_CHANNEL", "CONNECT", "MOVE_MEMBERS") || null;
+        } catch (_) {}
+
+        // Discord permission bit values are stable. Runtime exports are preferred,
+        // these BigInt fallbacks keep the plugin functional if the constants export moves.
+        return {
+            VIEW_CHANNEL: bits?.VIEW_CHANNEL ?? 1024n,
+            CONNECT: bits?.CONNECT ?? 1048576n,
+            MOVE_MEMBERS: bits?.MOVE_MEMBERS ?? 16777216n
+        };
+    }
+
+    canPermission(permission, channel) {
+        if (!this.permissionStore?.can || permission == null || !channel) return null;
+        try { return Boolean(this.permissionStore.can(permission, channel)); }
+        catch (_) { return null; }
     }
 
     findVoiceSelectorActions() {
@@ -221,23 +243,18 @@ module.exports = class FollowUser {
             W.getByKeys?.("selectChannel");
 
         if (!actions || !this.hasVoiceSelector(actions)) {
-            actions = W.getModule?.(
-                (module) => module && this.hasVoiceSelector(module),
-                {searchExports: true}
-            );
+            actions = W.getModule?.((module) => module && this.hasVoiceSelector(module), {searchExports: true});
         }
 
         return actions || null;
     }
 
     hasVoiceSelector(module) {
-        return Boolean(
-            module && (
-                typeof module.selectVoiceChannel === "function" ||
-                typeof module.selectVoiceChannelById === "function" ||
-                typeof module.selectChannel === "function"
-            )
-        );
+        return Boolean(module && (
+            typeof module.selectVoiceChannel === "function" ||
+            typeof module.selectVoiceChannelById === "function" ||
+            typeof module.selectChannel === "function"
+        ));
     }
 
     getCurrentVoiceChannelId() {
@@ -257,8 +274,103 @@ module.exports = class FollowUser {
         return null;
     }
 
+    getChannel(channelId) {
+        try { return this.channelStore?.getChannel?.(channelId) || null; }
+        catch (_) { return null; }
+    }
+
+    getVoiceOccupancy(channelId) {
+        try {
+            const states = this.voiceStateStore?.getVoiceStatesForChannel?.(channelId);
+            if (!states) return null;
+            if (states instanceof Map || states instanceof Set) return states.size;
+            if (Array.isArray(states)) return states.length;
+            if (typeof states === "object") return Object.keys(states).length;
+        } catch (_) {}
+        return null;
+    }
+
+    getChannelJoinStatus(channelId) {
+        const channel = this.getChannel(channelId);
+        if (!channel) {
+            // If Discord does not expose the object we cannot safely pre-check it.
+            // Preserve old behavior and let the join attempt/fallback decide.
+            return {ok: true, channel: null, name: `channel ${channelId}`, reason: "unknown"};
+        }
+
+        const name = channel.name || `channel ${channelId}`;
+
+        const canView = this.canPermission(this.permissionBits?.VIEW_CHANNEL, channel);
+        if (canView === false) {
+            return {ok: false, channel, name, reason: "permission", permission: "VIEW_CHANNEL"};
+        }
+
+        const canConnect = this.canPermission(this.permissionBits?.CONNECT, channel);
+        if (canConnect === false) {
+            return {ok: false, channel, name, reason: "permission", permission: "CONNECT"};
+        }
+
+        const limitRaw = channel.userLimit ?? channel.user_limit ?? 0;
+        const limit = Number(limitRaw) || 0;
+        if (limit <= 0) return {ok: true, channel, name, reason: "unlimited"};
+
+        // Discord explicitly allows MOVE_MEMBERS to bypass a voice channel's user limit.
+        const canBypassLimit = this.canPermission(this.permissionBits?.MOVE_MEMBERS, channel);
+        if (canBypassLimit === true) {
+            return {ok: true, channel, name, reason: "limit-bypass", limit, bypass: true};
+        }
+
+        const count = this.getVoiceOccupancy(channelId);
+        if (count != null && count >= limit) {
+            return {ok: false, channel, name, reason: "full", count, limit};
+        }
+
+        return {ok: true, channel, name, reason: "available", count, limit};
+    }
+
+    setWaitingState(status, channelId) {
+        const signature = `${status.reason}:${channelId}:${status.permission || ""}:${status.limit ?? ""}`;
+        if (this._waiting?.signature === signature) return;
+
+        this._waiting = {
+            signature,
+            reason: status.reason,
+            channelId,
+            name: status.name,
+            permission: status.permission || null,
+            count: status.count ?? null,
+            limit: status.limit ?? null
+        };
+
+        if (status.reason === "full") {
+            BdApi.UI.showToast(`⏳ ${status.name} is full (${status.count}/${status.limit}) — waiting for a slot`, {type: "info"});
+        } else if (status.reason === "permission") {
+            BdApi.UI.showToast(`⛔ Cannot join ${status.name}: missing ${status.permission} — follow remains active`, {type: "error"});
+        }
+    }
+
+    clearWaitingAndNotify(status, channelId) {
+        const previous = this._waiting;
+        if (!previous || previous.channelId !== channelId) {
+            this._waiting = null;
+            return;
+        }
+
+        this._waiting = null;
+        if (previous.reason === "full") {
+            BdApi.UI.showToast(`✅ Slot available — joining ${status.name}`, {type: "success"});
+        } else if (previous.reason === "permission") {
+            BdApi.UI.showToast(`✅ ${status.name} is accessible — joining`, {type: "success"});
+        }
+    }
+
     selectVoiceChannel(channelId) {
         if (!channelId || !this.channelActions) return false;
+
+        // Avoid hammering Discord while a previous channel switch is still propagating.
+        const now = Date.now();
+        if (this._lastJoinAttempt.channelId === channelId && now - this._lastJoinAttempt.at < 2000) return false;
+        this._lastJoinAttempt = {channelId, at: now};
 
         try {
             if (typeof this.channelActions.selectVoiceChannel === "function") {
@@ -308,17 +420,38 @@ module.exports = class FollowUser {
                     return;
                 }
 
-                // User is not currently in voice: keep watching, but do not move us.
-                if (!targetChannelId) return;
+                // Target user is not in voice: keep following silently.
+                if (!targetChannelId) {
+                    this._lastTargetChannelId = null;
+                    this._waiting = null;
+                    return;
+                }
             } else if (this.currentChannel) {
                 targetChannelId = this.currentChannel;
             } else {
                 return;
             }
 
-            const currentChannelId = this.getCurrentVoiceChannelId();
-            if (currentChannelId === targetChannelId) return;
+            // User-follow may change target channel at any moment. A wait state belongs
+            // only to the old target and must not block the new one.
+            if (this._lastTargetChannelId && this._lastTargetChannelId !== targetChannelId) {
+                this._waiting = null;
+            }
+            this._lastTargetChannelId = targetChannelId;
 
+            const currentChannelId = this.getCurrentVoiceChannelId();
+            if (currentChannelId === targetChannelId) {
+                this._waiting = null;
+                return;
+            }
+
+            const status = this.getChannelJoinStatus(targetChannelId);
+            if (!status.ok) {
+                this.setWaitingState(status, targetChannelId);
+                return;
+            }
+
+            this.clearWaitingAndNotify(status, targetChannelId);
             this.selectVoiceChannel(targetChannelId);
         };
 
@@ -335,7 +468,7 @@ module.exports = class FollowUser {
     }
 
     // ------------------------------------------------------------------
-    // Full-channel detection
+    // Full-channel race-condition fallback
     // ------------------------------------------------------------------
 
     observeModals() {
@@ -357,8 +490,15 @@ module.exports = class FollowUser {
                         text.includes("nombre maximal de personnes");
 
                     if (full && (this.currentUser || this.currentChannel)) {
-                        this.stopFollowing();
-                        BdApi.UI.showToast("❌ Channel full - follow stopped", {type: "error"});
+                        const channelId = this._lastTargetChannelId || this.currentChannel || null;
+                        const status = channelId ? this.getChannelJoinStatus(channelId) : null;
+                        this.setWaitingState(
+                            status?.reason === "full"
+                                ? status
+                                : {reason: "full", name: status?.name || "Target channel", count: "?", limit: "?"},
+                            channelId || "unknown"
+                        );
+                        // IMPORTANT: do not stop following. This modal is only a race fallback.
                         return;
                     }
                 }
@@ -378,11 +518,18 @@ module.exports = class FollowUser {
 
         const state = document.createElement("div");
         const refresh = () => {
-            state.textContent = this.currentUser
+            let text = this.currentUser
                 ? `Following user: ${this.currentUser}`
                 : this.currentChannel
                     ? `Following voice channel: ${this.currentChannel}`
                     : "No active follow.";
+
+            if (this._waiting?.reason === "full") {
+                text += ` Waiting: ${this._waiting.name} is full (${this._waiting.count}/${this._waiting.limit}).`;
+            } else if (this._waiting?.reason === "permission") {
+                text += ` Waiting: missing ${this._waiting.permission} on ${this._waiting.name}.`;
+            }
+            state.textContent = text;
         };
         state.style.cssText = "margin-bottom:14px;color:var(--text-muted);";
         refresh();
