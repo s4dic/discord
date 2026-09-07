@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.4
+// @version      1.7.6.5
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -15,10 +15,10 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.10.4';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_4_GROUP_OWN_ECHO_VERSION_UI';
-    console.info('[SDC][BUILD][v70.10.4] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_4_GROUP_OWN_ECHO_VERSION_UI',
+    window.SdcRuntimeBuild = () => 'v70.10.5';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_5_SDC4Q_STICKY_PREKEY_CONTINUITY';
+    console.info('[SDC][BUILD][v70.10.5] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_5_SDC4Q_STICKY_PREKEY_CONTINUITY',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -70,7 +70,7 @@
   // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
   // but is NOT cryptographic key material and does not alter any frozen wire.
   const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
-  const SDC_VERSION_POLICY_BUILD = 'v70.10.4';
+  const SDC_VERSION_POLICY_BUILD = 'v70.10.5';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -29537,12 +29537,44 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return true;
   }
 
-  function pqV692CapabilityUsable(record, now = Date.now()) {
+  // v70.10.5: the 24-hour signed v69.2 lease remains the strongest freshness
+  // signal, but Quiet-PQ deliberately has no background network maintenance. Lease
+  // expiry alone must therefore not strand a previously authenticated HYBRID peer.
+  // Continuity is allowed only through the exact still-current identity-signed
+  // classical/ML-KEM prekey pair and is immediately killed by revocation or newer
+  // signed legacy evidence (which clears pqV692HybridOfflineCapable above).
+  function pqV692CapabilityLeaseFresh(record, now = Date.now()) {
     if (!record || record.revokedAt || record.pqV692HybridOfflineCapable !== true) return false;
     const verifiedAt = Number(record.pqV692LastVerifiedAt || 0);
     const supersededAt = Number(record.pqV692CapabilitySupersededAt || 0);
     const expiresAt = Number(record.pqV692CapabilityExpiresAt || 0);
-    return verifiedAt > 0 && verifiedAt > supersededAt && expiresAt > Number(now || Date.now());
+    const at = Number(now || Date.now());
+    return Number(record.pqV692CapabilityVersion || 0) === SDC_PQ_V692_CAPABILITY_VERSION &&
+      verifiedAt > 0 && verifiedAt > supersededAt && expiresAt > at;
+  }
+
+  function pqV692StickyBoundPrekeyContinuityUsable(record, now = Date.now()) {
+    if (!record || record.revokedAt || record.pqV692HybridOfflineCapable !== true) return false;
+    if (Number(record.pqV692CapabilityVersion || 0) !== SDC_PQ_V692_CAPABILITY_VERSION) return false;
+    const at = Number(now || Date.now());
+    const verifiedAt = Number(record.pqV692LastVerifiedAt || 0);
+    const supersededAt = Number(record.pqV692CapabilitySupersededAt || 0);
+    if (!(verifiedAt > 0 && verifiedAt > supersededAt)) return false;
+    if (!(record.pqEverHybrid === true || record.pqRatchetEverLive === true || record.pqOfflineHybridEverSeen === true)) return false;
+
+    const classical = record.asyncPrekey || null;
+    const pq = record.pqPrekey || null;
+    if (!classical || !pq || record.pqPrekeyBindingCurrent !== true) return false;
+    if (!String(classical.keyId || '') || String(pq.boundClassicalPrekeyId || '') !== String(classical.keyId || '')) return false;
+    if (Number(classical.expiresAt || 0) <= at || Number(pq.expiresAt || 0) <= at) return false;
+    if (String(pq.algorithm || '') !== SDC_PQ_KEM || String(pq.profile || '') !== SDC_PQ_PROFILE) return false;
+    if (record.sdcMinimumVersionCompatible === false) return false;
+    return true;
+  }
+
+  function pqV692CapabilityUsable(record, now = Date.now()) {
+    return pqV692CapabilityLeaseFresh(record, now) ||
+      pqV692StickyBoundPrekeyContinuityUsable(record, now);
   }
 
 
@@ -29838,18 +29870,25 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   function pqPeerDeviceSummary(accountId, deviceId) {
     const record = getDeviceRecord(accountId, deviceId);
     const pq = record?.pqPrekey || null;
+    const classical = record?.asyncPrekey || null;
+    const leaseFresh = pqV692CapabilityLeaseFresh(record);
+    const stickyPrekeyContinuity = pqV692StickyBoundPrekeyContinuityUsable(record);
+    const v692Usable = leaseFresh || stickyPrekeyContinuity;
     return {
       accountId: String(accountId || ''),
       deviceId: String(deviceId || ''),
       revoked: !!record?.revokedAt,
       everHybrid: record?.pqEverHybrid === true || record?.pqRatchetEverLive === true || record?.pqV692HybridOfflineCapable === true,
       stickyAntiDowngrade: record?.pqEverHybrid === true || record?.pqRatchetEverLive === true || record?.pqV692HybridOfflineCapable === true,
-      v692HybridOfflineCapable: pqV692CapabilityUsable(record),
-      v692MultiDeviceFanoutCapable: pqV692CapabilityUsable(record) && record?.pqV692HybridOfflineFanoutCapable === true,
+      v692HybridOfflineCapable: v692Usable,
+      v692MultiDeviceFanoutCapable: v692Usable && record?.pqV692HybridOfflineFanoutCapable === true,
       v692CapabilityStored: record?.pqV692HybridOfflineCapable === true,
       v692CapabilityVersion: Number(record?.pqV692CapabilityVersion || 0) || null,
       v692CapabilityLastVerifiedAt: Number(record?.pqV692LastVerifiedAt || 0) || null,
       v692CapabilityExpiresAt: Number(record?.pqV692CapabilityExpiresAt || 0) || null,
+      v692CapabilityLeaseFresh: leaseFresh,
+      v692StickyBoundPrekeyContinuityUsable: stickyPrekeyContinuity,
+      v692CapabilityUseMode: leaseFresh ? 'SIGNED_LEASE' : (stickyPrekeyContinuity ? 'STICKY_BOUND_PREKEY_CONTINUITY' : 'UNAVAILABLE'),
       v692CapabilitySupersededAt: Number(record?.pqV692CapabilitySupersededAt || 0) || null,
       v692CapabilitySupersededSource: record?.pqV692CapabilitySupersededSource || null,
       pqRatchetEverLive: record?.pqRatchetEverLive === true,
@@ -29859,9 +29898,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       algorithm: pq?.algorithm || null,
       profile: pq?.profile || null,
       expiresAt: Number(pq?.expiresAt || 0) || null,
+      classicalPrekeyId: classical?.keyId || null,
+      classicalPrekeyExpiresAt: Number(classical?.expiresAt || 0) || null,
       boundClassicalPrekeyId: pq?.boundClassicalPrekeyId || null,
       bindingCurrent: record?.pqPrekeyBindingCurrent === true,
-      usableNow: !!pq && !record?.revokedAt && Number(pq.expiresAt || 0) > Date.now() && record?.pqPrekeyBindingCurrent === true,
+      usableNow: !!pq && !!classical && !record?.revokedAt &&
+        Number(pq.expiresAt || 0) > Date.now() && Number(classical.expiresAt || 0) > Date.now() &&
+        record?.pqPrekeyBindingCurrent === true && String(pq?.boundClassicalPrekeyId || '') === String(classical?.keyId || ''),
     };
   }
 
@@ -30066,7 +30109,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       });
       await persistRatchetSessions();
-      console.info('[SDC][PQ][v70.10.4] deferred PQ ACK emitted immediately before protected user message', {
+      console.info('[SDC][PQ][v70.10.5] deferred PQ ACK emitted immediately before protected user message', {
         channelId: String(state.channelId), sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
         epoch: Number(state.pqLastAckEpoch || 0), reason: String(reason || ''), suppressNotifications: true,
       });
@@ -30089,7 +30132,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       try { if (await sendDeferredPqRatchetAckForState(state, reason)) sent += 1; }
       catch (error) {
         failed += 1;
-        console.warn('[SDC][PQ][v70.10.4] deferred ACK remains pending; user message may use frozen offline PQ transport', {
+        console.warn('[SDC][PQ][v70.10.5] deferred ACK remains pending; user message may use frozen offline PQ transport', {
           channelId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
           reason: error?.message || String(error),
         });
@@ -30390,7 +30433,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // message. An offline peer may therefore reconnect days later without
       // generating a notification-only acknowledgement.
       if (!ackSpec.duplicate || state.pqDeferredAck === true) {
-        console.info('[SDC][PQ][v70.10.4] PQ ratchet INIT accepted; ACK deferred until local user activity', {
+        console.info('[SDC][PQ][v70.10.5] PQ ratchet INIT accepted; ACK deferred until local user activity', {
           channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch: info.epoch,
           nextKemKeyId: ackSpec.nextKemKeyId, offlineHistory: oldMessage === true,
         });
@@ -30783,7 +30826,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // SDC4/SDC4Q fail-closed rules remain authoritative; never downgrade merely
       // because an announcement could not be queued.
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.debug('[SDC][PQ][v70.10.4] zero-touch quiet capability announcement deferred', {
+      console.debug('[SDC][PQ][v70.10.5] zero-touch quiet capability announcement deferred', {
         channelId, peerId, source: String(source || ''), reason: PqQuietControlStats.lastError,
       });
       return { applicable: true, sent: false, peerId, source: String(source || ''), error: PqQuietControlStats.lastError };
@@ -30827,7 +30870,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       PqQuietControlStats.inheritedPendingResumesSent += 1;
       PqQuietControlStats.initControlsSent += 1;
       PqQuietControlStats.lastControlAt = Date.now();
-      console.info('[SDC][PQ][v70.10.4] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
+      console.info('[SDC][PQ][v70.10.5] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         remoteDeviceId: String(state.remoteDeviceId), pendingEpoch: Number(state.pqPending?.epoch || 0) || null,
         suppressNotifications: true,
@@ -30836,7 +30879,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     } catch (error) {
       PqQuietControlStats.inheritedPendingResumeFailures += 1;
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.warn('[SDC][PQ][v70.10.4] inherited PQ pending resume deferred; confirmed epoch remains usable', {
+      console.warn('[SDC][PQ][v70.10.5] inherited PQ pending resume deferred; confirmed epoch remains usable', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         reason: PqQuietControlStats.lastError,
       });
@@ -30904,7 +30947,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
       if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
         PqQuietControlStats.legacyPeerRefreshSuppressed += 1;
-        console.debug('[SDC][PQ][v70.10.4] quiet refresh held until peer advertises deferred-ACK capability', {
+        console.debug('[SDC][PQ][v70.10.5] quiet refresh held until peer advertises deferred-ACK capability', {
           channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId), dueReason,
         });
         continue;
@@ -30915,7 +30958,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           initSent += 1;
           PqQuietControlStats.initControlsSent += 1;
           PqQuietControlStats.lastControlAt = Date.now();
-          console.info('[SDC][PQ][v70.10.4] lazy PQ refresh INIT emitted immediately before protected user message', {
+          console.info('[SDC][PQ][v70.10.5] lazy PQ refresh INIT emitted immediately before protected user message', {
             channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
             dueReason, suppressNotifications: true,
           });
@@ -30925,7 +30968,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Do not destroy an already-built user ciphertext because a maintenance
         // control could not be queued; next genuine user activity can try again.
         PqQuietControlStats.lastError = error?.message || String(error);
-        console.warn('[SDC][PQ][v70.10.4] lazy refresh deferred; current confirmed epoch remains usable', {
+        console.warn('[SDC][PQ][v70.10.5] lazy refresh deferred; current confirmed epoch remains usable', {
           channelId, peerId, sessionId: String(state.sessionId), reason: PqQuietControlStats.lastError,
         });
       }
@@ -32243,7 +32286,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // therefore forces that proof once as well; otherwise capability convergence could
       // accidentally leave SDC4Q disabled on mixed/current peers.
       try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey); }
-      catch (error) { console.warn('[SDC][PQ][v70.10.4] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
+      catch (error) { console.warn('[SDC][PQ][v70.10.5] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
       return true;
     } catch (error) {
       if (previousLast > 0) local.announcedChannels[channelKey] = previousLast;
@@ -33105,8 +33148,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       throw new Error('Secure Input SDC4Q target device is unavailable/revoked');
     const summary = pqPeerDeviceSummary(peerId, deviceId);
     if (summary.v692HybridOfflineCapable !== true || summary.usableNow !== true || !record?.pqPrekey) {
-      const error = new Error('Peer device lacks a current authenticated SDC4Q capability/bound ML-KEM prekey');
+      let detail = 'authenticated SDC4Q capability/bound ML-KEM prekey unavailable';
+      if (record?.revokedAt || isDeviceRevoked(peerId, deviceId)) detail = 'peer device is revoked';
+      else if (summary.v692CapabilityStored !== true) detail = 'peer has no authenticated SDC4Q capability';
+      else if (Number(summary.v692CapabilitySupersededAt || 0) >= Number(summary.v692CapabilityLastVerifiedAt || 0)) detail = 'peer SDC4Q capability was superseded by newer signed device evidence';
+      else if (summary.bindingCurrent !== true || String(summary.boundClassicalPrekeyId || '') !== String(summary.classicalPrekeyId || '')) detail = 'peer ML-KEM/classical async prekey binding is stale';
+      else if (Number(summary.expiresAt || 0) <= Date.now()) detail = 'peer ML-KEM prekey expired';
+      else if (Number(summary.classicalPrekeyExpiresAt || 0) <= Date.now()) detail = 'peer classical async prekey expired';
+      else if (summary.v692CapabilityLeaseFresh !== true && summary.v692StickyBoundPrekeyContinuityUsable !== true) detail = 'peer SDC4Q lease expired without safe signed-prekey continuity';
+      const error = new Error(`Peer device cannot use SDC4Q: ${detail}`);
       error.code = 'SDC_PQ_HYBRID_OFFLINE_PREKEY_UNAVAILABLE';
+      error.sdcPqSummary = summary;
       throw error;
     }
 
@@ -34970,10 +35022,33 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const fanoutDecoded = decodeHybridAsyncFanoutCarrierWire(fanoutWrapped);
       const fanoutWireFitsBudget = Array.from(fanoutWrapped + ' `🔒`').length <= SDC_HYBRID_ASYNC_MAX_WIRE_CHARS;
       const leaseNow = Date.now();
-      const leaseRecord = { pqV692HybridOfflineCapable: true, pqV692LastVerifiedAt: leaseNow, pqV692CapabilityExpiresAt: leaseNow + 60_000, pqEverHybrid: true };
+      const continuityClassicalId = Utils.BytesToBase64url(Utils.GetRandomBytes(16));
+      const continuityPqId = Utils.BytesToBase64url(Utils.GetRandomBytes(16));
+      const leaseRecord = {
+        pqV692HybridOfflineCapable: true,
+        pqV692HybridOfflineFanoutCapable: true,
+        pqV692CapabilityVersion: SDC_PQ_V692_CAPABILITY_VERSION,
+        pqV692LastVerifiedAt: leaseNow,
+        pqV692CapabilityExpiresAt: leaseNow + 60_000,
+        pqEverHybrid: true,
+        asyncPrekey: { keyId: continuityClassicalId, expiresAt: leaseNow + 120_000 },
+        pqPrekey: {
+          keyId: continuityPqId,
+          algorithm: SDC_PQ_KEM,
+          profile: SDC_PQ_PROFILE,
+          boundClassicalPrekeyId: continuityClassicalId,
+          expiresAt: leaseNow + 120_000,
+        },
+        pqPrekeyBindingCurrent: true,
+        sdcMinimumVersionCompatible: true,
+      };
       const supersededRecord = { ...leaseRecord, pqV692CapabilitySupersededAt: leaseNow + 1, pqV692HybridOfflineCapable: false };
       const renewedRecord = { ...supersededRecord, pqV692HybridOfflineCapable: true, pqV692LastVerifiedAt: leaseNow + 2, pqV692CapabilityExpiresAt: leaseNow + 60_002 };
       const expiredRecord = { ...leaseRecord, pqV692CapabilityExpiresAt: leaseNow - 1 };
+      const staleBindingRecord = { ...expiredRecord, pqPrekeyBindingCurrent: false };
+      const mismatchedBindingRecord = { ...expiredRecord, pqPrekey: { ...expiredRecord.pqPrekey, boundClassicalPrekeyId: Utils.BytesToBase64url(Utils.GetRandomBytes(16)) } };
+      const expiredPqPrekeyRecord = { ...expiredRecord, pqPrekey: { ...expiredRecord.pqPrekey, expiresAt: leaseNow - 1 } };
+      const expiredClassicalPrekeyRecord = { ...expiredRecord, asyncPrekey: { ...expiredRecord.asyncPrekey, expiresAt: leaseNow - 1 } };
       const revokedLeaseRecord = { ...leaseRecord, revokedAt: leaseNow - 10 };
       const verifiedTrust = { publicKey: 'synthetic-pinned-key', status: IDENTITY_TRUST.VERIFIED, securityState: PEER_SECURITY_STATE.NORMAL };
       const changedTrust = { publicKey: 'synthetic-pinned-key', status: IDENTITY_TRUST.CHANGED, observedIdentityPublicKey: 'synthetic-replacement', observedIdentityFingerprint: 'replacement' };
@@ -34992,10 +35067,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         compactWireFitsConfiguredMaxPlaintext: wireFitsAtConfiguredMaxPlaintext,
         explicitV692CapabilityRequiredByPolicy: true,
         mixedVersionUnreadableWireNeverSelectedWithoutCapability: true,
-        freshCapabilityLeaseAccepted: pqV692CapabilityUsable(leaseRecord, leaseNow) === true,
+        freshCapabilityLeaseAccepted: pqV692CapabilityLeaseFresh(leaseRecord, leaseNow) === true && pqV692CapabilityUsable(leaseRecord, leaseNow) === true,
         newerLegacyEvidenceSuspendsOnlySdc4q: pqV692CapabilityUsable(supersededRecord, leaseNow) === false && supersededRecord.pqEverHybrid === true,
         freshV692ProofAfterSupersessionRestoresSdc4q: pqV692CapabilityUsable(renewedRecord, leaseNow + 2) === true,
-        expiredCapabilityLeaseRejected: pqV692CapabilityUsable(expiredRecord, leaseNow) === false,
+        expiredCapabilityLeaseUsesStickyBoundPrekeyContinuity:
+          pqV692CapabilityLeaseFresh(expiredRecord, leaseNow) === false &&
+          pqV692StickyBoundPrekeyContinuityUsable(expiredRecord, leaseNow) === true &&
+          pqV692CapabilityUsable(expiredRecord, leaseNow) === true,
+        expiredLeaseWithStaleBindingRejected: pqV692CapabilityUsable(staleBindingRecord, leaseNow) === false,
+        expiredLeaseWithMismatchedBindingRejected: pqV692CapabilityUsable(mismatchedBindingRecord, leaseNow) === false,
+        expiredLeaseWithExpiredPqPrekeyRejected: pqV692CapabilityUsable(expiredPqPrekeyRecord, leaseNow) === false,
+        expiredLeaseWithExpiredClassicalPrekeyRejected: pqV692CapabilityUsable(expiredClassicalPrekeyRecord, leaseNow) === false,
         revokedDeviceCapabilityLeaseRejected: pqV692CapabilityUsable(revokedLeaseRecord, leaseNow) === false,
         verifiedIdentityAllowsFreshHybridBootstrap: verifiedPolicy.freshHybridBootstrapAllowed === true,
         changedIdentityBlocksFreshHybridBootstrap: changedPolicy.freshHybridBootstrapAllowed === false,
@@ -70548,7 +70630,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.10.4',
+      build: 'v70.10.5',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -70680,7 +70762,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.4',
+      build: 'v70.10.5',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -70706,7 +70788,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.10.4',
+    build: 'v70.10.5',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -70795,7 +70877,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.4',
+      build: 'v70.10.5',
       portableAccountIdentity: true,
       portableDevicePrivateKey: false,
       portableMutableRatchetState: false,
@@ -70913,7 +70995,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     };
     return {
-      build: 'v70.10.4',
+      build: 'v70.10.5',
       ok: Object.values(gates).every(Boolean),
       policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
       backgroundNetworkMaintenance: false,
@@ -70930,7 +71012,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.10.4',
+    build: 'v70.10.5',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -71101,7 +71183,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     pruneSdc3OwnOutboundAdmissions(Date.now());
     return {
       lot: 'LOT_3_SDC3_REPLAY_OWN_ECHO_CORRECTIVE',
-      build: 'v70.10.4',
+      build: 'v70.10.5',
       ok: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
       policy: {
         remoteDifferentMessageIdReplayRejected: true,
@@ -73125,14 +73207,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               try {
                 const ownWireId = await rememberSdc3OwnOutboundTransport(channelId, secureTransport);
                 if (ownWireId) {
-                  console.debug('[SDC][CRYPTO][LOT3][v70.10.4] native SDC3 own outbound alias marker registered', {
+                  console.debug('[SDC][CRYPTO][LOT3][v70.10.5] native SDC3 own outbound alias marker registered', {
                     channelId: String(channelId || ''),
                     nativeMode: secureOutgoing.nativeMode || null,
                     wireId: ownWireId,
                   });
                 }
               } catch (error) {
-                console.debug('[SDC][CRYPTO][LOT3][v70.10.4] native SDC3 own outbound alias marker unavailable', {
+                console.debug('[SDC][CRYPTO][LOT3][v70.10.5] native SDC3 own outbound alias marker unavailable', {
                   channelId: String(channelId || ''),
                   nativeMode: secureOutgoing.nativeMode || null,
                   reason: error?.message || String(error),
