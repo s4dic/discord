@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.5
+// @version      1.7.6.6
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -15,10 +15,10 @@
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.10.5';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_5_SDC4Q_STICKY_PREKEY_CONTINUITY';
-    console.info('[SDC][BUILD][v70.10.5] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_5_SDC4Q_STICKY_PREKEY_CONTINUITY',
+    window.SdcRuntimeBuild = () => 'v70.10.9';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_8_ANIMATED_CUSTOM_EMOJI';
+    console.info('[SDC][BUILD][v70.10.9] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_8_ANIMATED_CUSTOM_EMOJI',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -70,7 +70,7 @@
   // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
   // but is NOT cryptographic key material and does not alter any frozen wire.
   const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
-  const SDC_VERSION_POLICY_BUILD = 'v70.10.5';
+  const SDC_VERSION_POLICY_BUILD = 'v70.10.9';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -17829,39 +17829,98 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       message.embeds.push(createYoutubeEmbed(match[1], match[2]));
   }
   const imageRegex = CONFIG.patterns.image;
+  const SDC_RICH_MEDIA_PLACEHOLDER =
+    'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+  function richMediaContentTypeFromUrl(url) {
+    try {
+      const path = new URL(String(url || '')).pathname.toLowerCase();
+      if (path.endsWith('.gif')) return 'image/gif';
+      if (path.endsWith('.webp')) return 'image/webp';
+      if (path.endsWith('.png')) return 'image/png';
+      if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
+      if (path.endsWith('.avif')) return 'image/avif';
+    } catch (_) {}
+    return null;
+  }
+
+  function messageAlreadyHasRichMediaUrl(message, url) {
+    if (!Array.isArray(message?.embeds)) return false;
+    const wanted = String(url || '');
+    return message.embeds.some((embed) => [
+      embed?.url,
+      embed?.image?.url,
+      embed?.image?.proxy_url,
+      embed?.thumbnail?.url,
+      embed?.thumbnail?.proxy_url,
+      embed?.video?.url,
+      embed?.video?.proxy_url,
+    ].some((value) => String(value || '') === wanted));
+  }
+
+  function applyRichImageEmbedMedia(embed, mediaUrl, width, height) {
+    const url = String(mediaUrl || '');
+    if (!url) return false;
+    const w = Math.max(1, Math.min(4096, Math.round(Number(width) || 400)));
+    const h = Math.max(1, Math.min(4096, Math.round(Number(height) || 300)));
+    const contentType = richMediaContentTypeFromUrl(url);
+    embed.image = {
+      url,
+      proxy_url: url,
+      width: w,
+      height: h,
+      ...(contentType ? { content_type: contentType } : {}),
+    };
+    try { delete embed.thumbnail; } catch (_) { embed.thumbnail = null; }
+    return true;
+  }
+
   function embedImage(message, url, queryString, forceImage) {
     if (!forceImage && !imageRegex.test(queryString)) return;
+    if (!Array.isArray(message.embeds)) message.embeds = [];
+    if (messageAlreadyHasRichMediaUrl(message, url)) return;
 
-    let placeholder = {
+    const placeholder = {
       type: 'image',
       url,
-      thumbnail: {
-        url: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+      image: {
+        url: SDC_RICH_MEDIA_PLACEHOLDER,
+        proxy_url: SDC_RICH_MEDIA_PLACEHOLDER,
         width: 1,
         height: 300,
+        content_type: 'image/gif',
       },
     };
     message.embeds.push(placeholder);
-    let tmpimg = document.createElement('img');
-    tmpimg.onload = () => {
-      let width = tmpimg.width;
-      let height = tmpimg.height;
-      placeholder.thumbnail = { url, width, height };
-      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
 
-      /*if(message.channel_id === Cache.channelId) {
-            let displayHeight = height;
-            if(width > 400 || height > 300) {
-                if(width / 400 > height / 300) {
-                    displayHeight = Math.round(height / (width / 400));
-                }
-                else {
-                    displayHeight = 300;
-                }
-            }
-            if(displayHeight !== 300) scrollChat(300 - displayHeight);
-        }*/
+    const tmpimg = document.createElement('img');
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      const index = message.embeds.indexOf(placeholder);
+      if (index !== -1) message.embeds.splice(index, 1);
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
+    }, 10000);
+
+    tmpimg.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      const width = tmpimg.naturalWidth || tmpimg.width || 400;
+      const height = tmpimg.naturalHeight || tmpimg.height || 300;
+      applyRichImageEmbedMedia(placeholder, url, width, height);
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
     };
+    tmpimg.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      const index = message.embeds.indexOf(placeholder);
+      if (index !== -1) message.embeds.splice(index, 1);
+      Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
+    };
+    tmpimg.referrerPolicy = 'no-referrer';
     tmpimg.src = url;
   }
 
@@ -19452,6 +19511,41 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return selected;
   }
 
+  async function resolveKlipyPageFallbackMedia(pageUrl) {
+    try {
+      const response = await fetchGifPage(pageUrl);
+      gifResolverLog('klipy', 'page-fallback:response', {
+        pageUrl,
+        status: response.status,
+        ok: response.ok,
+        finalUrl: response.url,
+        contentType: response.headers?.get?.('content-type') || null,
+      });
+      if (!response.ok) return null;
+      const html = await response.text();
+      const candidates = extractGifMediaCandidates(
+        html,
+        response.url || pageUrl,
+        'klipy'
+      );
+      const selected = selectBestGifMediaUrl(candidates, 'klipy');
+      gifResolverLog('klipy', 'page-fallback:candidates', {
+        pageUrl,
+        count: candidates.length,
+        selected,
+        top: getTopGifCandidateDiagnostics(candidates, 'klipy', 8),
+      });
+      return selected;
+    } catch (error) {
+      gifResolverWarn('klipy', 'page-fallback:failed', {
+        pageUrl,
+        name: error?.name,
+        message: error?.message || String(error),
+      });
+      return null;
+    }
+  }
+
   async function resolveKlipyMedia(pageUrl) {
     gifResolverLog('klipy', 'resolver:start', { pageUrl });
 
@@ -19461,90 +19555,47 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       masked: maskKlipyApiKey(apiKey),
     });
 
-    if (!apiKey) {
-      if (!klipyMissingApiKeyLogged) {
-        klipyMissingApiKeyLogged = true;
-        gifResolverWarn('klipy', 'api:key-missing', {
-          message:
-            'KLIPY API key required. In DevTools run: ' +
-            'SDC_KLIPY_API.setKey("YOUR_KLIPY_API_KEY")',
+    if (apiKey) {
+      try {
+        const oembedUrl =
+          'https://api.klipy.com/api/v1/web/gifs/embed/oembed?format=json&url=' +
+          encodeURIComponent(pageUrl);
+        const oembedResponse = await BdApi.Net.fetch(oembedUrl, {
+          method: 'GET', redirect: 'follow', timeout: 8000,
+          headers: { Accept: 'application/json,text/plain;q=0.9,*/*;q=0.8' },
         });
-      }
-      return null;
-    }
-
-    // KLIPY's oEmbed endpoint is reachable from Discord and gives us the
-    // canonical content title. It deliberately does not expose the actual GIF
-    // URL, so the official v2 API is used for media resolution.
-    try {
-      const oembedUrl =
-        'https://api.klipy.com/api/v1/web/gifs/embed/oembed?format=json&url=' +
-        encodeURIComponent(pageUrl);
-
-      gifResolverLog('klipy', 'oembed:fetch', { url: oembedUrl });
-
-      const oembedResponse = await BdApi.Net.fetch(oembedUrl, {
-        method: 'GET',
-        redirect: 'follow',
-        timeout: 8000,
-        headers: {
-          Accept: 'application/json,text/plain;q=0.9,*/*;q=0.8',
-        },
-      });
-
-      gifResolverLog('klipy', 'oembed:response', {
-        status: oembedResponse.status,
-        ok: oembedResponse.ok,
-        finalUrl: oembedResponse.url,
-        contentType: oembedResponse.headers?.get?.('content-type') || null,
-      });
-
-      let oembedData = null;
-      if (oembedResponse.ok) {
-        try {
-          oembedData = await oembedResponse.json();
-        } catch (error) {
-          gifResolverWarn('klipy', 'oembed:json-parse-failed', {
-            message: error?.message || String(error),
-          });
+        let oembedData = null;
+        if (oembedResponse.ok) {
+          try { oembedData = await oembedResponse.json(); }
+          catch (error) {
+            gifResolverWarn('klipy', 'oembed:json-parse-failed', {
+              message: error?.message || String(error),
+            });
+          }
         }
-      }
-
-      gifResolverLog('klipy', 'oembed:identity', {
-        pageUrl,
-        title: oembedData?.title ?? null,
-        thumbnail_width: oembedData?.thumbnail_width ?? null,
-        thumbnail_height: oembedData?.thumbnail_height ?? null,
-      });
-
-      const apiMedia = await resolveKlipyOfficialApiMedia(
-        pageUrl,
-        oembedData,
-        apiKey
-      );
-
-      if (apiMedia) {
-        gifResolverLog('klipy', 'resolver:success-official-api', {
+        const apiMedia = await resolveKlipyOfficialApiMedia(pageUrl, oembedData, apiKey);
+        if (apiMedia) {
+          gifResolverLog('klipy', 'resolver:success-official-api', {
+            pageUrl, selected: apiMedia,
+          });
+          return apiMedia;
+        }
+      } catch (error) {
+        gifResolverWarn('klipy', 'resolver:official-api-failed', {
           pageUrl,
-          selected: apiMedia,
+          name: error?.name,
+          message: error?.message || String(error),
         });
-        return apiMedia;
       }
-
-      gifResolverWarn('klipy', 'resolver:no-media-from-official-api', {
+    } else if (!klipyMissingApiKeyLogged) {
+      klipyMissingApiKeyLogged = true;
+      gifResolverLog('klipy', 'api:key-missing-using-page-fallback', {
         pageUrl,
-        title: oembedData?.title ?? null,
+        mode: 'bounded-public-page-fallback',
       });
-      return null;
-    } catch (error) {
-      gifResolverWarn('klipy', 'resolver:exception', {
-        pageUrl,
-        name: error?.name,
-        message: error?.message || String(error),
-        stack: error?.stack,
-      });
-      return null;
     }
+
+    return await resolveKlipyPageFallbackMedia(pageUrl);
   }
 
   async function resolveGifPageMedia(pageUrl, provider) {
@@ -19618,24 +19669,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   function embedResolvedGifImage(message, displayUrl, sourceUrl, provider) {
     if (!Array.isArray(message.embeds)) message.embeds = [];
+    if (messageAlreadyHasRichMediaUrl(message, sourceUrl) ||
+        messageAlreadyHasRichMediaUrl(message, displayUrl)) return null;
 
     const placeholder = {
       type: 'image',
-      // Keep the original remote URL in embed.url so repeated MESSAGE_UPDATE
-      // processing can recognize this embed even when thumbnail.url is blob:.
       url: sourceUrl,
       ...(provider === 'klipy'
-        ? {
-            provider: {
-              name: 'KLIPY',
-              url: 'https://klipy.com',
-            },
-          }
+        ? { provider: { name: 'KLIPY', url: 'https://klipy.com' } }
         : {}),
-      thumbnail: {
-        url: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+      image: {
+        url: SDC_RICH_MEDIA_PLACEHOLDER,
+        proxy_url: SDC_RICH_MEDIA_PLACEHOLDER,
         width: 1,
         height: 300,
+        content_type: 'image/gif',
       },
     };
     message.embeds.push(placeholder);
@@ -19653,9 +19701,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (settled) return;
       settled = true;
       gifResolverWarn(provider, 'image:probe-timeout', {
-        sourceUrl,
-        displayUrl,
-        messageId: message?.id || null,
+        sourceUrl, displayUrl, messageId: message?.id || null,
       });
       const index = message.embeds.indexOf(placeholder);
       if (index !== -1) message.embeds.splice(index, 1);
@@ -19666,17 +19712,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      const width = tmpimg.naturalWidth || tmpimg.width || 1;
-      const height = tmpimg.naturalHeight || tmpimg.height || 1;
-      placeholder.thumbnail = { url: displayUrl, width, height };
-
+      const width = tmpimg.naturalWidth || tmpimg.width || 400;
+      const height = tmpimg.naturalHeight || tmpimg.height || 300;
+      applyRichImageEmbedMedia(placeholder, displayUrl, width, height);
       gifResolverLog(provider, 'image:onload', {
-        sourceUrl,
-        displayUrl,
-        width,
-        height,
-        complete: tmpimg.complete,
-        messageId: message?.id || null,
+        sourceUrl, displayUrl, width, height,
+        complete: tmpimg.complete, messageId: message?.id || null,
       });
       Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
     };
@@ -19686,18 +19727,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       settled = true;
       clearTimeout(timeout);
       gifResolverWarn(provider, 'image:onerror', {
-        sourceUrl,
-        displayUrl,
-        isBlob: /^blob:/i.test(displayUrl),
-        eventType: event?.type || null,
-        messageId: message?.id || null,
+        sourceUrl, displayUrl, isBlob: /^blob:/i.test(displayUrl),
+        eventType: event?.type || null, messageId: message?.id || null,
       });
-      // Do not leave the old 300px blank placeholder behind on failure.
       const index = message.embeds.indexOf(placeholder);
       if (index !== -1) message.embeds.splice(index, 1);
       Discord.dispatch({ type: 'MESSAGE_UPDATE', message });
     };
 
+    tmpimg.referrerPolicy = 'no-referrer';
     tmpimg.src = displayUrl;
     return placeholder;
   }
@@ -19810,17 +19848,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function embedKlipy(message, url, queryString) {
-    gifResolverLog('klipy', 'native-unfurl:client-resolver-skipped', {
+    const nativeEmbedPresent =
+      Array.isArray(message?.embeds) && message.embeds.some(isNativeKlipyEmbed);
+    gifResolverLog('klipy', nativeEmbedPresent
+      ? 'native-unfurl:present'
+      : 'native-unfurl:missing-use-client-fallback', {
       url,
       queryString: queryString || '',
       messageId: message?.id || null,
-      nativeEmbedPresent:
-        Array.isArray(message?.embeds) &&
-        message.embeds.some(isNativeKlipyEmbed),
+      nativeEmbedPresent,
     });
-    // v16 intentionally does not fetch klipy.com, /player, oEmbed, or the KLIPY
-    // API. Discord's own backend has already seen the plaintext transport URL
-    // and is responsible for producing the native link preview.
+    if (nativeEmbedPresent) return;
+    embedGifPage(message, url, queryString, 'klipy');
   }
 
   var EmbedFrames = [];
@@ -19969,6 +20008,61 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return String(content) + '\n' + urls.join('\n');
   }
 
+  // v70.10.7: Discord may expose duplicate picker SEARCH aliases such as
+  // :HAHAHA~1:, and some component paths escape them as <\:HAHAHA\~1:ID>.
+  // Those aliases are not valid Discord custom-emoji wire names. The snowflake is
+  // authoritative; NAME is parser/presentation metadata and uses the documented
+  // alphanumeric/underscore grammar.
+  function canonicalDiscordCustomEmojiWireName(rawName) {
+    let name = String(rawName || '')
+      .replace(/\\([\\`*_~|>\[\]{}()#+\-.!:])/g, '$1')
+      .trim()
+      .replace(/^:+|:+$/g, '')
+      .replace(/~[0-9]+$/u, '')
+      .replace(/[^A-Za-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (name.length > 32) name = name.slice(0, 32).replace(/_+$/g, '');
+    if (name.length < 2) name = 'emoji';
+    return name;
+  }
+
+  function canonicalizeDiscordCustomEmojiMarkup(value) {
+    return String(value == null ? '' : value).replace(
+      /<(a?)(?:\\)?:((?:\\.|[^:<>\\\r\n]){1,160})(?:\\)?:([0-9]{15,32})>/g,
+      (full, animated, rawName, id) =>
+        '<' + (animated ? 'a' : '') + ':' +
+        canonicalDiscordCustomEmojiWireName(rawName) + ':' + String(id) + '>'
+    );
+  }
+
+
+  // v70.10.8: merge two observations of the same custom emoji without ever
+  // losing the animated bit. Discord's picker can expose an animated asset via
+  // a .webp URL on the fast DOM path while React still carries animated=true.
+  // The snowflake is authoritative; React may refine animation/name metadata.
+  function mergeDiscordCustomEmojiObservations(currentValue, candidateValue) {
+    const current = canonicalizeDiscordCustomEmojiMarkup(String(currentValue || ''));
+    const candidate = canonicalizeDiscordCustomEmojiMarkup(String(candidateValue || ''));
+    const tokenRe = /^<(a?):([A-Za-z0-9_]{2,32}):([0-9]{15,32})>$/u;
+    const currentMatch = tokenRe.exec(current);
+    const candidateMatch = tokenRe.exec(candidate);
+
+    if (!currentMatch) return candidateMatch ? candidate : current;
+    if (!candidateMatch) return current;
+    if (String(currentMatch[3]) !== String(candidateMatch[3])) return current;
+
+    const animated = currentMatch[1] === 'a' || candidateMatch[1] === 'a';
+    const currentName = String(currentMatch[2] || '');
+    const candidateName = String(candidateMatch[2] || '');
+    const name =
+      (candidateName && candidateName !== 'emoji' ? candidateName : '') ||
+      currentName ||
+      'emoji';
+
+    return `<${animated ? 'a' : ''}:${name}:${currentMatch[3]}>`;
+  }
+
   const userMentionRegex = /<@!?(\d{1,32})>/g;
   const channelMentionRegex = /<#(\d{1,32})>/g;
 
@@ -20062,6 +20156,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
     content = stripNativeStickerCarrierAfterDecrypt(message, content);
     content = applyEncryptedStickerPresentation(message, content);
+
+    // v70.10.7: repair escaped/duplicate-alias custom emoji before Discord's
+    // Markdown renderer sees the decrypted text. Only NAME is canonicalized;
+    // the exact emoji snowflake and animated/static bit are preserved.
+    const preEmojiCanonicalContent = String(content == null ? '' : content);
+    const canonicalEmojiContent = canonicalizeDiscordCustomEmojiMarkup(preEmojiCanonicalContent);
+    if (canonicalEmojiContent !== preEmojiCanonicalContent) {
+      const current = String(message?.content || '');
+      if (current.includes(preEmojiCanonicalContent)) {
+        message.content = current.replace(preEmojiCanonicalContent, canonicalEmojiContent);
+      }
+      content = canonicalEmojiContent;
+    }
+
     const decryptedMentions = rebuildDecryptedUserMentions(message, content);
     const decryptedChannelMentions = rebuildDecryptedChannelMentions(message, content);
     if (message.author != null) {
@@ -29537,7 +29645,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return true;
   }
 
-  // v70.10.5: the 24-hour signed v69.2 lease remains the strongest freshness
+  // v70.10.7: the 24-hour signed v69.2 lease remains the strongest freshness
   // signal, but Quiet-PQ deliberately has no background network maintenance. Lease
   // expiry alone must therefore not strand a previously authenticated HYBRID peer.
   // Continuity is allowed only through the exact still-current identity-signed
@@ -30109,7 +30217,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       });
       await persistRatchetSessions();
-      console.info('[SDC][PQ][v70.10.5] deferred PQ ACK emitted immediately before protected user message', {
+      console.info('[SDC][PQ][v70.10.9] deferred PQ ACK emitted immediately before protected user message', {
         channelId: String(state.channelId), sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
         epoch: Number(state.pqLastAckEpoch || 0), reason: String(reason || ''), suppressNotifications: true,
       });
@@ -30132,7 +30240,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       try { if (await sendDeferredPqRatchetAckForState(state, reason)) sent += 1; }
       catch (error) {
         failed += 1;
-        console.warn('[SDC][PQ][v70.10.5] deferred ACK remains pending; user message may use frozen offline PQ transport', {
+        console.warn('[SDC][PQ][v70.10.9] deferred ACK remains pending; user message may use frozen offline PQ transport', {
           channelId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
           reason: error?.message || String(error),
         });
@@ -30433,7 +30541,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // message. An offline peer may therefore reconnect days later without
       // generating a notification-only acknowledgement.
       if (!ackSpec.duplicate || state.pqDeferredAck === true) {
-        console.info('[SDC][PQ][v70.10.5] PQ ratchet INIT accepted; ACK deferred until local user activity', {
+        console.info('[SDC][PQ][v70.10.9] PQ ratchet INIT accepted; ACK deferred until local user activity', {
           channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch: info.epoch,
           nextKemKeyId: ackSpec.nextKemKeyId, offlineHistory: oldMessage === true,
         });
@@ -30826,7 +30934,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // SDC4/SDC4Q fail-closed rules remain authoritative; never downgrade merely
       // because an announcement could not be queued.
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.debug('[SDC][PQ][v70.10.5] zero-touch quiet capability announcement deferred', {
+      console.debug('[SDC][PQ][v70.10.9] zero-touch quiet capability announcement deferred', {
         channelId, peerId, source: String(source || ''), reason: PqQuietControlStats.lastError,
       });
       return { applicable: true, sent: false, peerId, source: String(source || ''), error: PqQuietControlStats.lastError };
@@ -30870,7 +30978,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       PqQuietControlStats.inheritedPendingResumesSent += 1;
       PqQuietControlStats.initControlsSent += 1;
       PqQuietControlStats.lastControlAt = Date.now();
-      console.info('[SDC][PQ][v70.10.5] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
+      console.info('[SDC][PQ][v70.10.9] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         remoteDeviceId: String(state.remoteDeviceId), pendingEpoch: Number(state.pqPending?.epoch || 0) || null,
         suppressNotifications: true,
@@ -30879,7 +30987,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     } catch (error) {
       PqQuietControlStats.inheritedPendingResumeFailures += 1;
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.warn('[SDC][PQ][v70.10.5] inherited PQ pending resume deferred; confirmed epoch remains usable', {
+      console.warn('[SDC][PQ][v70.10.9] inherited PQ pending resume deferred; confirmed epoch remains usable', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         reason: PqQuietControlStats.lastError,
       });
@@ -30947,7 +31055,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
       if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
         PqQuietControlStats.legacyPeerRefreshSuppressed += 1;
-        console.debug('[SDC][PQ][v70.10.5] quiet refresh held until peer advertises deferred-ACK capability', {
+        console.debug('[SDC][PQ][v70.10.9] quiet refresh held until peer advertises deferred-ACK capability', {
           channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId), dueReason,
         });
         continue;
@@ -30958,7 +31066,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           initSent += 1;
           PqQuietControlStats.initControlsSent += 1;
           PqQuietControlStats.lastControlAt = Date.now();
-          console.info('[SDC][PQ][v70.10.5] lazy PQ refresh INIT emitted immediately before protected user message', {
+          console.info('[SDC][PQ][v70.10.9] lazy PQ refresh INIT emitted immediately before protected user message', {
             channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
             dueReason, suppressNotifications: true,
           });
@@ -30968,7 +31076,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Do not destroy an already-built user ciphertext because a maintenance
         // control could not be queued; next genuine user activity can try again.
         PqQuietControlStats.lastError = error?.message || String(error);
-        console.warn('[SDC][PQ][v70.10.5] lazy refresh deferred; current confirmed epoch remains usable', {
+        console.warn('[SDC][PQ][v70.10.9] lazy refresh deferred; current confirmed epoch remains usable', {
           channelId, peerId, sessionId: String(state.sessionId), reason: PqQuietControlStats.lastError,
         });
       }
@@ -32286,7 +32394,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // therefore forces that proof once as well; otherwise capability convergence could
       // accidentally leave SDC4Q disabled on mixed/current peers.
       try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey); }
-      catch (error) { console.warn('[SDC][PQ][v70.10.5] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
+      catch (error) { console.warn('[SDC][PQ][v70.10.9] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
       return true;
     } catch (error) {
       if (previousLast > 0) local.announcedChannels[channelKey] = previousLast;
@@ -43722,6 +43830,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // erasing the message key. Keep only a small in-memory plaintext bridge so the
       // just-sent message renders normally; nothing is persisted for history.
       if (authorId === ownId) {
+        // v70.10.9: these KLIPY URLs are already plaintext suffixes by design for
+        // Discord native unfurling; using them for a local fallback reveals nothing new.
+        for (const klipyUrl of splitTransport.nativeUnfurlUrls) {
+          try {
+            if (!Array.isArray(message.embeds) || !message.embeds.some(isNativeKlipyEmbed)) {
+              const parsedKlipy = new URL(klipyUrl);
+              embedKlipy(
+                message,
+                klipyUrl,
+                parsedKlipy.pathname.replace(/^\//, '') + parsedKlipy.search
+              );
+            }
+          } catch (_) {}
+        }
         const normalizedSelfWire = wireLine.replace(/\s+`🔒`\s*$/u, '');
         const localPlain = await ratchetGetSentPlaintext(normalizedSelfWire);
         if (localPlain != null) {
@@ -50497,8 +50619,31 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return text;
   }
 
+  function canonicalDiscordCustomEmojiWireName(rawName) {
+    let name = String(rawName || '')
+      .replace(/\\([\\*_~|>\[\]{}()#+\-.!:])/g, '$1')
+      .trim()
+      .replace(/^:+|:+$/g, '')
+      .replace(/~[0-9]+$/u, '')
+      .replace(/[^A-Za-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (name.length > 32) name = name.slice(0, 32).replace(/_+$/g, '');
+    if (name.length < 2) name = 'emoji';
+    return name;
+  }
+
+  function canonicalizeDiscordCustomEmojiMarkup(value) {
+    return String(value == null ? '' : value).replace(
+      /<(a?)(?:\\)?:((?:\\.|[^:<>\\\r\n]){1,160})(?:\\)?:([0-9]{15,32})>/g,
+      (full, animated, rawName, id) =>
+        '<' + (animated ? 'a' : '') + ':' +
+        canonicalDiscordCustomEmojiWireName(rawName) + ':' + String(id) + '>'
+    );
+  }
+
   function normalizeSecureEmojiShortcuts(value) {
-    let text = String(value || '');
+    let text = canonicalizeDiscordCustomEmojiMarkup(String(value || ''));
 
     const aliases = {
       heart_eyes: '😍',
@@ -50547,7 +50692,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
 
     text = text.replace(
-      /:([a-zA-Z0-9_+-]+):/g,
+      /:([a-zA-Z0-9_+~.\-]+):/g,
       (full, rawName) =>
         aliases[
           String(rawName || '')
@@ -53371,6 +53516,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
   #echo a { color:#00a8fc; text-decoration:none; cursor:pointer; }
   #echo a:hover { text-decoration:underline; }
+  #echo .sdc-inline-media {
+    display:block; width:min(400px,100%); max-width:100%; margin:6px 0 2px 0;
+    border-radius:8px; overflow:hidden; line-height:0; user-select:none;
+  }
+  #echo .sdc-inline-media > a { display:block; line-height:0; }
+  #echo .sdc-inline-media img {
+    display:block; max-width:100%; max-height:300px; width:auto; height:auto;
+    object-fit:contain; border-radius:8px; cursor:pointer; user-select:none;
+  }
 
   /* v70.9.2: sender-local formatting is rendered inside this opaque frame.
      Only a narrow Markdown subset is materialized as DOM elements; HTML from
@@ -53442,6 +53596,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   let port = null;
   let lastLayoutSignature = '';
   let discordUnicodeEmojiAssets = new Map();
+  let echoRenderedMediaUrls = new Set();
 
   function concatBuffers(buffers) {
     let length = 0;
@@ -53615,6 +53770,29 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return concatBuffers([prefix, messageCiphertext]);
   }
 
+  function canonicalDiscordCustomEmojiWireName(rawName) {
+    let name = String(rawName || '')
+      .replace(/\\([\\*_~|>\[\]{}()#+\-.!:])/g, '$1')
+      .trim()
+      .replace(/^:+|:+$/g, '')
+      .replace(/~[0-9]+$/u, '')
+      .replace(/[^A-Za-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (name.length > 32) name = name.slice(0, 32).replace(/_+$/g, '');
+    if (name.length < 2) name = 'emoji';
+    return name;
+  }
+
+  function canonicalizeDiscordCustomEmojiMarkup(value) {
+    return String(value == null ? '' : value).replace(
+      /<(a?)(?:\\)?:((?:\\.|[^:<>\\\r\n]){1,160})(?:\\)?:([0-9]{15,32})>/g,
+      (full, animated, rawName, id) =>
+        '<' + (animated ? 'a' : '') + ':' +
+        canonicalDiscordCustomEmojiWireName(rawName) + ':' + String(id) + '>'
+    );
+  }
+
   const CUSTOM_EMOJI_RE = /<(a?):([A-Za-z0-9_]{2,32}):([0-9]{15,32})>/g;
   const EMOJI_GRAPHEME_RE = /(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Regional_Indicator}|\u20E3)/u;
 
@@ -53773,6 +53951,57 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     fragment.appendChild(img);
   }
 
+  function safeEchoDirectMediaUrl(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      if (parsed.protocol !== 'https:') return null;
+      const host = parsed.hostname.toLowerCase();
+      const trustedHost =
+        host === 'cdn.discordapp.com' ||
+        host === 'media.discordapp.net' ||
+        host === 'gif.fxtwitter.com' ||
+        /^static\d*\.klipy\.com$/.test(host) ||
+        host === 'media.tenor.com' ||
+        /^media\d+\.tenor\.com$/.test(host) ||
+        host === 'c.tenor.com';
+      if (!trustedHost) return null;
+      if (!/\.(?:gif|webp|png|jpe?g|avif)$/i.test(parsed.pathname)) return null;
+      return parsed.href;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function appendSafeEchoMediaPreview(fragment, value) {
+    const mediaUrl = safeEchoDirectMediaUrl(value);
+    if (!mediaUrl || echoRenderedMediaUrls.has(mediaUrl)) return false;
+    echoRenderedMediaUrls.add(mediaUrl);
+
+    const box = document.createElement('span');
+    box.className = 'sdc-inline-media';
+    const link = document.createElement('a');
+    link.href = mediaUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.referrerPolicy = 'no-referrer';
+    const img = document.createElement('img');
+    img.alt = 'GIF / media preview';
+    img.draggable = false;
+    img.loading = 'eager';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+    img.src = mediaUrl;
+    img.addEventListener('load', reportHeight, { once: true });
+    img.addEventListener('error', () => {
+      try { box.remove(); } catch (_) {}
+      reportHeight();
+    }, { once: true });
+    link.appendChild(img);
+    box.appendChild(link);
+    fragment.appendChild(box);
+    return true;
+  }
+
   function appendSafeEchoSegment(fragment, segment) {
     if (!segment) return;
     const tokenRe = /<(a?):([A-Za-z0-9_]{2,32}):([0-9]{15,32})>|https?:\/\/[^\s<>"']+/gi;
@@ -53801,6 +54030,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             a.rel = 'noopener noreferrer';
             a.referrerPolicy = 'no-referrer';
             fragment.appendChild(a);
+            appendSafeEchoMediaPreview(fragment, parsed.href);
             linked = true;
           }
         } catch (_) {}
@@ -53942,8 +54172,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function renderEchoPlaintext(value) {
-    const text = String(value == null ? '' : value);
+    const text = canonicalizeDiscordCustomEmojiMarkup(
+      String(value == null ? '' : value)
+    );
     const fragment = document.createDocumentFragment();
+    echoRenderedMediaUrls = new Set();
 
     // v70.9.2: mimic the subset produced by Secure Input's formatting toolbar
     // while keeping the local echo inside the same opaque-origin security boundary.
@@ -55277,7 +55510,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       value
     ) {
       let text =
-        String(value || '');
+        canonicalizeDiscordCustomEmojiMarkup(
+          String(value || '')
+        );
 
       // Common Discord-style named aliases. The picker bridge normally receives
       // Unicode/custom emoji directly when Discord exposes the emoji object;
@@ -55355,7 +55590,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       text =
         text.replace(
-          /:([a-zA-Z0-9_+-]+):/g,
+          /:([a-zA-Z0-9_+~.\-]+):/g,
           (full, rawName) => {
             const name =
               String(rawName || '')
@@ -55788,18 +56023,25 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             return;
           }
 
+          const normalizedAlias =
+            value
+              .toLowerCase()
+              .replace(
+                /\s+/g,
+                '_'
+              );
+
+          // Discord may disambiguate duplicate/custom picker aliases with
+          // punctuation such as "~1". The alias is only a short-lived lookup
+          // key for the exact clicked picker item; ':' / angle brackets / control
+          // characters remain excluded so it cannot become custom markup itself.
           if (
-            /^[a-zA-Z0-9_+\- ]+$/.test(
-              value
-            )
+            normalizedAlias &&
+            normalizedAlias.length <= 80 &&
+            !/[:<>\r\n\u0000-\u001F\u007F]/u.test(normalizedAlias)
           ) {
             aliases.add(
-              value
-                .toLowerCase()
-                .replace(
-                  /\s+/g,
-                  '_'
-                )
+              normalizedAlias
             );
           }
         };
@@ -55822,12 +56064,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (
             /[\u{1F000}-\u{1FAFF}\u2600-\u27BF]/u.test(
               value
-            ) ||
-            /^<a?:[a-zA-Z0-9_]+:\d+>$/.test(
-              value
             )
           ) {
             return value;
+          }
+
+          const canonicalCustom =
+            canonicalizeDiscordCustomEmojiMarkup(value);
+
+          if (
+            /^<a?:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>$/u.test(
+              canonicalCustom
+            )
+          ) {
+            return canonicalCustom;
           }
 
           return '';
@@ -55868,6 +56118,35 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           addAlias(
             alt
           );
+
+          // Some Discord builds expose a duplicate custom emoji to the picker as
+          // text like :HAHAHA~1: while the actual emoji identity is present only
+          // in the image URL. Recover the snowflake directly from that trusted
+          // Discord CDN path and keep the alias solely as the display-name field.
+          const imageSrc = String(
+            image?.currentSrc ||
+            image?.src ||
+            image?.getAttribute?.('src') ||
+            ''
+          );
+          const idMatch =
+            /\/emojis\/([0-9]{15,32})(?:\.(gif|webp|png|avif))?(?:[?#]|$)/i.exec(imageSrc);
+          const customName =
+            String(alt || '')
+              .trim()
+              .replace(/^:+|:+$/g, '');
+
+          if (
+            idMatch &&
+            customName &&
+            customName.length <= 80 &&
+            !/[\s:<>]/u.test(customName)
+          ) {
+            const animated = String(idMatch[2] || '').toLowerCase() === 'gif';
+            emojiText = canonicalizeDiscordCustomEmojiMarkup(
+              `<${animated ? 'a' : ''}:${customName}:${idMatch[1]}>`
+            );
+          }
         }
       } catch (_) {}
 
@@ -55922,8 +56201,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         } catch (_) {}
       }
 
-      // Only if DOM data was insufficient, inspect React metadata on at most
-      // three nearby nodes, with at most four Fiber levels per node.
+      // Inspect bounded React metadata even when the DOM fast path already found
+      // a custom emoji. Discord can serve animated picker previews as .webp; React
+      // remains authoritative for animated=true on that same snowflake.
       const reactNodes = [];
 
       const addNode =
@@ -55970,12 +56250,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (!emojiVisual) {
             emojiVisual = extractVisualAssetFromObject(props);
           }
-          if (!emojiText) {
+          const reactEmojiCandidate =
+            maybeEmoji(
+              this.extractEmojiTextFromObject(
+                props
+              )
+            );
+
+          if (reactEmojiCandidate) {
             emojiText =
-              maybeEmoji(
-                this.extractEmojiTextFromObject(
-                  props
-                )
+              mergeDiscordCustomEmojiObservations(
+                emojiText,
+                reactEmojiCandidate
               );
           }
 
@@ -55995,7 +56281,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
           if (
             emojiText &&
-            aliases.size >= 3
+            aliases.size >= 3 &&
+            (
+              !/^<a?:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>$/u.test(emojiText) ||
+              /^<a:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>$/u.test(emojiText)
+            )
           ) {
             break;
           }
@@ -56003,7 +56293,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
         if (
           emojiText &&
-          aliases.size >= 3
+          aliases.size >= 3 &&
+          (
+            !/^<a?:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>$/u.test(emojiText) ||
+            /^<a:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>$/u.test(emojiText)
+          )
         ) {
           break;
         }
@@ -56063,10 +56357,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             /[\u200B\u2060\uFEFF]/g,
             ''
           )
+          .replace(/\\([\\:~*_])/g, '$1')
           .trim();
 
       const match =
-        /^:([a-zA-Z0-9_+\-]+):$/.exec(
+        /^:([^:<>\r\n]{1,80}):$/u.exec(
           raw
         );
 
@@ -56078,7 +56373,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         String(
           match[1] || ''
         )
-          .toLowerCase();
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '_');
 
       if (
         Array.isArray(
@@ -56183,22 +56480,52 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         value.emojiId ||
         value.emoji_id;
 
-      const name =
+      const rawName =
         value.name ||
         value.emojiName ||
-        value.emoji_name;
+        value.emoji_name ||
+        value.originalName ||
+        value.uniqueName ||
+        value.shortName ||
+        value.short_name;
+
+      const name =
+        typeof rawName === 'string'
+          ? rawName.trim().replace(/^:+|:+$/g, '')
+          : '';
+
+      const idText = String(id || '');
 
       if (
-        id &&
-        name
+        /^[0-9]{15,32}$/.test(idText) &&
+        name &&
+        name.length <= 80 &&
+        !/[\s:<>]/u.test(name)
       ) {
+        const animationUrlHint =
+          [
+            value.url,
+            value.src,
+            value.imageUrl,
+            value.imageURL,
+            value.assetUrl,
+            value.assetURL,
+            value.emojiUrl,
+            value.emojiURL,
+          ].some((candidate) =>
+            /\/emojis\/[0-9]{15,32}\.gif(?:[?#]|$)/i.test(String(candidate || ''))
+          );
+
         const animated =
           !!(
             value.animated ||
-            value.isAnimated
+            value.isAnimated ||
+            value.is_animated ||
+            value.isAnimatedEmoji ||
+            animationUrlHint
           );
 
-        return `<${animated ? 'a' : ''}:${name}:${id}>`;
+        return `<${animated ? 'a' : ''}:${canonicalDiscordCustomEmojiWireName(name)}:${idText}>`;
       }
 
       // Unicode emoji objects used by Discord.
@@ -56379,6 +56706,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         text =
           pickerResolved;
       }
+
+      text =
+        canonicalizeDiscordCustomEmojiMarkup(text);
 
       text =
         this.normalizeSecureEmojiShortcuts(
@@ -70630,7 +70960,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.10.5',
+      build: 'v70.10.9',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -70762,7 +71092,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.5',
+      build: 'v70.10.9',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -70788,7 +71118,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.10.5',
+    build: 'v70.10.9',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -70877,7 +71207,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.5',
+      build: 'v70.10.9',
       portableAccountIdentity: true,
       portableDevicePrivateKey: false,
       portableMutableRatchetState: false,
@@ -70995,7 +71325,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     };
     return {
-      build: 'v70.10.5',
+      build: 'v70.10.9',
       ok: Object.values(gates).every(Boolean),
       policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
       backgroundNetworkMaintenance: false,
@@ -71012,7 +71342,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.10.5',
+    build: 'v70.10.9',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -71183,7 +71513,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     pruneSdc3OwnOutboundAdmissions(Date.now());
     return {
       lot: 'LOT_3_SDC3_REPLAY_OWN_ECHO_CORRECTIVE',
-      build: 'v70.10.5',
+      build: 'v70.10.9',
       ok: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
       policy: {
         remoteDifferentMessageIdReplayRejected: true,
@@ -73207,14 +73537,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               try {
                 const ownWireId = await rememberSdc3OwnOutboundTransport(channelId, secureTransport);
                 if (ownWireId) {
-                  console.debug('[SDC][CRYPTO][LOT3][v70.10.5] native SDC3 own outbound alias marker registered', {
+                  console.debug('[SDC][CRYPTO][LOT3][v70.10.9] native SDC3 own outbound alias marker registered', {
                     channelId: String(channelId || ''),
                     nativeMode: secureOutgoing.nativeMode || null,
                     wireId: ownWireId,
                   });
                 }
               } catch (error) {
-                console.debug('[SDC][CRYPTO][LOT3][v70.10.5] native SDC3 own outbound alias marker unavailable', {
+                console.debug('[SDC][CRYPTO][LOT3][v70.10.9] native SDC3 own outbound alias marker unavailable', {
                   channelId: String(channelId || ''),
                   nativeMode: secureOutgoing.nativeMode || null,
                   reason: error?.message || String(error),
