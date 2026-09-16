@@ -9,6 +9,38 @@
 // @updateURL    https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // ==/UserScript==
 
+(function () {
+  'use strict';
+
+  // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
+  // stale BetterDiscord loader/browser-cache execution before any functional test.
+  try {
+    window.SdcRuntimeBuild = () => 'v70.10.11';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_11_OFFLINE_RECIPIENT_COVERAGE';
+    console.info('[SDC][BUILD][v70.10.11] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_11_OFFLINE_RECIPIENT_COVERAGE',
+      secureInputPqRecoveryExpected: true,
+    });
+  } catch (_) {}
+
+  // ============================================================================
+  // v70.9.2 COMPATIBILITY POLICY — signed client-version admission + visible blocking UX
+  // ============================================================================
+  // The userscript metadata version remains the packaging/build version. The numeric
+  // public release prefix is advertised inside identity-signed DEVICE_ANNOUNCE payloads.
+  // A missing version is deliberately treated as legacy: builds predating this policy
+  // did not advertise it, so they are below the enforced minimum by definition.
+  //
+  // IMPORTANT: this is a recipient/admission policy only. It never deletes historical
+  // keys or messages and it does not change SDC3/SDC4/SDC4Q/PQ/GROUP primitives, KDFs,
+  // AADs or application ciphertext formats.
+  // Public version source: do not maintain a second UI/version literal. The
+  // BetterDiscord loader performs a direct eval(scriptContent), so locally loaded
+  // builds can read their own UserScript metadata comment from that lexical source.
+  // Tampermonkey/Greasemonkey exposes the same value through GM_info. The online
+  // loader fallback evaluates from its local `data` buffer, which is also visible to
+  // direct eval. If none are available, fail visibly as UNKNOWN rather than inventing
+  // a release number.
   function readSdcUserscriptMetadataVersion() {
     try {
       const gmVersion = globalThis?.GM_info?.script?.version;
