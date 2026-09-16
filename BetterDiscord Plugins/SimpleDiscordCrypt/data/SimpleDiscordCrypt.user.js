@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.8
+// @version      1.7.6.9
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -9,16 +9,17 @@
 // @updateURL    https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // ==/UserScript==
 
+
 (function () {
   'use strict';
 
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.10.11';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_11_OFFLINE_RECIPIENT_COVERAGE';
-    console.info('[SDC][BUILD][v70.10.11] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_11_OFFLINE_RECIPIENT_COVERAGE',
+    window.SdcRuntimeBuild = () => 'v70.10.12';
+    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_12_PASSIVE_REPLY_MEDIA';
+    console.info('[SDC][BUILD][v70.10.12] runtime loaded', {
+      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_12_PASSIVE_REPLY_MEDIA',
       secureInputPqRecoveryExpected: true,
     });
   } catch (_) {}
@@ -70,7 +71,7 @@
   // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
   // but is NOT cryptographic key material and does not alter any frozen wire.
   const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
-  const SDC_VERSION_POLICY_BUILD = 'v70.10.11';
+  const SDC_VERSION_POLICY_BUILD = 'v70.10.12';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -14614,6 +14615,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function handleCreatePendingReply(event) {
+    try {
+      SecureComposer.rememberNativeReplyContext?.(
+        event?.message, event?.channel, event?.shouldMention !== false
+      );
+    } catch (_) {}
     // Discord can build the reply bar from a fresh/raw message object instead of
     // the decrypted MessageStore instance. Rehydrate that preview from trusted
     // local presentation/history data before CREATE_PENDING_REPLY reaches React.
@@ -14646,6 +14652,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   let historyLoadDeferredKeySyncScheduled = 0;
   let historyLoadDeferredKeySyncFlushed = 0;
   let historyLoadDeferredKeySyncFailures = 0;
+  const PendingUserIntentHistoryKeySyncs = new Map();
 
   function createHistoryLoadProcessingContext(event, channelId) {
     return {
@@ -14679,23 +14686,46 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       : [];
     if (entries.length === 0) return 0;
     context.deferredKeySyncs.clear();
-    console.debug('[SDC][DEVICE][v68.0.20.4] flushing deferred history exact-key recovery after native load', {
+
+    // v70.10.12: LOAD_MESSAGES is passive navigation. Keep the exact-key requests
+    // locally queued rather than leaking "this DM was opened" through a KEY REQUEST.
+    for (const entry of entries) {
+      const id = `${String(entry.channelId || '')}|${String(entry.scopedKeyId || '')}`;
+      PendingUserIntentHistoryKeySyncs.set(id, { ...entry, queuedAt: Date.now() });
+    }
+    while (PendingUserIntentHistoryKeySyncs.size > 256)
+      PendingUserIntentHistoryKeySyncs.delete(PendingUserIntentHistoryKeySyncs.keys().next().value);
+
+    console.debug('[SDC][PRIVACY][v70.10.12] history exact-key recovery held for user intent', {
       channelId: String(context?.channelId || ''),
       eventType: String(context?.eventType || ''),
       count: entries.length,
+      networkTraffic: false,
     });
+    return entries.length;
+  }
 
-    // The timer is deliberately armed only AFTER original_dispatch returned.
-    // Recovery may still wait on Discord's queue, but it can no longer block the
-    // MessageStore transition that makes that queue ready.
+  function flushPendingHistoryKeySyncsOnUserIntent(channelId, source = 'protected-user-intent') {
+    const channel = String(channelId || '');
+    if (!channel || PendingUserIntentHistoryKeySyncs.size === 0) return 0;
+    const entries = [];
+    for (const [id, entry] of Array.from(PendingUserIntentHistoryKeySyncs.entries())) {
+      if (String(entry?.channelId || '') !== channel) continue;
+      PendingUserIntentHistoryKeySyncs.delete(id);
+      entries.push(entry);
+    }
+    if (!entries.length) return 0;
+
+    // The human has now initiated a protected action, so recovery no longer leaks a
+    // passive read/open event. Do not delay their ciphertext on these history repairs.
     setTimeout(() => {
       for (const entry of entries) {
         historyLoadDeferredKeySyncFlushed++;
-        requestMissingKeyRecovery(entry.channelId, entry.scopedKeyId, entry.peerUserId, entry.source).catch((error) => {
+        requestMissingKeyRecovery(entry.channelId, entry.scopedKeyId, entry.peerUserId, `user-intent:${String(source || '')}:${entry.source}`).catch((error) => {
           historyLoadDeferredKeySyncFailures++;
-          console.warn('[SDC][DEVICE][v68.0.20.4] deferred history exact-key recovery failed', {
+          console.warn('[SDC][DEVICE][v70.10.12] user-intent history exact-key recovery failed', {
             channelId: entry.channelId,
-            source: entry.source,
+            source: String(source || ''),
             error: String(error?.message || error),
           });
         });
@@ -15012,6 +15042,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         message.content = '<:ENC:465534298662109185>🔒 Hybrid multi-device carrier failed authentication/decryption.';
         message.embeds = [];
         try { message.attachments = []; } catch (_) {}
+      }
+      if (message?._sdc_auxiliary_transport) {
+        // v70.10.12: live auxiliary carriers are transport-only. Suppressing the
+        // MESSAGE_CREATE before MessageStore avoids invisible sibling rows changing
+        // Discord's native compact-group decision (missing author/avatar on the
+        // next visible per-device fragment). LOAD_MESSAGES keeps cardinality and
+        // uses the existing CSS-hiding path for historical pagination safety.
+        return true;
       }
       if (Cache.pingOn != null && Cache.pingOn.test(message.content)) { const u=Discord.getCurrentUser(); message.mentions = Array.from(new Map([...(message.mentions||[]),u].map(x=>[String(x.id),x])).values()); }
       return false;
@@ -17817,16 +17855,36 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
   const youtubeRegex = CONFIG.patterns.youtube;
-  function embedYoutube(message, url, queryString) {
-    let match = youtubeRegex.exec(queryString);
-    if (match != null)
-      message.embeds.push(createYoutubeEmbed(match[1], match[2]));
-  }
   const youtuRegex = CONFIG.patterns.youtu;
+  function parseYoutubePresentationUrl(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+      const host = parsed.hostname.toLowerCase();
+      let id = '';
+      if (host === 'youtu.be') {
+        id = parsed.pathname.split('/').filter(Boolean)[0] || '';
+      } else if (host === 'youtube.com' || host === 'www.youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com' || host === 'www.youtube-nocookie.com' || host === 'youtube-nocookie.com') {
+        if (parsed.pathname === '/watch') id = parsed.searchParams.get('v') || '';
+        else {
+          const match = /^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{6,})/.exec(parsed.pathname);
+          if (match) id = match[1];
+        }
+      }
+      if (!/^[A-Za-z0-9_-]{6,32}$/.test(id)) return null;
+      const start = parsed.searchParams.get('t') || parsed.searchParams.get('start') || '';
+      return { id, timequery: start ? `&t=${start}` : null, href: parsed.href };
+    } catch (_) {
+      return null;
+    }
+  }
+  function embedYoutube(message, url, queryString) {
+    const parsed = parseYoutubePresentationUrl(url);
+    if (parsed) message.embeds.push(createYoutubeEmbed(parsed.id, parsed.timequery));
+  }
   function embedYoutu(message, url, queryString) {
-    let match = youtuRegex.exec(queryString);
-    if (match != null)
-      message.embeds.push(createYoutubeEmbed(match[1], match[2]));
+    const parsed = parseYoutubePresentationUrl(url);
+    if (parsed) message.embeds.push(createYoutubeEmbed(parsed.id, parsed.timequery));
   }
   const imageRegex = CONFIG.patterns.image;
   const SDC_RICH_MEDIA_PLACEHOLDER =
@@ -19902,7 +19960,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       );
   }
   const linkEmbedders = {
+    'youtube.com': embedYoutube,
     'www.youtube.com': embedYoutube,
+    'm.youtube.com': embedYoutube,
+    'music.youtube.com': embedYoutube,
+    'youtube-nocookie.com': embedYoutube,
+    'www.youtube-nocookie.com': embedYoutube,
     'youtu.be': embedYoutu,
     'cdn.discordapp.com': embedImage,
     'media.discordapp.net': embedImage,
@@ -20216,7 +20279,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     let url;
     while ((url = urlRegex.exec(content)) != null && url[1] != null) {
-      let linkEmbedder = linkEmbedders[url[1]];
+      let linkEmbedder = linkEmbedders[String(url[1]).toLowerCase()];
       if (linkEmbedder != null) linkEmbedder(message, url[0], url[2]);
     }
     urlRegex.lastIndex = 0;
@@ -30905,6 +30968,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return { applicable: false, sent: false, reason: 'peer-identity-not-pinned' };
 
     PqQuietControlStats.capabilityIntentChecks += 1;
+    try { flushPendingHistoryKeySyncsOnUserIntent(channelId, source); } catch (_) {}
     try {
       const local = await ensureLocalDeviceIdentity();
       if (!local.announcedQuietPqZeroTouch || typeof local.announcedQuietPqZeroTouch !== 'object')
@@ -33448,6 +33512,36 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
+  function normalizeSdcOutgoingReplyContext(value, fallbackChannelId = '') {
+    if (!value || typeof value !== 'object') return null;
+    const reference = value.messageReference || value.message_reference || value.reference || value;
+    const nestedMessage = reference?.message && typeof reference.message === 'object' ? reference.message : null;
+    const messageId = String(
+      reference?.message_id || reference?.messageId || nestedMessage?.id ||
+      ((reference?.id && !reference?.channel_id && !reference?.channelId) ? reference.id : '') || ''
+    );
+    const channelId = String(
+      reference?.channel_id || reference?.channelId || nestedMessage?.channel_id || nestedMessage?.channelId || fallbackChannelId || ''
+    );
+    if (!/^[0-9]{10,32}$/.test(messageId) || !/^[0-9]{10,32}$/.test(channelId)) return null;
+    const messageReference = { channel_id: channelId, message_id: messageId };
+    const failIfNotExists = reference?.fail_if_not_exists ?? reference?.failIfNotExists;
+    if (typeof failIfNotExists === 'boolean') messageReference.fail_if_not_exists = failIfNotExists;
+    const allowedMentions = value.allowedMentions && typeof value.allowedMentions === 'object'
+      ? { ...value.allowedMentions }
+      : (value.allowed_mentions && typeof value.allowed_mentions === 'object' ? { ...value.allowed_mentions } : null);
+    return { messageReference, allowedMentions };
+  }
+
+  function sdcOutgoingOptionsWithReplyContext(baseOptions, replyContext) {
+    const options = { ...(baseOptions || {}) };
+    const normalized = normalizeSdcOutgoingReplyContext(replyContext, '');
+    if (!normalized) return options;
+    options.messageReference = { ...normalized.messageReference };
+    if (normalized.allowedMentions) options.allowedMentions = { ...normalized.allowedMentions };
+    return options;
+  }
+
   async function buildHybridAsyncMultiDeviceFanoutCarrier(channelId, plaintext, recipientsOverride = null) {
     channelId = String(channelId || '');
     const peerId = ratchetPeerAccountId(channelId);
@@ -33508,7 +33602,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     });
   }
 
-  async function enqueueHybridAsyncMultiDeviceFanout(channelId, built, source = 'production-offline-fanout') {
+  async function enqueueHybridAsyncMultiDeviceFanout(channelId, built, source = 'production-offline-fanout', nativePresentationContext = null) {
     channelId = String(channelId || '');
     if (!built?.multiMessageFanout || !Array.isArray(built.parts) || built.parts.length < 2)
       throw new Error('Invalid SDC4QF fan-out carrier');
@@ -33542,7 +33636,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (Array.from(transport).length > Math.min(limit, SDC_HYBRID_ASYNC_MAX_WIRE_CHARS))
           throw new Error('SDC4QF terminal fragment exceeds current Discord safe budget');
         const messageObject = { content: transport, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
-        const options = { alsoForwardToChannelId: undefined, location: 'chat_input' };
+        const options = sdcOutgoingOptionsWithReplyContext(
+          { alsoForwardToChannelId: undefined, location: 'chat_input' },
+          nativePresentationContext
+        );
         TrustedFinalEncryptedMessageObjects.add(messageObject);
         try {
           await Discord.enqueue(channelId, messageObject, undefined, options);
@@ -40478,6 +40575,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   async function ensurePortableImportConvergenceForChannel(channelId, reason = 'protected-use') {
     const state = portableImportConvergenceState();
     const channel = String(channelId || '');
+    // v70.10.12 defense-in-depth: even a future direct caller may not turn a
+    // passive view/load reason into a signed announcement or HELLO.
+    if (pqRatchetPassiveNavigationReason(reason)) {
+      return { status: 'PASSIVE_NAVIGATION_SUPPRESSED', channelId: channel, reason: String(reason || '') };
+    }
     if (!state || !channel) return { status: 'NOT_IMPORTED_OR_NOT_PENDING', channelId: channel };
     if (state.convergedChannels[channel]) return { status: 'ALREADY_CONVERGED', channelId: channel, ...state.convergedChannels[channel] };
 
@@ -40538,6 +40640,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   function schedulePortableImportConvergence(channelId, reason = 'channel-select') {
     const channel = String(channelId || '');
+    // v70.10.12 privacy boundary: importing a DB does not authorize network traffic
+    // merely because a DM is viewed. The first genuine protected user send runs the
+    // explicit convergence gate; passive navigation only refreshes local UI/cache.
+    if (pqRatchetPassiveNavigationReason(reason)) {
+      console.debug('[SDC][PRIVACY][v70.10.12] passive portable-import convergence suppressed', {
+        channelId: channel || null, reason: String(reason || ''), networkTraffic: false,
+      });
+      return false;
+    }
     if (!portableImportConvergenceState() || !channel || !ratchetV4IsRequired(channel)) return false;
     setTimeout(() => {
       ensurePortableImportConvergenceForChannel(channel, reason).catch((error) => {
@@ -40559,6 +40670,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function scheduleAutomaticRatchetV4(channelId, reason = 'channel-selected') {
+    // v70.10.12 privacy boundary: SDC4 HELLO is network-visible. Never initiate or
+    // retry it from passive navigation/plugin-load. User-send and authenticated
+    // protocol events keep their event-driven recovery paths unchanged.
+    if (pqRatchetPassiveNavigationReason(reason)) {
+      console.debug('[SDC][PRIVACY][v70.10.12] passive SDC4 recovery suppressed', {
+        channelId: String(channelId || '') || null, reason: String(reason || ''), networkTraffic: false,
+      });
+      return false;
+    }
     // Re-check both when scheduling AND when the timer fires. This closes the
     // pre-unlock race where a timer armed against the Real Vault could execute
     // after a Duress password swaps DataBase to the alternate vault.
@@ -49821,7 +49941,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     allowRatchet = false,
     attachmentScopedKeyIdOverride = null,
     attachmentFileFsDescriptorsOverride = null,
-    attachmentGroupFileFsDescriptorsOverride = null
+    attachmentGroupFileFsDescriptorsOverride = null,
+    nativePresentationContext = null
   ) {
     let content = String(message?.content ?? '');
 
@@ -50133,7 +50254,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 ? await buildSdc4OfflineFileDelivery(channelId, ratchetFileFsUserText || '', ratchetFileFsDescriptors)
                 : await buildAsyncPrekeyMessageWire(channelId, content);
               if (asyncBuilt?.multiMessageFanout === true) {
-                await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'sticky-pq-fast-offline');
+                await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'sticky-pq-fast-offline', nativePresentationContext);
                 if (ratchetFileFsDescriptors.length) {
                   message.content = encodeSdc4FileFsDetachedCarrier(asyncBuilt.batchId);
                 } else {
@@ -50197,7 +50318,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 ? await buildSdc4OfflineFileDelivery(channelId, ratchetFileFsUserText || '', ratchetFileFsDescriptors)
                 : await buildAsyncPrekeyMessageWire(channelId, content);
               if (asyncBuilt?.multiMessageFanout === true) {
-                await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'automatic-fast-path');
+                await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'automatic-fast-path', nativePresentationContext);
                 if (ratchetFileFsDescriptors.length) {
                   message.content = encodeSdc4FileFsDetachedCarrier(asyncBuilt.batchId);
                 } else {
@@ -50259,7 +50380,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                   ? await buildSdc4OfflineFileDelivery(channelId, ratchetFileFsUserText || '', ratchetFileFsDescriptors)
                   : await buildAsyncPrekeyMessageWire(channelId, content);
                 if (asyncBuilt?.multiMessageFanout === true) {
-                  await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'automatic-recovery-fallback');
+                  await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'automatic-recovery-fallback', nativePresentationContext);
                   if (ratchetFileFsDescriptors.length) {
                     message.content = encodeSdc4FileFsDetachedCarrier(asyncBuilt.batchId);
                   } else {
@@ -54040,20 +54161,38 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
+  function safeEchoYoutubeDescriptor(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+      const host = parsed.hostname.toLowerCase();
+      let id = '';
+      if (host === 'youtu.be') id = parsed.pathname.split('/').filter(Boolean)[0] || '';
+      else if (host === 'youtube.com' || host === 'www.youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com' || host === 'www.youtube-nocookie.com') {
+        if (parsed.pathname === '/watch') id = parsed.searchParams.get('v') || '';
+        else { const match = /^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{6,})/.exec(parsed.pathname); if (match) id = match[1]; }
+      }
+      if (!/^[A-Za-z0-9_-]{6,32}$/.test(id)) return null;
+      return { href: parsed.href, thumbnail: 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg', id };
+    } catch (_) { return null; }
+  }
+
   function appendSafeEchoMediaPreview(fragment, value) {
-    const mediaUrl = safeEchoDirectMediaUrl(value);
-    if (!mediaUrl || echoRenderedMediaUrls.has(mediaUrl)) return false;
-    echoRenderedMediaUrls.add(mediaUrl);
+    const youtube = safeEchoYoutubeDescriptor(value);
+    const mediaUrl = youtube?.thumbnail || safeEchoDirectMediaUrl(value);
+    const identityUrl = youtube?.href || mediaUrl;
+    if (!mediaUrl || !identityUrl || echoRenderedMediaUrls.has(identityUrl)) return false;
+    echoRenderedMediaUrls.add(identityUrl);
 
     const box = document.createElement('span');
     box.className = 'sdc-inline-media';
     const link = document.createElement('a');
-    link.href = mediaUrl;
+    link.href = youtube?.href || mediaUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.referrerPolicy = 'no-referrer';
     const img = document.createElement('img');
-    img.alt = 'GIF / media preview';
+    img.alt = youtube ? 'YouTube preview' : 'GIF / media preview';
     img.draggable = false;
     img.loading = 'eager';
     img.decoding = 'async';
@@ -58481,6 +58620,66 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       }
 
+      return false;
+    },
+
+    rememberNativeReplyContext(message, channel, shouldMention = true) {
+      const messageId = String(message?.id || message?.message_id || '');
+      const channelId = String(message?.channel_id || message?.channelId || channel?.id || Cache.channelId || '');
+      if (!/^[0-9]{10,32}$/.test(messageId) || !/^[0-9]{10,32}$/.test(channelId)) return false;
+      if (!(this.pendingNativeReplyContexts instanceof Map)) this.pendingNativeReplyContexts = new Map();
+      this.pendingNativeReplyContexts.set(channelId, {
+        messageReference: { channel_id: channelId, message_id: messageId },
+        allowedMentions: { replied_user: shouldMention !== false },
+        createdAt: Date.now(),
+      });
+      return true;
+    },
+
+    capturePendingNativeReplyContext(channelId = this.active?.channelId || Cache.channelId) {
+      const channel = String(channelId || '');
+      const record = this.pendingNativeReplyContexts instanceof Map
+        ? this.pendingNativeReplyContexts.get(channel)
+        : null;
+      if (!record) return null;
+      if (Date.now() - Number(record.createdAt || 0) > 10 * 60 * 1000) {
+        this.pendingNativeReplyContexts.delete(channel);
+        return null;
+      }
+      // When Chat Control is mounted, the DOM/React reply state is authoritative;
+      // a cancelled Reply must never be resurrected by stale remembered metadata.
+      if (this.active && String(this.active.channelId || '') === channel && !this.hasPendingNativeReplyState()) {
+        this.pendingNativeReplyContexts.delete(channel);
+        return null;
+      }
+      return {
+        messageReference: { ...record.messageReference },
+        allowedMentions: { ...(record.allowedMentions || {}) },
+      };
+    },
+
+    clearNativeReplyContextAfterDirectSend(channelId = this.active?.channelId || Cache.channelId) {
+      const channel = String(channelId || '');
+      if (this.pendingNativeReplyContexts instanceof Map) this.pendingNativeReplyContexts.delete(channel);
+      const active = this.active;
+      if (!active || String(active.channelId || '') !== channel || !this.hasPendingNativeReplyState()) return false;
+      const selectors = [
+        '[aria-label*="cancel reply" i]',
+        '[aria-label*="annuler la réponse" i]',
+        '[class*="replyBar"] button[aria-label*="close" i]',
+        '[class*="replyBar"] button[aria-label*="fermer" i]',
+        '[class*="replyBar"] [class*="closeButton"]',
+        '[class*="replyBar"] button[class*="close"]',
+      ];
+      for (const root of [active.composerRoot, active.editor?.parentElement, document]) {
+        if (!root?.querySelector) continue;
+        for (const selector of selectors) {
+          try {
+            const button = root.querySelector(selector);
+            if (button instanceof HTMLElement) { button.click(); return true; }
+          } catch (_) {}
+        }
+      }
       return false;
     },
 
@@ -69134,6 +69333,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                   wireChars: Array.from(carrierWire + ' `🔒`').length,
                 };
               });
+              const nativeReplyContext = this.capturePendingNativeReplyContext(active.channelId);
               await enqueueHybridAsyncMultiDeviceFanout(active.channelId, {
                 multiMessageFanout: true,
                 hybridOffline: true,
@@ -69144,8 +69344,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 parts,
                 compactWireBytes: finalized.reduce((sum, x) => sum + Number(x.compactWireBytes || 0), 0),
                 profile: SDC_HYBRID_ASYNC_PROFILE,
-              }, offlineFileSend ? 'secure-input-offline-file-fallback' : 'secure-input-offline-fallback');
+              }, offlineFileSend ? 'secure-input-offline-file-fallback' : 'secure-input-offline-fallback', nativeReplyContext);
               offlineFanoutPartsSent = parts.length;
+              if (nativeReplyContext)
+                this.clearNativeReplyContextAfterDirectSend(active.channelId);
               if (offlineFileSend) {
                 if (!this.hasPendingNativeAttachmentState())
                   throw new Error('Secure Input SDC4QF encrypted attachment state disappeared before detached submit');
@@ -71092,7 +71294,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.10.11',
+      build: 'v70.10.12',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -71224,7 +71426,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.11',
+      build: 'v70.10.12',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -71250,7 +71452,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.10.11',
+    build: 'v70.10.12',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -71339,7 +71541,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.11',
+      build: 'v70.10.12',
       portableAccountIdentity: true,
       portableDevicePrivateKey: false,
       portableMutableRatchetState: false,
@@ -71457,7 +71659,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     };
     return {
-      build: 'v70.10.11',
+      build: 'v70.10.12',
       ok: Object.values(gates).every(Boolean),
       policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
       backgroundNetworkMaintenance: false,
@@ -71474,7 +71676,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.10.11',
+    build: 'v70.10.12',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -71645,7 +71847,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     pruneSdc3OwnOutboundAdmissions(Date.now());
     return {
       lot: 'LOT_3_SDC3_REPLAY_OWN_ECHO_CORRECTIVE',
-      build: 'v70.10.11',
+      build: 'v70.10.12',
       ok: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
       policy: {
         remoteDifferentMessageIdReplayRejected: true,
@@ -73709,7 +73911,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           }
 
           if (!secureTransportAlreadyFinal) {
-            await handleSend(channelId, message, true, true);
+            await handleSend(channelId, message, true, true, null, null, null, args[3] || null);
           }
           if (message?._sdc_skip_original_send === true) {
             delete message._sdc_skip_original_send;
