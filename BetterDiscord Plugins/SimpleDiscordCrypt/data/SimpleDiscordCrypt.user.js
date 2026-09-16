@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.7
+// @version      1.7.6.8
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -9,38 +9,6 @@
 // @updateURL    https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // ==/UserScript==
 
-(function () {
-  'use strict';
-
-  // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
-  // stale BetterDiscord loader/browser-cache execution before any functional test.
-  try {
-    window.SdcRuntimeBuild = () => 'v70.10.10';
-    window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_10_ATTACHMENT_SIBLING_UI';
-    console.info('[SDC][BUILD][v70.10.10] runtime loaded', {
-      feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_10_ATTACHMENT_SIBLING_UI',
-      secureInputPqRecoveryExpected: true,
-    });
-  } catch (_) {}
-
-  // ============================================================================
-  // v70.9.2 COMPATIBILITY POLICY — signed client-version admission + visible blocking UX
-  // ============================================================================
-  // The userscript metadata version remains the packaging/build version. The numeric
-  // public release prefix is advertised inside identity-signed DEVICE_ANNOUNCE payloads.
-  // A missing version is deliberately treated as legacy: builds predating this policy
-  // did not advertise it, so they are below the enforced minimum by definition.
-  //
-  // IMPORTANT: this is a recipient/admission policy only. It never deletes historical
-  // keys or messages and it does not change SDC3/SDC4/SDC4Q/PQ/GROUP primitives, KDFs,
-  // AADs or application ciphertext formats.
-  // Public version source: do not maintain a second UI/version literal. The
-  // BetterDiscord loader performs a direct eval(scriptContent), so locally loaded
-  // builds can read their own UserScript metadata comment from that lexical source.
-  // Tampermonkey/Greasemonkey exposes the same value through GM_info. The online
-  // loader fallback evaluates from its local `data` buffer, which is also visible to
-  // direct eval. If none are available, fail visibly as UNKNOWN rather than inventing
-  // a release number.
   function readSdcUserscriptMetadataVersion() {
     try {
       const gmVersion = globalThis?.GM_info?.script?.version;
@@ -70,7 +38,7 @@
   // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
   // but is NOT cryptographic key material and does not alter any frozen wire.
   const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
-  const SDC_VERSION_POLICY_BUILD = 'v70.10.10';
+  const SDC_VERSION_POLICY_BUILD = 'v70.10.11';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -30217,7 +30185,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       });
       await persistRatchetSessions();
-      console.info('[SDC][PQ][v70.10.10] deferred PQ ACK emitted immediately before protected user message', {
+      console.info('[SDC][PQ][v70.10.11] deferred PQ ACK emitted immediately before protected user message', {
         channelId: String(state.channelId), sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
         epoch: Number(state.pqLastAckEpoch || 0), reason: String(reason || ''), suppressNotifications: true,
       });
@@ -30240,7 +30208,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       try { if (await sendDeferredPqRatchetAckForState(state, reason)) sent += 1; }
       catch (error) {
         failed += 1;
-        console.warn('[SDC][PQ][v70.10.10] deferred ACK remains pending; user message may use frozen offline PQ transport', {
+        console.warn('[SDC][PQ][v70.10.11] deferred ACK remains pending; user message may use frozen offline PQ transport', {
           channelId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
           reason: error?.message || String(error),
         });
@@ -30541,7 +30509,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // message. An offline peer may therefore reconnect days later without
       // generating a notification-only acknowledgement.
       if (!ackSpec.duplicate || state.pqDeferredAck === true) {
-        console.info('[SDC][PQ][v70.10.10] PQ ratchet INIT accepted; ACK deferred until local user activity', {
+        console.info('[SDC][PQ][v70.10.11] PQ ratchet INIT accepted; ACK deferred until local user activity', {
           channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch: info.epoch,
           nextKemKeyId: ackSpec.nextKemKeyId, offlineHistory: oldMessage === true,
         });
@@ -30934,7 +30902,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // SDC4/SDC4Q fail-closed rules remain authoritative; never downgrade merely
       // because an announcement could not be queued.
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.debug('[SDC][PQ][v70.10.10] zero-touch quiet capability announcement deferred', {
+      console.debug('[SDC][PQ][v70.10.11] zero-touch quiet capability announcement deferred', {
         channelId, peerId, source: String(source || ''), reason: PqQuietControlStats.lastError,
       });
       return { applicable: true, sent: false, peerId, source: String(source || ''), error: PqQuietControlStats.lastError };
@@ -30978,7 +30946,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       PqQuietControlStats.inheritedPendingResumesSent += 1;
       PqQuietControlStats.initControlsSent += 1;
       PqQuietControlStats.lastControlAt = Date.now();
-      console.info('[SDC][PQ][v70.10.10] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
+      console.info('[SDC][PQ][v70.10.11] inherited PQ pending INIT resumed once after signed quiet capability convergence', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         remoteDeviceId: String(state.remoteDeviceId), pendingEpoch: Number(state.pqPending?.epoch || 0) || null,
         suppressNotifications: true,
@@ -30987,7 +30955,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     } catch (error) {
       PqQuietControlStats.inheritedPendingResumeFailures += 1;
       PqQuietControlStats.lastError = error?.message || String(error);
-      console.warn('[SDC][PQ][v70.10.10] inherited PQ pending resume deferred; confirmed epoch remains usable', {
+      console.warn('[SDC][PQ][v70.10.11] inherited PQ pending resume deferred; confirmed epoch remains usable', {
         channelId: String(state.channelId), peerId: String(peerId), sessionId: String(state.sessionId),
         reason: PqQuietControlStats.lastError,
       });
@@ -31055,7 +31023,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
       if (Number(remoteRecord?.quietPqControlVersion || 0) < SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
         PqQuietControlStats.legacyPeerRefreshSuppressed += 1;
-        console.debug('[SDC][PQ][v70.10.10] quiet refresh held until peer advertises deferred-ACK capability', {
+        console.debug('[SDC][PQ][v70.10.11] quiet refresh held until peer advertises deferred-ACK capability', {
           channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId), dueReason,
         });
         continue;
@@ -31066,7 +31034,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           initSent += 1;
           PqQuietControlStats.initControlsSent += 1;
           PqQuietControlStats.lastControlAt = Date.now();
-          console.info('[SDC][PQ][v70.10.10] lazy PQ refresh INIT emitted immediately before protected user message', {
+          console.info('[SDC][PQ][v70.10.11] lazy PQ refresh INIT emitted immediately before protected user message', {
             channelId, peerId, sessionId: String(state.sessionId), remoteDeviceId: String(state.remoteDeviceId),
             dueReason, suppressNotifications: true,
           });
@@ -31076,7 +31044,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Do not destroy an already-built user ciphertext because a maintenance
         // control could not be queued; next genuine user activity can try again.
         PqQuietControlStats.lastError = error?.message || String(error);
-        console.warn('[SDC][PQ][v70.10.10] lazy refresh deferred; current confirmed epoch remains usable', {
+        console.warn('[SDC][PQ][v70.10.11] lazy refresh deferred; current confirmed epoch remains usable', {
           channelId, peerId, sessionId: String(state.sessionId), reason: PqQuietControlStats.lastError,
         });
       }
@@ -32050,7 +32018,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const HiddenSdcDeviceControlMessageIds = new Set();
   const SDC_HIDDEN_CONTROL_STYLE_ID = 'sdc-hidden-device-control-rows';
 
-  // v70.10.10: SDC4QF uses one authenticated Discord carrier per recipient device.
+  // v70.10.11: SDC4QF uses one authenticated Discord carrier per recipient device.
   // Those extra carriers are protocol transport, not user-visible conversation
   // events. Keep their wire/messages intact in Discord history, but locally collapse
   // rows that are provably auxiliary for this installation. This is deliberately
@@ -32095,7 +32063,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     message.embeds = [];
     try { message.attachments = []; } catch (_) {}
     message._sdc_auxiliary_transport = String(reason || 'auxiliary-transport');
-    console.debug('[SDC][PQ][v70.10.10] auxiliary SDC4QF transport row hidden', {
+    console.debug('[SDC][PQ][v70.10.11] auxiliary SDC4QF transport row hidden', {
       reason: String(reason || ''),
       messageId: id || null,
       channelId: String(message?.channel_id || ''),
@@ -32447,7 +32415,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // therefore forces that proof once as well; otherwise capability convergence could
       // accidentally leave SDC4Q disabled on mixed/current peers.
       try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey); }
-      catch (error) { console.warn('[SDC][PQ][v70.10.10] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
+      catch (error) { console.warn('[SDC][PQ][v70.10.11] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
       return true;
     } catch (error) {
       if (previousLast > 0) local.announcedChannels[channelKey] = previousLast;
@@ -41989,7 +41957,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           parts.push(`missing LIVE session for ${resolved.missingLiveDeviceIds.join(',')}`);
         if (resolved.unexpectedLiveDeviceIds.length)
           parts.push(`LIVE session for unregistered/inactive device ${resolved.unexpectedLiveDeviceIds.join(',')}`);
-        throw new Error(`SDC4 active-device recipient-set is incomplete: ${parts.join('; ') || 'unknown mismatch'}`);
+        const error = new Error(`SDC4 active-device recipient-set is incomplete: ${parts.join('; ') || 'unknown mismatch'}`);
+        error.code = 'SDC4_ACTIVE_DEVICE_SET_INCOMPLETE';
+        error.missingLiveDeviceIds = resolved.missingLiveDeviceIds.slice();
+        error.unexpectedLiveDeviceIds = resolved.unexpectedLiveDeviceIds.slice();
+        error.activeDeviceIds = resolved.activeDeviceIds.slice();
+        throw error;
       }
     }
     return resolved;
@@ -50112,13 +50085,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         try {
           ratchetWire = await encryptRatchetV4Text(channelId, content, { attachmentScopedKeyId: ratchetAttachmentScopedKeyId });
         } catch (error) {
+          const incompleteRecipientCoverage = error?.code === 'SDC4_ACTIVE_DEVICE_SET_INCOMPLETE';
           if (error?.code !== 'SDC4_PQ_RATCHET_REQUIRED_UNAVAILABLE' &&
-              error?.code !== 'SDC4_PQ_RATCHET_PEER_CONFIRMATION_PENDING') throw error;
+              error?.code !== 'SDC4_PQ_RATCHET_PEER_CONFIRMATION_PENDING' &&
+              !incompleteRecipientCoverage) throw error;
           stickyPqRecoveryError = error;
-          // v70.3.9: match Secure Input latency behavior. If authenticated hybrid
-          // offline readiness already exists, do not stall the native composer on
-          // a LIVE-PQ retry before sending. SDC4Q/SDC4QF is still post-quantum and
-          // fail-closed; one rate-limited convergence attempt continues in background.
+          // v70.10.11: the same exact-recipient SDC4Q/SDC4QF fallback also covers
+          // a current-KEX device that is authorized but temporarily lacks a LIVE
+          // SDC4 ratchet. This never removes that device: the offline builder uses
+          // the full authoritative recipient membership and revalidates every bound
+          // classical/ML-KEM prekey immediately before enqueue.
           if (!ratchetAttachmentScopedKeyId && content !== '') {
             try {
               const asyncBuilt = ratchetFileFsDescriptors.length
@@ -50142,7 +50118,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               channelConfig.asyncPrekeyLastRecipientDeviceIds = asyncBuilt.recipientDeviceIds.slice();
               Utils.dbChanged = true;
               void ensurePqRatchetLiveForUserSend(channelId, ratchetPeerAccountId(channelId)).catch(() => {});
-              console.log('[SDC][PQ][v70.3.9] sticky-PQ native send used immediate authenticated SDC4Q/SDC4QF', {
+              try { scheduleAutomaticRatchetV4(channelId, 'offline-recipient-coverage-background'); } catch (_) {}
+              console.log('[SDC][PQ][v70.10.11] authenticated SDC4Q/SDC4QF used for incomplete LIVE recipient coverage', {
                 channelId: String(channelId), peerId: asyncBuilt.peerId, recipientDeviceIds: asyncBuilt.recipientDeviceIds,
                 waitedForLivePq: false, classicalFallback: false,
               });
@@ -63482,7 +63459,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         createdAt: Date.now(),
         resolveObserved,
         offlineFileRecipientDeviceIds: offlineFileRecipients.slice(),
-        // v70.10.10: Reply and upload state can coexist in Discord. The file
+        // v70.10.11: Reply and upload state can coexist in Discord. The file
         // transaction is the stricter terminal path, so attachment must win over
         // Reply for transport admission/cleanup while Discord still preserves the
         // native reply metadata on the actual submit.
@@ -68698,6 +68675,64 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             // native composer. Converge sticky PQ before reserving/advancing any
             // SDC4 chain position. If convergence cannot complete, keep plaintext
             // inside the iframe and prepare the existing SDC4Q/SDC4QF offline wire.
+            // v70.10.11: recipient membership and LIVE ratchet coverage are separate
+            // concepts. A currently-authorized sibling device may be offline or may
+            // not yet have converged on this imported installation. Before any SDC4
+            // reservation advances a ratchet, detect that gap and, if every exact
+            // recipient still has authenticated bound hybrid prekeys, use SDC4Q/F
+            // for the whole authoritative recipient set. Never drop the missing device.
+            const liveCoverageBeforeReservation =
+              resolveRatchetV4ActiveDeviceRecipientSet(active.channelId, peerId, false);
+            if (!liveCoverageBeforeReservation.complete &&
+                liveCoverageBeforeReservation.missingLiveDeviceIds.length > 0) {
+              try {
+                const offline = await this.prepareSandboxSdc4qOfflineGrantBatch(active, {
+                  requestId,
+                  plainUtf8Bytes: effectivePlainUtf8Bytes,
+                  offlineFileDescriptorIds,
+                });
+                const transfer = [];
+                const grants = offline.grants.map((item) => {
+                  const keyBuffer = item.contentKey.buffer;
+                  const aadBuffer = item.contentAad.buffer;
+                  transfer.push(keyBuffer, aadBuffer);
+                  item.contentKey = null;
+                  item.contentAad = null;
+                  return {
+                    token: item.token,
+                    recipientDeviceId: item.recipientDeviceId,
+                    contentKey: keyBuffer,
+                    contentAad: aadBuffer,
+                  };
+                });
+                this.postAuthenticatedFrameCommand(
+                  active,
+                  'sdc4q-encrypt-multigrant',
+                  { requestId, batchId: offline.batchId, grants, fileFsEnvelope: fileFsOfflineEnvelopeForRequest },
+                  transfer
+                );
+                try { scheduleAutomaticRatchetV4(active.channelId, 'secure-input-offline-recipient-coverage-background'); } catch (_) {}
+                this.log('sdc4q-incomplete-live-coverage-grants-transferred', {
+                  channelId: active.channelId,
+                  requestId,
+                  batchId: offline.batchId,
+                  recipientDeviceIds: offline.recipientDeviceIds,
+                  missingLiveDeviceIds: liveCoverageBeforeReservation.missingLiveDeviceIds.slice(),
+                  recipientCount: offline.grants.length,
+                  parentPlaintextReceived: false,
+                  classicalFallback: false,
+                  droppedRecipientDeviceIds: [],
+                });
+                return;
+              } catch (offlineCoverageError) {
+                console.debug('[SDC][SECURE_INPUT][v70.10.11] incomplete LIVE recipient coverage has no authenticated SDC4Q/F route; retaining fail-closed recovery', {
+                  channelId: active.channelId,
+                  missingLiveDeviceIds: liveCoverageBeforeReservation.missingLiveDeviceIds.slice(),
+                  reason: offlineCoverageError?.message || String(offlineCoverageError),
+                });
+              }
+            }
+
             const blockedPqBeforeReservation = pqRatchetOutboundBlockedSessions(active.channelId, peerId);
             if (blockedPqBeforeReservation.length) {
               // v70.3.9: if a fully authenticated SDC4Q/SDC4QF route is already
@@ -71025,7 +71060,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.10.10',
+      build: 'v70.10.11',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -71157,7 +71192,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.10',
+      build: 'v70.10.11',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -71183,7 +71218,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.10.10',
+    build: 'v70.10.11',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -71272,7 +71307,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.10',
+      build: 'v70.10.11',
       portableAccountIdentity: true,
       portableDevicePrivateKey: false,
       portableMutableRatchetState: false,
@@ -71390,7 +71425,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     };
     return {
-      build: 'v70.10.10',
+      build: 'v70.10.11',
       ok: Object.values(gates).every(Boolean),
       policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
       backgroundNetworkMaintenance: false,
@@ -71407,7 +71442,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.10.10',
+    build: 'v70.10.11',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -71578,7 +71613,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     pruneSdc3OwnOutboundAdmissions(Date.now());
     return {
       lot: 'LOT_3_SDC3_REPLAY_OWN_ECHO_CORRECTIVE',
-      build: 'v70.10.10',
+      build: 'v70.10.11',
       ok: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
       policy: {
         remoteDifferentMessageIdReplayRejected: true,
@@ -73615,14 +73650,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               try {
                 const ownWireId = await rememberSdc3OwnOutboundTransport(channelId, secureTransport);
                 if (ownWireId) {
-                  console.debug('[SDC][CRYPTO][LOT3][v70.10.10] native SDC3 own outbound alias marker registered', {
+                  console.debug('[SDC][CRYPTO][LOT3][v70.10.11] native SDC3 own outbound alias marker registered', {
                     channelId: String(channelId || ''),
                     nativeMode: secureOutgoing.nativeMode || null,
                     wireId: ownWireId,
                   });
                 }
               } catch (error) {
-                console.debug('[SDC][CRYPTO][LOT3][v70.10.10] native SDC3 own outbound alias marker unavailable', {
+                console.debug('[SDC][CRYPTO][LOT3][v70.10.11] native SDC3 own outbound alias marker unavailable', {
                   channelId: String(channelId || ''),
                   nativeMode: secureOutgoing.nativeMode || null,
                   reason: error?.message || String(error),
