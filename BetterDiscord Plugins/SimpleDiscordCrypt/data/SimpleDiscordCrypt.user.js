@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SimpleDiscordCryptV2
 // @namespace    https://github.com/s4dic/discord/tree/main/BetterDiscord%20Plugins/SimpleDiscordCrypt
-// @version      1.7.6.9
+// @version      1.7.7.0
 // @description  SimpleDiscordCrypt 2026 – Now with all features working as intended
 // @author       Sleek, original by An0
 // @license      LGPLv3 - https://www.gnu.org/licenses/lgpl-3.0.txt
@@ -9,16 +9,15 @@
 // @updateURL    https://raw.githubusercontent.com/s4dic/discord/refs/heads/main/BetterDiscord%20Plugins/SimpleDiscordCrypt/SimpleDiscordCryptLoader.plugin.js
 // ==/UserScript==
 
-
 (function () {
   'use strict';
 
   // v70.3.8: diagnostic-only runtime marker. This exists specifically to detect
   // stale BetterDiscord loader/browser-cache execution before any functional test.
   try {
-    window.SdcRuntimeBuild = () => 'v70.10.12';
+    window.SdcRuntimeBuild = () => 'v70.11.3';
     window.SdcRuntimeFeatureMarker = () => 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_12_PASSIVE_REPLY_MEDIA';
-    console.info('[SDC][BUILD][v70.10.12] runtime loaded', {
+    console.info('[SDC][BUILD][v70.11.3] runtime loaded', {
       feature: 'CLASSICAL_PQ_GROUP_FROZEN_V70_10_12_PASSIVE_REPLY_MEDIA',
       secureInputPqRecoveryExpected: true,
     });
@@ -71,7 +70,7 @@
   // v70.10.1 orchestration capability. This is signed inside DEVICE_ANNOUNCE,
   // but is NOT cryptographic key material and does not alter any frozen wire.
   const SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION = 1;
-  const SDC_VERSION_POLICY_BUILD = 'v70.10.12';
+  const SDC_VERSION_POLICY_BUILD = 'v70.11.3';
 
   function normalizeSdcClientVersion(value) {
     const match = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/i.exec(String(value || ''));
@@ -1059,7 +1058,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       ['Known holders are only peers this local client observed sharing/receiving this GROUP key with. This is not the Discord server member list.', 'Les détenteurs connus sont uniquement les correspondants que ce client local a observés partager/recevoir cette clé GROUP. Il ne s’agit pas de la liste des membres du serveur Discord.'],
       ['Future access must be rotated:', 'L’accès futur exige une rotation :'],
       ['No known external holder has been recorded on this client.', 'Aucun détenteur externe connu n’a été enregistré sur ce client.'],
-      ['The portable SDC database keeps the account identity and keys, but does not export this device private key. Importing the same account database on another installation therefore creates a distinct per-installation device identity while preserving the same SDC account identity.', 'La base SDC portable conserve l’identité et les clés du compte, mais n’exporte pas la clé privée de cet appareil. Importer la même base de compte sur une autre installation crée donc une identité d’appareil distincte tout en conservant la même identité de compte SDC.'],
+      ['The encrypted .dat backup includes this device’s private recovery keys, retained history and ratchet checkpoints. Imported private checkpoints are used only to read old messages. Every import creates a distinct device for new sends, while preserving the SDC account identity.', 'Le .dat chiffré contient les clés privées de récupération, l’historique conservé et les checkpoints ratchet de cet appareil. Les checkpoints importés servent uniquement à lire les anciens messages. Chaque import crée un nouvel appareil pour les envois, en conservant l’identité du compte SDC.'],
       ['SDC4 Double Ratchet is enabled per device. v68.4 additionally publishes an identity-signed rotating async prekey. Once a peer/device prekey has been observed, a new installation can send a short encrypted bootstrap message while that peer is offline; normal SDC4 converges when the peer returns. With multiple eligible devices, LIVE SDC4 remains all-or-nothing fan-out.', 'SDC4 Double Ratchet est activé par appareil. Une prekey asynchrone rotative signée par l’identité est également publiée. Une fois la prekey d’un correspondant/appareil observée, une nouvelle installation peut envoyer un court bootstrap chiffré pendant que ce correspondant est hors ligne ; SDC4 converge normalement à son retour. Avec plusieurs appareils éligibles, le fan-out SDC4 LIVE reste tout-ou-rien.'],
       ['Device/prekey announcement is lazy: opening a DM sends nothing. It is emitted only for actual encrypted/KEX activity when the current prekey epoch has not yet been advertised; the manual button remains an expert recovery/refresh control.', 'L’annonce appareil/prekey est paresseuse : ouvrir un DM n’envoie rien. Elle n’est émise que lors d’une activité chiffrée/KEX réelle lorsque l’époque de prekey courante n’a pas encore été annoncée ; le bouton manuel reste un contrôle expert de récupération/actualisation.'],
       ['Revocation is sticky for a known device ID and excludes it from future synchronization/fan-out on clients that know the revocation. A machine that has fully stolen the account root identity can still create a brand-new device identity; root-identity compromise therefore requires replacing/re-verifying the account identity, not only revoking one device ID.', 'La révocation est persistante pour un device ID connu et l’exclut des futures synchronisations/fan-out sur les clients connaissant cette révocation. Une machine ayant entièrement compromis l’identité racine du compte peut toutefois créer une nouvelle identité d’appareil ; une compromission de l’identité racine exige donc de remplacer/revérifier l’identité du compte, pas seulement de révoquer un device ID.'],
@@ -2951,7 +2950,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>9 · Gestionnaire de clés et salons</h5>
             <p><strong>Gestionnaire de clés :</strong> affiche les clés connues, leur type, leur descripteur et permet leur suppression. <strong>Gestionnaire de salons :</strong> associe la clé voulue au salon. Supprimer une clé ou une association peut rendre de futurs messages illisibles ; exportez la base avant une opération importante.</p>
             <h5>10 · Export, import et nouvelle base</h5>
-            <p><strong>Exporter la base</strong> sauvegarde le coffre portable chiffré, y compris l’identité de compte, les clés portables et l’historique SDC4 lisible lorsqu’il peut être exporté sous forme chiffrée. La clé privée propre à l’appareil et les états ratchet mutables restent volontairement hors export afin de ne jamais cloner une installation complète. Après import, la première ouverture ou utilisation d’un DM protégé crée/reprend automatiquement l’identité de la nouvelle installation, envoie une nouvelle <strong>DEVICE ANNOUNCE</strong> signée (incluant la capacité quiet PQ) puis reconstruit la couverture SDC4 requise. Aucune commande console, KEX manuel ou annonce manuelle n’est nécessaire lorsque les identités/KEX portables restent valides. Si l’identité/KEX du correspondant n’est plus exploitable, SDC bloque l’envoi et demande une nouvelle convergence/KEX au lieu de downgrader.</p>
+            <p><strong>Exporter la base</strong> produit un <code>.dat</code> chiffré contenant les clés privées de récupération, les checkpoints ratchet et l’historique conservé. Le profil Duress configuré dispose d’un accès indépendant avec son propre mot de passe. Chaque import crée un nouvel appareil pour les envois et conserve les anciennes sessions uniquement pour la lecture. La première demande d’envoi protégé reconstruit la couverture authentifiée nécessaire ; ouvrir ou lire un DM ne déclenche aucun échange. Les clés déjà effacées ou créées après une sauvegarde ne peuvent pas être recréées par cette copie.</p>
             <p><strong>Nouvelle base</strong> efface la continuité cryptographique de l’ancienne base sur cette installation : les correspondants devront refaire KEX/vérification et les GROUP devront être recréés/redistribués.</p>
             <h5>11 · Auto-lock</h5>
             <p>Le verrouillage automatique masque le plaintext, sauvegarde le coffre, quitte la conversation active et détruit les références de secrets runtime avant de redemander le mot de passe. Il est recommandé sur un poste partagé ou laissé sans surveillance.</p>
@@ -2998,7 +2997,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             <h5>9 · Key Manager and Channel Manager</h5>
             <p><strong>Key Manager:</strong> shows known keys, types and descriptors and allows deletion. <strong>Channel Manager:</strong> binds the intended key to a channel. Deleting a key or binding can make future content unreadable; export the database before major changes.</p>
             <h5>10 · Export, import and New Database</h5>
-            <p><strong>Export Database</strong> saves the encrypted portable vault, including the account identity, portable keys and readable SDC4 history when it can be exported in encrypted form. The installation device private key and mutable ratchet state deliberately stay outside the export so a complete installation is never cloned. After import, the first opening or use of a protected DM automatically creates/resumes the new installation identity, sends a fresh signed <strong>DEVICE ANNOUNCE</strong> (including the quiet-PQ capability), and reconstructs the required SDC4 coverage. No console command, manual KEX, or manual announce is required while the portable identity/KEX material remains valid. If the peer identity/KEX can no longer be used, SDC blocks sending and requires fresh convergence/KEX rather than downgrading.</p>
+            <p><strong>Export Database</strong> creates an encrypted <code>.dat</code> containing private recovery keys, ratchet checkpoints and retained history. The configured Duress profile has independent access with its own password. Every import creates a fresh sending device and keeps old sessions for reading only. The first requested protected send reconstructs the required authenticated coverage; opening or reading a DM causes no exchange. Keys already erased or created after a backup cannot be recreated from that copy.</p>
             <p><strong>New Database</strong> intentionally breaks cryptographic continuity on that installation: peers must perform KEX/verification again and GROUP keys must be recreated/redistributed.</p>
             <h5>11 · Auto-lock</h5>
             <p>Auto-lock masks plaintext, saves the vault, leaves the active conversation and tears down runtime secret references before requiring the database password again. It is recommended on shared or unattended machines.</p>
@@ -4100,6 +4099,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         'db-duress-check': 11,
         'db-duress-vault': 12,
         'db-duress-queue': 13,
+        // Local backup purposes only; existing network purpose IDs are frozen.
+        'db-portable-sdc4-history-key-v1': 14,
+        'db-portable-private-recovery-v1': 15,
+        'db-sdc4-file-fs-vault-v2': 16,
       });
 
       if (
@@ -4133,6 +4136,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         'db-duress-check',
         'db-duress-vault',
         'db-duress-queue',
+        'db-portable-sdc4-history-key-v1',
+        'db-portable-private-recovery-v1',
+        'db-sdc4-file-fs-vault-v2',
       ];
 
       if (
@@ -4952,7 +4958,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     // Base64 Encoding
     bytesToBase64(buffer) {
-      return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+      const bytes = new Uint8Array(buffer);
+      const chunks = [];
+      // Multiples of three keep intermediate Base64 chunks padding-free, with
+      // bounded argument counts for large encrypted archives/attachments.
+      for (let offset = 0; offset < bytes.length; offset += 24576)
+        chunks.push(btoa(String.fromCharCode.apply(null, bytes.subarray(offset, offset + 24576))));
+      return chunks.join('');
     }
 
     base64ToBytes(string) {
@@ -5787,6 +5799,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
 
       newDbKey = await createDbKeyV3(password, newDataBase);
+      await rewrapPrivateRecoveryForDatabase(DataBase, newDataBase, oldDbKey, newDbKey);
       for (const [hash, clear] of Object.entries(clearKeys)) {
         newDataBase.keys[hash].k = cryptoService.bytesToBase64(
           await cryptoService.aesEncrypt(newDbKey, clear, 'db-key')
@@ -5882,6 +5895,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
 
       newDbKey = await createDbKeyV3(password, newDataBase);
+      await rewrapPrivateRecoveryForDatabase(DataBase, newDataBase, oldDbKey, newDbKey);
       // A v68.4 portable-history export is wrapped by the database master key.
       // When an imported database also needs an Argon2 profile upgrade, rewrap
       // this transient history key envelope under the new DB key before commit;
@@ -6088,6 +6102,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   // in-memory globals, helper functions may call FastSaveDb(). Suppress those
   // deferred writes until the explicit atomic StorageSave() commit boundary.
   let dbAtomicConstructionDepth = 0;
+  let SdcMainDatabaseWriteTail = Promise.resolve();
+  let SdcMainDatabasePersistenceFrozen = false;
+  let SdcMainDatabaseImportTarget = null;
 
   // v70.6.3: "New Database" is a destructive cryptographic first-use boundary.
   // The canonical replacement DB is persisted BEFORE these old local namespaces
@@ -6218,6 +6235,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function eraseFreshDatabaseRuntimeSecrets() {
+    Sdc4FileFsVaultEpoch++;
+    clearSdc4FileFsRuntimeVaults();
+    invalidateSelfHistoryRuntime();
     try { SecureComposer?.Stop?.(); } catch (_) {}
     try {
       for (const exchangeId of Array.from(pendingV3KeyExchanges.keys())) {
@@ -6236,7 +6256,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       pendingV3KeyExchanges, pendingV3ExchangeByPeer, consumedV3ExchangeIds, completedV3KexReceipts,
       IdentityVerifySessions, IdentityVerifyRecentControls, IdentityVerifyRateLimits,
       pendingDeviceSyncRequests, answeredDeviceSyncRequests, pendingRatchetBootstrapHellosAwaitingKey,
-      deviceAnnouncementInFlight, RecentAsyncPrekeySentPlaintext, PendingSelfSyncedOwnMessages, SelfSyncFanoutOnce,
+      deviceAnnouncementInFlight, RecentAsyncPrekeySentPlaintext, PendingSelfSyncedOwnMessages, SelfSyncFanoutOnce, SdcAsyncInboundDecryptTransactions,
       PqV692CapabilityAnnounced, RecentPqRatchetControlMessages, PqUserSendRetryAt,
       RatchetSessionQueues, PendingRatchetHandshakes, RecentRatchetControlMessages,
       RecentRatchetSentPlaintext, RecentRatchetReceivedPlaintext, Sdc4MessageAttachmentBindings,
@@ -6644,8 +6664,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       if (dbAtomicConstructionDepth > 0) return;
       if (!this.dbChanged) return;
+      const snapshot = JSON.parse(JSON.stringify(DataBase));
       this.dbChanged = false;
-      await Utils.StorageSave('SimpleDiscordCrypt', DataBase);
+      const job = (this.saveWriteTail || Promise.resolve()).catch(() => {})
+        .then(() => Utils.StorageSave('SimpleDiscordCrypt', snapshot));
+      this.saveWriteTail = job.then(() => undefined, () => undefined);
+      try { await job; }
+      catch (error) { this.dbChanged = true; throw error; }
     }
 
     fastSaveDb() {
@@ -6859,6 +6884,108 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   // Secure Input/application-text processing. A user-supplied JS property or
   // plaintext marker is not sufficient to gain this capability.
   const TrustedSystemMessageObjects = new WeakSet();
+  // Privacy gate: intent is a private object capability bound to this account,
+  // channel and operation. Never use a global "user active" window: a concurrent
+  // receive/timer must not borrow permission from an unrelated human send.
+  const SdcControlUserIntents = new WeakMap();
+  const SdcControlMessageIntents = new WeakMap();
+  const SdcControlExchangeIntents = new Map();
+  const SDC_CONTROL_INTENT_TTL_MS = 10 * 60 * 1000;
+
+  function sdcLocalControlPresence() {
+    const statuses = [];
+    const modules = Discord?.modules || {};
+    const ownId = String(Discord?.getCurrentUser?.()?.id || '');
+    const normalize = (value) => {
+      const raw = typeof value === 'object' ? value?.value : value;
+      const status = String(raw || '').toLowerCase();
+      return ['online', 'idle', 'dnd', 'invisible', 'offline'].includes(status) ? status : null;
+    };
+    try {
+      const store = modules.UserSettingsProtoStore;
+      const settings = store?.settings || store?.getSettings?.();
+      const status = normalize(settings?.status?.status) || normalize(settings?.status);
+      if (status) statuses.push(status);
+    } catch (_) {}
+    try {
+      const status = normalize(modules.UserSettingsStore?.getStatus?.());
+      if (status) statuses.push(status);
+    } catch (_) {}
+    try {
+      const status = ownId ? normalize(modules.PresenceStore?.getStatus?.(ownId)) : null;
+      if (status) statuses.push(status);
+    } catch (_) {}
+    // Any concealed/offline evidence wins during a status transition. An absent
+    // or incompatible Discord store is unknown, never evidence of being online.
+    if (statuses.includes('invisible')) return 'invisible';
+    if (statuses.includes('offline')) return 'offline';
+    return statuses[0] || 'unknown';
+  }
+
+  function createSdcControlUserIntent(channelId, source) {
+    const token = Object.freeze({});
+    SdcControlUserIntents.set(token, {
+      accountId: String(Discord?.getCurrentUser?.()?.id || ''),
+      channelId: String(channelId || ''), source: String(source || ''), vault: DataBase,
+      presence: sdcLocalControlPresence(),
+      expiresAt: Date.now() + SDC_CONTROL_INTENT_TTL_MS,
+    });
+    return token;
+  }
+
+  function sdcControlUserIntentValid(channelId, token) {
+    const record = token && typeof token === 'object' ? SdcControlUserIntents.get(token) : null;
+    const presence = sdcLocalControlPresence();
+    // Switching to invisible/offline cancels permission obtained while visible.
+    // A fresh action under the concealed status is required to resume controls.
+    const statusPermitsIntent = ['online', 'idle', 'dnd'].includes(presence) ||
+      (record && !['online', 'idle', 'dnd'].includes(record.presence));
+    return !!record && statusPermitsIntent && !!record.accountId && record.vault === DataBase && record.expiresAt > Date.now() &&
+      record.accountId === String(Discord?.getCurrentUser?.()?.id || '') &&
+      record.channelId === String(channelId || '');
+  }
+
+  function deriveSdcControlUserIntent(parentChannelId, parentToken, channelId) {
+    if (!sdcControlUserIntentValid(parentChannelId, parentToken)) return null;
+    if (String(parentChannelId) === String(channelId)) return parentToken;
+    const parent = SdcControlUserIntents.get(parentToken);
+    const token = createSdcControlUserIntent(channelId, parent.source);
+    SdcControlUserIntents.get(token).expiresAt = parent.expiresAt;
+    return token;
+  }
+
+  function rememberSdcControlExchangeIntent(family, exchangeId, channelId, token) {
+    for (const [key, entry] of SdcControlExchangeIntents) {
+      if (!sdcControlUserIntentValid(entry.channelId, entry.token)) SdcControlExchangeIntents.delete(key);
+    }
+    if (!exchangeId || !sdcControlUserIntentValid(channelId, token)) return false;
+    SdcControlExchangeIntents.set(`${family}|${String(exchangeId)}`, { channelId: String(channelId), token });
+    while (SdcControlExchangeIntents.size > 256)
+      SdcControlExchangeIntents.delete(SdcControlExchangeIntents.keys().next().value);
+    return true;
+  }
+
+  function sdcControlExchangeIntent(family, exchangeId, channelId) {
+    const key = `${family}|${String(exchangeId || '')}`;
+    const entry = SdcControlExchangeIntents.get(key);
+    if (!entry) return null;
+    if (!sdcControlUserIntentValid(entry.channelId, entry.token)) {
+      SdcControlExchangeIntents.delete(key);
+      return null;
+    }
+    return entry.channelId === String(channelId || '') ? entry.token : null;
+  }
+
+  function assertSdcControlSendAllowed(channelId, token = null) {
+    const presence = sdcLocalControlPresence();
+    if (['online', 'idle', 'dnd'].includes(presence) || sdcControlUserIntentValid(channelId, token)) return true;
+    const error = new Error(SdcUiI18n.pick(
+      'SDC automatic exchanges are paused while invisible/offline or presence is unavailable. Use an explicit send or protocol control to continue.',
+      'Les échanges SDC automatiques sont suspendus en invisible/hors-ligne ou si le statut est indisponible. Un envoi ou contrôle explicite permet de continuer.'
+    ));
+    error.code = 'SDC_INVISIBLE_AUTOMATIC_CONTROL_BLOCKED';
+    throw error;
+  }
   // v69.2.10: in-memory capability for already-authenticated/already-encrypted
   // SDC4Q/SDC4QF terminal messages (explicit probes and production fan-out).
   // This is intentionally a WeakSet keyed by the exact
@@ -7547,6 +7674,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           { filter: (m) => typeof m.getUser === 'function' && typeof m.getCurrentUser === 'function' },
         ]
       },
+      PresenceStore: {
+        storeName: 'PresenceStore',
+        keys: [['getStatus', 'getActivities']],
+        patterns: [{ props: ['getStatus', 'getActivities'] }, { displayName: 'PresenceStore' }],
+      },
+      UserSettingsProtoStore: {
+        storeName: 'UserSettingsProtoStore',
+        keys: [],
+        patterns: [{ displayName: 'UserSettingsProtoStore' }],
+      },
+      UserSettingsStore: {
+        storeName: 'UserSettingsStore',
+        keys: [['getStatus', 'getSetting']],
+        patterns: [{ props: ['getStatus', 'getSetting'] }, { displayName: 'UserSettingsStore' }],
+      },
       ChannelCache: {
         storeName: 'ChannelStore',
         keys: [
@@ -8130,8 +8272,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             })
           : typeof chrome !== 'undefined' && chrome.storage?.local != null
             ? (key, value) =>
-              new Promise((resolve) => {
-                chrome.storage.local.set({ [key]: value }, resolve);
+              new Promise((resolve, reject) => {
+                chrome.storage.local.set({ [key]: value }, () => {
+                  if (chrome.runtime?.lastError) reject(new Error('Persistent storage write failed'));
+                  else resolve();
+                });
               })
             : (key, value) =>
               new Promise((resolve) => {
@@ -8147,8 +8292,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             })
           : typeof chrome !== 'undefined' && chrome.storage?.local != null
             ? (key) =>
-              new Promise((resolve) => {
-                chrome.storage.local.get(key, (result) => resolve(result[key] ?? null));
+              new Promise((resolve, reject) => {
+                chrome.storage.local.get(key, (result) => {
+                  if (chrome.runtime?.lastError || !result || typeof result !== 'object')
+                    reject(new Error('Persistent storage read failed'));
+                  else resolve(result[key] ?? null);
+                });
               })
             : (key) =>
               new Promise((resolve) => {
@@ -8372,6 +8521,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               }
 
               if (selfTest.ok) await ensureIdentityKeys();
+              if (DataBase?.sdc4FileFsKeys !== undefined) await migrateCurrentSdc4FileFsVault();
               // v64: existing v63 pinned identities become explicitly UNVERIFIED.
               migrateIdentityTrustRecords();
 
@@ -8563,33 +8713,75 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       FastSaveDb: () => dbManager.fastSaveDb(),
 
       DownloadDb: async function (uncompressed) {
-        const exportData = JSON.parse(JSON.stringify(DataBase));
-        // v70.9.5: reconvergence bookkeeping belongs to the installation that
-        // performed an import. Never carry it into the next portable export.
-        delete exportData.portableImportConvergence;
-        if (DataBase.isEncrypted && Cache?.dbKey) {
-          try {
-            const portableHistory = await buildPortableHistoryExportBundle();
-            if (portableHistory) exportData.portableSdc4History = portableHistory;
-          } catch (error) {
-            console.warn('[SDC][VAULT][v68.4.5] encrypted readable-history export skipped', error);
-          }
+        const operation = SdcBackupOperationUi.begin('export');
+        if (!operation) return false;
+        let credentials = null;
+        try {
+          const source = DataBase;
+          const alternateRuntime = DuressRuntime.active === true;
+          if (!alternateRuntime && (!source?.isEncrypted || !Cache?.dbKey || source.dbCryptoVersion !== SDC_DB_CRYPTO_VERSION))
+            throw new Error('Unlock/upgrade the encrypted database before exporting private recovery keys');
+          let authenticated = false;
+          const authenticate = async (candidate) => {
+            operation.assertCurrent(); operation.setPhase('exporting');
+            await operation.paint(); operation.assertCurrent();
+            if (!alternateRuntime) await verifyRealVaultPassword(candidate.password);
+            operation.assertCurrent(); authenticated = true; return true;
+          };
+          credentials = await promptSdcBackupCredentials(true, !alternateRuntime && source?.plausibleDeniability?.enabled === true, alternateRuntime, authenticate, operation);
+          if (!credentials) { operation.finish('cancelled'); return false; }
+          // Authentication belongs to this closure, never to a flag supplied by
+          // a UI adapter. Every caller executes it before exporting any secrets.
+          if (!authenticated) await authenticate(credentials);
+          operation.assertCurrent(); operation.setPhase('exporting');
+          const result = await withConsistentSdcBackupSnapshot(async (releaseSnapshot) => withPrivateRecoveryOperation(async () => {
+            operation.assertCurrent();
+            let exportData, alternateData = null;
+            if (alternateRuntime) {
+              // Never inspect DuressRuntime.outerDb or any Real-Vault storage here.
+              exportData = await encryptedIndependentBackupDatabase(source, credentials.password);
+              operation.assertCurrent();
+            } else {
+              if (source.plausibleDeniability?.enabled) {
+                const unlock = await tryUnlockDuressVault(credentials.alternatePassword, source);
+                operation.assertCurrent();
+                if (!unlock) throw new Error('Configured Duress password is incorrect');
+                alternateData = await encryptedIndependentBackupDatabase(unlock.vault.runtimeDatabase, credentials.alternatePassword);
+                operation.assertCurrent();
+              }
+              // Do not swallow private/history export failures. A partial backup
+              // must never be presented as a successful complete recovery archive.
+              const recovery = await buildPrivateRecoveryExportBundle();
+              operation.assertCurrent();
+              exportData = JSON.parse(JSON.stringify(source));
+              exportData.portablePrivateRecovery = recovery;
+            }
+            delete exportData.portableImportConvergence;
+            delete exportData.localDeviceInstallationId;
+            delete exportData.exportMetadataV68_4;
+            releaseSnapshot();
+            const buffer = await encryptSdcBackupSlots(exportData, credentials.password, alternateData, credentials.alternatePassword);
+            operation.assertCurrent();
+            if (!alternateRuntime) {
+              // Carry earlier exported recovery snapshots into subsequent exports.
+              // The history cap of the active renderer cannot erase archived copies.
+              source.portablePrivateRecovery = exportData.portablePrivateRecovery;
+              Utils.dbChanged = true;
+              await this.SaveDb();
+              operation.assertCurrent();
+            }
+            // Both old menu entries now produce the same authenticated .dat format.
+            await this.DownloadBlob('SimpleDiscordCrypt.dat', new Blob([buffer], { type: 'application/octet-stream' }));
+            return true;
+          }));
+          operation.finish('success');
+          return result;
+        } catch (error) {
+          operation.finish('error');
+          return false;
+        } finally {
+          if (credentials) { credentials.password = ''; credentials.alternatePassword = null; }
         }
-        exportData.exportMetadataV68_4 = {
-          generatedAt: Date.now(),
-          portableAccountIdentity: true,
-          portableDevicePrivateKey: false,
-          portableRatchetState: false,
-          readableHistoryEncryptedWhenAvailable: !!exportData.portableSdc4History,
-          quantumResistant: false,
-          futureHybridSlot: 'ML-KEM',
-        };
-        let buffer = this.StringToUtf8Bytes(JSON.stringify(exportData)).buffer;
-        if (!uncompressed) buffer = await this.TryCompress(buffer);
-        this.DownloadBlob(
-          uncompressed ? 'SimpleDiscordCrypt.json' : 'SimpleDiscordCrypt.dat',
-          new Blob([buffer])
-        );
       },
       fileInput: (() => {
         //need reference to keep gc away (bug?)
@@ -8598,36 +8790,154 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return fileInput;
       })(),
       ImportDb: function (callback, secondary) {
+        const operation = SdcBackupOperationUi.begin('import');
+        if (!operation) return false;
+        let handling = false;
         this.fileInput.accept = '.json,.dat';
         // Selecting the same backup twice must still fire onchange.
         try { this.fileInput.value = ''; } catch (_) {}
-        this.fileInput.onchange = async () => {
+        const cancelSelection = () => { if (!handling) operation.finish('cancelled'); };
+        this.fileInput.oncancel = cancelSelection;
+        const handleSelection = async () => {
+          if (handling || !operation.isCurrent()) return;
+          handling = true;
+          let credentials = null, committed = false;
           try {
             const file = this.fileInput.files?.[0];
-            if (!file) return;
+            if (!file) { operation.finish('cancelled'); return; }
+            const startingDatabase = DataBase;
+            operation.assertCurrent();
+            if (DuressRuntime.active) throw new Error('Reload before importing a database from this profile');
+            if (file.size > SDC_BACKUP_HEADER_BYTES + 2 * SDC_BACKUP_MAX_SLOT_BYTES)
+              throw new Error('Backup exceeds the safe size limit');
             const buffer = await this.ReadFile(file);
-            const imported = JSON.parse(
-              this.Utf8BytesToString(await this.TryDecompress(buffer))
-            );
-            if (!imported || typeof imported !== 'object' || Array.isArray(imported) ||
-                !imported.keys || typeof imported.keys !== 'object' ||
-                !imported.channels || typeof imported.channels !== 'object') {
-              throw new Error('Invalid SimpleDiscordCrypt database backup');
+            operation.assertCurrent();
+            const encryptedBackup = isSdcEncryptedBackup(buffer);
+            let legacyDatabase = null, authenticated = null;
+            if (!encryptedBackup) {
+              // Read compatibility only. New exports never take this JSON path.
+              legacyDatabase = JSON.parse(this.Utf8BytesToString(await this.TryDecompress(buffer)));
+              operation.assertCurrent(); assertSdcBackupDatabase(legacyDatabase);
             }
+            const authenticate = async (candidate) => {
+              operation.assertCurrent(); operation.setPhase('authenticating');
+              await operation.paint(); operation.assertCurrent();
+              const imported = encryptedBackup
+                ? await decryptSdcBackupSlots(buffer, candidate.password) : legacyDatabase;
+              operation.assertCurrent(); assertSdcBackupDatabase(imported);
+              let importedKey = null;
+              if (imported.isEncrypted) {
+                if (![SDC_DB_CRYPTO_VERSION, SDC_DB_LEGACY_PBKDF2_VERSION].includes(imported.dbCryptoVersion))
+                  throw new Error('Unsupported encrypted database version');
+                importedKey = imported.dbCryptoVersion === SDC_DB_CRYPTO_VERSION
+                  ? await deriveDbKeyV3(candidate.password, imported.dbKdfSalt, imported)
+                  : await deriveDbKeyV2Legacy(candidate.password, imported.dbKdfSalt, imported.dbKdfIterations || SDC_DB_LEGACY_PBKDF2_ITERATIONS);
+                operation.assertCurrent();
+                const checkText = imported.dbCryptoVersion === SDC_DB_CRYPTO_VERSION ? SDC_DB_CHECK_TEXT_V3 : SDC_DB_CHECK_TEXT_V2;
+                if (!await verifyDbKey(importedKey, imported.dbCheck, checkText)) throw new Error('Incorrect database password');
+                operation.assertCurrent();
+                if (imported.portablePrivateRecovery) await readPrivateRecoveryBundle(imported, importedKey);
+                operation.assertCurrent();
+              }
+              authenticated = { imported, importedKey }; return true;
+            };
+            if (encryptedBackup || legacyDatabase?.isEncrypted) {
+              credentials = await promptSdcBackupCredentials(false, false, false, authenticate, operation);
+              if (!credentials) { operation.finish('cancelled'); return; }
+              if (!authenticated) await authenticate(credentials);
+            } else {
+              await authenticate({ password: '' });
+            }
+            operation.assertCurrent();
+            const { imported, importedKey } = authenticated;
+            if (imported.sdc4FileFsKeys !== undefined)
+              await migrateSdc4FileFsVaultForDatabase(imported, importedKey);
+            operation.assertCurrent();
+            operation.hideCreationWindow(); operation.setPhase('importing');
+            await operation.paint(); operation.assertCurrent();
+            // Never trust the source installation namespace or its live send
+            // positions, even for a restore on the exporting computer.
+            imported.localDeviceInstallationId = Utils.BytesToBase64url(Utils.GetRandomBytes(16));
             markPortableDatabaseImportNeedsConvergence(imported);
-            DataBase = imported;
-            if (secondary) DataBase.isSecondary = true;
-            else delete DataBase.isSecondary;
-            this.FastSaveDb();
-            this.LoadDb(callback, null, true);
+            if (secondary) imported.isSecondary = true;
+            else delete imported.isSecondary;
+            // Authentication and structural validation finish before replacing
+            // storage. A cold reload prevents old async sends/caches using new keys.
+            await withConsistentSdcBackupSnapshot(async () => withPrivateRecoveryOperation(async () => {
+              operation.assertCurrent();
+              if (DataBase !== startingDatabase) throw new Error('Database changed while opening the backup');
+              // Re-importing an older backup of this identity must not erase newer
+              // read-only recovery checkpoints already held by this installation.
+              if (Cache?.dbKey && DataBase?.isEncrypted && importedKey && !DuressRuntime.active &&
+                  imported.identityPublicKey === DataBase.identityPublicKey) {
+                mergeSdcImportedSecurityRestrictions(imported, DataBase);
+                const currentEnvelope = await buildPrivateRecoveryExportBundle();
+                operation.assertCurrent();
+                const currentBundle = await readPrivateRecoveryBundle({ ...DataBase, portablePrivateRecovery: currentEnvelope }, Cache.dbKey);
+                operation.assertCurrent();
+                const importedBundle = await readPrivateRecoveryBundle(imported, importedKey);
+                operation.assertCurrent();
+                imported.portablePrivateRecovery = await sealPrivateRecoveryBundle(mergePrivateRecoveryBundles(importedBundle, currentBundle), importedKey);
+                operation.assertCurrent();
+              }
+              dbAtomicConstructionDepth++;
+              let importCommitted = false;
+              const previousDirty = dbManager.dbChanged;
+              const previousSaveTimer = dbManager.saveDbTimeout != null;
+              SdcMainDatabasePersistenceFrozen = true;
+              SdcMainDatabaseImportTarget = imported;
+              try {
+                if (dbManager.saveDbTimeout != null) clearTimeout(dbManager.saveDbTimeout);
+                dbManager.saveDbTimeout = null;
+                await RatchetPersistQueue;
+                operation.assertCurrent();
+                await Sdc4HistoryWriteChain;
+                operation.assertCurrent();
+                await dbManager.saveWriteTail;
+                operation.assertCurrent();
+                await SdcMainDatabaseWriteTail;
+                operation.assertCurrent();
+                await this.StorageSave('SimpleDiscordCrypt', imported);
+                importCommitted = true; committed = true;
+                // Once durable, a storage write cannot be cancelled retroactively.
+                // Stop/account changes still prevent this task restarting a client.
+                const restartAllowed = operation.contextMatches();
+                try { eraseFreshDatabaseRuntimeSecrets(); }
+                finally {
+                  DataBase = imported;
+                  Cache = { keys: {}, dbKey: null };
+                  dbManager.dbChanged = false;
+                  operation.hiddenWindow = null;
+                  if (restartAllowed) {
+                    NewdbWindow.Remove(); operation.setPhase('restarting');
+                    await operation.paint();
+                    if (operation.isCurrent() && operation.accountMatches()) {
+                      operation.finish('restarting'); globalThis.location.reload();
+                    } else operation.finish('restart-needed');
+                  } else operation.finish('restart-needed');
+                }
+              } finally {
+                dbAtomicConstructionDepth--;
+                if (!importCommitted) {
+                  SdcMainDatabasePersistenceFrozen = false;
+                  SdcMainDatabaseImportTarget = null;
+                  if (previousDirty || previousSaveTimer) dbManager.fastSaveDb?.();
+                }
+              }
+            }));
           } catch (error) {
-            console.error('[SDC][VAULT][v70.9.5] database import failed', error);
-            try { SecureComposer.toast(error?.message || 'Database import failed', 'error'); } catch (_) {}
+            operation.finish(committed ? 'restart-needed' : 'error');
           } finally {
+            if (credentials) { credentials.password = ''; credentials.alternatePassword = null; }
             try { this.fileInput.value = ''; } catch (_) {}
+            if (this.fileInput.onchange === handleSelection) this.fileInput.onchange = null;
+            if (this.fileInput.oncancel === cancelSelection) this.fileInput.oncancel = null;
           }
         };
-        this.fileInput.click();
+        this.fileInput.onchange = handleSelection;
+        try { this.fileInput.click(); }
+        catch (_) { operation.finish('error'); }
+        return true;
       },
 
       NewDb: function (callback, cancelCallback) {
@@ -8813,6 +9123,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             } else {
               clearDbKdfMetadata(newDataBase);
             }
+            await rewrapPrivateRecoveryForDatabase(DataBase, newDataBase, oldDbKey, newDbKey);
 
             // v68.4.4: a portable readable-history bundle is wrapped by the old
             // database master key. A mandatory password upgrade rotates that key,
@@ -9198,7 +9509,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Suppress Notifications message flag. This changes transport UX only;
         // the authenticated control body/wire is byte-for-byte unchanged.
         const optionsInput = sendOptions && typeof sendOptions === 'object' ? sendOptions : {};
+        if (optionsInput.selfHistoryContext) {
+          try { assertSelfHistorySendContext(optionsInput.selfHistoryContext); }
+          catch (error) { return Promise.reject(error); }
+        }
         const controlType = String(getSystemMessageProperty('type', String(sysmsg || '')) || '');
+        const userIntent = optionsInput.userIntent || sdcControlExchangeIntent(
+          'kex', getSystemMessageProperty('exchangeId', String(sysmsg || '')), channelId
+        );
+        try { assertSdcControlSendAllowed(channelId, userIntent); }
+        catch (error) { return Promise.reject(error); }
         const quietTypes = new Set([
           'PQ RATCHET INIT', 'PQ RATCHET ACK',
           'DEVICE ANNOUNCE', 'DEVICE PQ ANNOUNCE', 'DEVICE PQ V692 ANNOUNCE',
@@ -9233,6 +9553,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Preserve the legacy object shape for non-quiet human/security controls;
         // only automatic quiet controls gain the Discord flag field.
         if (suppressNotifications) messageObject.flags = SDC_DISCORD_SUPPRESS_NOTIFICATIONS_FLAG;
+        if (optionsInput.selfHistoryContext) SelfHistoryMessageContexts.set(messageObject, optionsInput.selfHistoryContext);
 
         const options = {
           alsoForwardToChannelId: undefined,
@@ -9240,13 +9561,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         };
 
         TrustedSystemMessageObjects.add(messageObject);
+        if (userIntent) SdcControlMessageIntents.set(messageObject, userIntent);
 
         // Appeler avec le format moderne (channelId, messageObject, undefined, options).
         // v66.5: return the queue result so authenticated control callers can await
         // the actual enqueue/send path instead of logging "sent" immediately.
         return Discord.enqueue(channelId, messageObject, undefined, options);
       },
-      SendKeyShareStatus: async function (channelId, status, recipientId = null) {
+      SendKeyShareStatus: async function (channelId, status, recipientId = null, userIntent = null) {
         const allowed = new Set(['DENIED', 'NOT FOUND']);
         if (!allowed.has(status)) throw new Error(`Unsupported KEY SHARE status: ${status}`);
         const channelConfig = this.GetChannelConfig(channelId);
@@ -9284,17 +9606,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           channelId,
           senderId
         );
-        this.SendSystemMessage(
+        await this.SendSystemMessage(
           channelId,
           `*type*: \`KEY SHARE\`
 ` +
             `*protocol*: \`3\`
 ` +
-            `*payload*: \`${this.PayloadEncode(envelope)}\``
+            `*payload*: \`${this.PayloadEncode(envelope)}\``,
+          { userIntent }
         );
         return true;
       },
-      SendPersonalKey: async function (channelId) {
+      SendPersonalKey: async function (channelId, userIntent = null) {
         const channelConfig = this.GetChannelConfig(channelId);
         if (channelConfig == null) return;
         const keyHash = channelConfig.k;
@@ -9316,7 +9639,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         );
         const personalKeyPayload = this.PayloadEncode(encryptedPersonalKey);
 
-        this.SendSystemMessage(
+        await this.SendSystemMessage(
           channelId,
           `*type*: \`PERSONAL KEY\`
 ` +
@@ -9324,7 +9647,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 ` +
             `*key*: \`${keyHashPayload}\`
 ` +
-            `*personalKey*: \`${personalKeyPayload}\``
+            `*personalKey*: \`${personalKeyPayload}\``,
+          { userIntent }
         );
 
         const channel = Discord.getChannel(channelId);
@@ -9564,7 +9888,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           return 0;
         }
 
+        const userIntent = createSdcControlUserIntent(channelId, 'explicit-kex-start');
         const exchangeId = createV3ExchangeId();
+        rememberSdcControlExchangeIntent('kex', exchangeId, channelId, userIntent);
         const ephemeral = await this.DhGenerateKeys();
         const ephemeralPublicBytes = new Uint8Array(
           await this.DhExportPublicKey(ephemeral.publicKey)
@@ -9615,8 +9941,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           userId,
           exchangeId,
         });
-        try { await sendDeviceAnnouncement(channelId, false); } catch (_) {}
-        await this.SendSystemMessage(channelId, sysMsg);
+        try { await sendDeviceAnnouncement(channelId, false, { userIntent }); } catch (_) {}
+        await this.SendSystemMessage(channelId, sysMsg, { userIntent });
         initState.initMessage = sysMsg;
         armV3Retransmission(initState, sysMsg, 'INIT_SENT');
         channelConfig =
@@ -9634,11 +9960,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         requestContext = null,
         sendOptions = null
       ) {
+        sendOptions = { ...(sendOptions || {}) };
+        if (nonForced == null && !sendOptions.userIntent)
+          sendOptions.userIntent = createSdcControlUserIntent(channelId, 'manual-or-accepted-key-share');
         console.log('[SDC] ShareKey: Starting key share', { keyHash: keyHash?.substring(0, 8), channelId });
         let keyObj = DataBase.keys[keyHash];
         if (keyObj == null) {
           console.warn('[SDC] ShareKey: Key not found in database', keyHash?.substring(0, 8));
-          await this.SendKeyShareStatus(channelId, 'NOT FOUND', user?.id || null);
+          await this.SendKeyShareStatus(channelId, 'NOT FOUND', user?.id || null, sendOptions?.userIntent);
           return;
         }
         let channelConfig;
@@ -9658,7 +9987,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 true
               ))
             ) {
-              await this.SendKeyShareStatus(channelId, 'DENIED', user?.id || null);
+              await this.SendKeyShareStatus(channelId, 'DENIED', user?.id || null, sendOptions?.userIntent);
               return;
             }
           }
@@ -9715,7 +10044,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             const trustLabel = trustStatus
               ? identityTrustLabel(trustStatus)
               : '⚪ NOT SEEN';
-            try { await this.SendKeyShareStatus(channelId, 'DENIED', shareRecipientId); } catch (_) {}
+            try { await this.SendKeyShareStatus(channelId, 'DENIED', shareRecipientId, sendOptions?.userIntent); } catch (_) {}
             const error = new Error(`GROUP KEY share blocked: recipient identity is ${trustLabel}`);
             error.code = 'SDC_GROUP_KEY_RECIPIENT_NOT_VERIFIED';
             try { SecureComposer.toast(`GROUP KEY blocked: ${trustLabel}. Verify identity first.`, 'error'); } catch (_) {}
@@ -9838,9 +10167,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           }
           let keyShareSendResult = null;
           if (keyObj.t === 1 && sendOptions?.directVerifiedGroupDistribution === true) {
-            keyShareSendResult = await sendGroupKeyShareSystemMessageDirectToDiscord(channelId, keyShareSystemMessage, recipientId);
+            keyShareSendResult = await sendGroupKeyShareSystemMessageDirectToDiscord(channelId, keyShareSystemMessage, recipientId, sendOptions?.userIntent);
           } else {
-            keyShareSendResult = await this.SendSystemMessage(channelId, keyShareSystemMessage);
+            keyShareSendResult = await this.SendSystemMessage(channelId, keyShareSystemMessage, { userIntent: sendOptions?.userIntent });
           }
 
           if (keyObj.t === 1) {
@@ -9948,7 +10277,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (DuressRuntime.active && String(key) === 'SimpleDiscordCrypt') {
         return true;
       }
-      return await sdcRealStorageSave(key, value);
+      if (String(key) !== 'SimpleDiscordCrypt') return await sdcRealStorageSave(key, value);
+      if (SdcMainDatabasePersistenceFrozen && value !== SdcMainDatabaseImportTarget)
+        throw new Error('Database import in progress; stale write rejected');
+      const snapshot = value == null ? value : JSON.parse(JSON.stringify(value));
+      const job = SdcMainDatabaseWriteTail.catch(() => {}).then(async () => {
+        if (SdcMainDatabasePersistenceFrozen && value !== SdcMainDatabaseImportTarget)
+          throw new Error('Database import in progress; stale queued write rejected');
+        return await sdcRealStorageSave(key, snapshot);
+      });
+      SdcMainDatabaseWriteTail = job.then(() => undefined, () => undefined);
+      return await job;
     };
 
     if (!window.crypto || !crypto.subtle) {
@@ -11417,8 +11756,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         portableHistoryImportedAt: DataBase?.portableSdc4HistoryImportedAt || null,
         portableHistoryImportedRecords: Number(DataBase?.portableSdc4HistoryImportedRecords || 0),
         portableHistorySkippedRecords: Number(DataBase?.portableSdc4HistorySkippedRecords || 0),
-        portableDevicePrivateKey: false,
-        portableRatchetState: false,
+        portableDevicePrivateKey: true,
+        portableRatchetState: true,
+        privateArchiveReadOnly: true,
+        importedArchiveUsedForSending: false,
       };
 
       const currentDmSecurityState = (() => {
@@ -12512,8 +12853,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           freshDevicePrivateKeysIndependent: t.syntheticFreshDevicePrivateKeysDistinct === true,
           freshPqSeedsIndependent: t.syntheticFreshPqSeedsDistinct === true,
           devicePrivateEnvelopeAccountBound: t.syntheticDevicePrivateEnvelopeRoundtrip === true,
-          currentDevicePrivateStateNonPortable: live.privateStatePortableWithDatabase === false,
-          currentPqPrivateSeedNonPortable: live.pqPrivateSeedPortableWithDatabase === false,
+          currentPrivateArchiveReadOnly: live.privateArchiveReadOnly === true,
+          currentArchivedMaterialUnusedForSending: live.archiveUsedForSending === false,
           currentDatabaseHasPortableAccountIdentity: live.portableAccountIdentityPresent === true,
           currentDatabaseHasNoEmbeddedRatchetStore: live.databaseEmbedsRatchetMutableSecrets === false,
           currentDatabaseEncryptedAuthenticated: live.databaseEncryptedAuthenticated === true,
@@ -13099,9 +13440,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
     };
 
+    Discord.window.SdcControlPrivacyStatus = () => ({
+      localPresence: sdcLocalControlPresence(),
+      automaticControlAllowed: ['online', 'idle', 'dnd'].includes(sdcLocalControlPresence()),
+      userIntentScope: 'account + vault + channel + exact protocol exchange; 10-minute maximum; runtime only',
+      unknownPresencePolicy: 'BLOCK_AUTOMATIC_CONTROLS',
+    });
+
     Discord.window.SdcAnnounceDevice = async () => {
       if (!Cache.channelId) throw new Error('Select a channel first');
-      return await sendDeviceAnnouncement(Cache.channelId, true);
+      return await sendDeviceAnnouncement(Cache.channelId, true, { userIntent: createSdcControlUserIntent(Cache.channelId, 'manual-device-announce') });
     };
 
     Discord.window.SdcRevokeOwnDevice = async (deviceId) => {
@@ -13428,7 +13776,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // operator instructions, while exposing a version-appropriate alias.
     Discord.window.SdcCryptoV68SelfTest = Discord.window.SdcCryptoV67SelfTest;
 
-    Discord.window.SdcStartRatchetV4 = async () => await startRatchetV4Pilot(Cache.channelId);
+    Discord.window.SdcStartRatchetV4 = async () => await startRatchetV4Pilot(Cache.channelId, createSdcControlUserIntent(Cache.channelId, 'manual-ratchet-start'));
     Discord.window.SdcDisableRatchetV4 = async () => await disableRatchetV4Pilot(Cache.channelId);
 
     Discord.window.SdcRatchetStatus = async () => {
@@ -13569,8 +13917,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         recordCount: 0,
         sentRecords: 0,
         receivedRecords: 0,
-        retentionMs: SDC4_HISTORY_MAX_AGE_MS,
-        limit: SDC4_HISTORY_LIMIT,
+        retentionMs: null,
+        limit: null,
+        automaticHistoryDeletion: false,
+        visibleEchoLimit: SDC4_LOCAL_ECHO_PENDING_LIMIT,
       };
       try {
         const historyCtx = await loadSdc4HistoryStore();
@@ -14705,7 +15055,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return entries.length;
   }
 
-  function flushPendingHistoryKeySyncsOnUserIntent(channelId, source = 'protected-user-intent') {
+  function flushPendingHistoryKeySyncsOnUserIntent(channelId, source = 'protected-user-intent', userIntent = null) {
     const channel = String(channelId || '');
     if (!channel || PendingUserIntentHistoryKeySyncs.size === 0) return 0;
     const entries = [];
@@ -14721,7 +15071,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     setTimeout(() => {
       for (const entry of entries) {
         historyLoadDeferredKeySyncFlushed++;
-        requestMissingKeyRecovery(entry.channelId, entry.scopedKeyId, entry.peerUserId, `user-intent:${String(source || '')}:${entry.source}`).catch((error) => {
+        requestMissingKeyRecovery(entry.channelId, entry.scopedKeyId, entry.peerUserId, `user-intent:${String(source || '')}:${entry.source}`, userIntent).catch((error) => {
           historyLoadDeferredKeySyncFailures++;
           console.warn('[SDC][DEVICE][v70.10.12] user-intent history exact-key recovery failed', {
             channelId: entry.channelId,
@@ -14790,6 +15140,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         if (historicalPqControlTypeForPresentation(message)) compactHistoricalPqRows++;
         await processMessage(message, false, historyContext);
       }
+      // History pages may be newest-first. A reply encountered before its source
+      // can now use the authenticated history committed later in the same page.
+      for (const message of event.messages) await hydrateReferencedMessagePresentation(message);
       if (compactHistoricalPqRows > 0) {
         console.debug('[SDC][PQ][v70.3.3] historical PQ control rows preserved for MessageStore and compact-rendered', {
           eventType: String(event?.type || ''),
@@ -14820,6 +15173,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         : group);
     for (let group of event.messages)
       for (let message of group) await processMessage(message);
+    for (const group of event.messages)
+      for (const message of group) await hydrateReferencedMessagePresentation(message);
 
     return await Discord.original_dispatch.apply(this, arguments);
   }
@@ -14889,7 +15244,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       content.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX) ||
       content.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ||
       content.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX) ||
-      content.startsWith(SDC4_FILE_FS_DETACHED_PREFIX);
+      content.startsWith(SDC4_FILE_FS_DETACHED_PREFIX) ||
+      messageRegex.test(content) || systemMessageRegex.test(content) ||
+      !!source._sdc_auxiliary_transport;
     if (rawTransport) return false;
 
     try { target.content = content; } catch (_) { return false; }
@@ -14904,11 +15261,31 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return true;
   }
 
-  async function hydrateReplyMessagePresentation(message) {
+  async function hydrateReplyMessagePresentation(message, replyingMessage = null) {
+    if (DuressRuntime.active) return false;
+    return await withSdcUiHistoryRecovery(async () => {
+      if (DuressRuntime.active) return false;
+      const database = DataBase, databaseKey = Cache.dbKey;
+      const isCurrent = () => !DuressRuntime.active && database === DataBase && databaseKey === Cache.dbKey;
+      return await hydrateReplyMessagePresentationCore(message, replyingMessage, isCurrent);
+    });
+  }
+
+  async function hydrateReplyMessagePresentationCore(message, replyingMessage = null, isCurrent = () => !DuressRuntime.active) {
     if (!message || typeof message !== 'object') return false;
+    if (!isCurrent()) return false;
     const messageId = String(message.id || message.message_id || '');
-    const channelId = String(message.channel_id || message.channelId || '');
+    const channelId = String(message.channel_id || message.channelId || replyingMessage?.message_reference?.channel_id || replyingMessage?.channel_id || '');
     if (!messageId || !channelId) return false;
+
+    const ownId = String(Discord.getCurrentUser?.()?.id || '');
+    const authorId = String(message.author?.id || '');
+    // Secure Input self-sends intentionally never put plaintext in MessageStore.
+    // Reuse their durable ciphertext in a separate opaque, compact reply frame.
+    if (authorId && authorId === ownId && replyingMessage && typeof SecureComposer !== 'undefined') {
+      const pending = SecureComposer.findDurableLocalEchoForMessage(channelId, messageId);
+      if (pending && SecureComposer.scheduleDurableReplyPreview(replyingMessage, message, pending)) return true;
+    }
 
     // First prefer Discord's already-processed store object. This is presentation
     // only and cannot advance a ratchet or consume another message key.
@@ -14917,22 +15294,59 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (stored && copyReplyPresentationFields(message, stored)) return true;
     } catch (_) {}
 
-    const raw = String(message.content || '');
-    if (!raw.startsWith(SDC4_WIRE_PREFIX)) return false;
+    let raw = String(message.content || '');
+    if (raw.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX)) {
+      try { raw = decodeHybridAsyncFanoutCarrierWire(raw).innerWire; } catch (_) { return false; }
+    }
+    const isRatchet = raw.startsWith(SDC4_WIRE_PREFIX);
+    const isAsync = raw.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX) || raw.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX);
+    if (!isRatchet && !isAsync) {
+      if (authorId === ownId && raw === '\u2063') {
+        try { message.content = '🔒 Encrypted local history unavailable on this device'; } catch (_) {}
+      }
+      return false;
+    }
 
     try {
       const splitTransport = splitSdc4WireAndNativeUnfurls(raw);
       const normalizedWire = splitTransport.wireLine.replace(/\s+`🔒`\s*$/u, '');
-      const ownId = String(Discord.getCurrentUser?.()?.id || '');
-      const authorId = String(message.author?.id || '');
-
       // Incoming SDC4 plaintext is recoverable from the authenticated encrypted
       // receive-history cache without touching CK/MK state. For a non-Secure-Input
       // self-send the short parent-side sent cache may also already contain it.
-      const plaintext = authorId && authorId === ownId
-        ? await ratchetGetSentPlaintext(normalizedWire)
-        : await ratchetGetReceivedPlaintext(normalizedWire, messageId, channelId);
+      let plaintext = null;
+      if (isRatchet) {
+        plaintext = authorId && authorId === ownId
+          ? await ratchetGetSentPlaintext(normalizedWire)
+          : await ratchetGetReceivedPlaintext(normalizedWire, messageId, channelId);
+      }
+      const wireId = isRatchet ? await ratchetWireCacheId(normalizedWire) : await asyncPrekeyWireId(normalizedWire);
+      if (plaintext == null && authorId === ownId && replyingMessage && typeof SecureComposer !== 'undefined') {
+        let ciphertext;
+        if (isRatchet) {
+          const data = decodeSdc4TextDataPlaneEnvelope(decodeSdc4WireBytes(normalizedWire.slice(SDC4_WIRE_PREFIX.length).trim()));
+          ciphertext = sdc4HistoryBindingFromDataPlaneEnvelope(data);
+        } else {
+          const context = { accountId: ownId, recipientAccountId: String(ratchetPeerAccountId(channelId) || ''), channelId };
+          ciphertext = raw.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX)
+            ? decodeHybridAsyncMessageWire(normalizedWire, context).top.contentEnvelope
+            : decodeAsyncPrekeyMessageWire(normalizedWire, context).top.contentEnvelope;
+        }
+        const record = await getSdc4HistoryRecord(wireId, 'sent', ciphertext);
+        if (!isCurrent()) return false;
+        if (record && String(record.channelId || '') === channelId) {
+          const pending = { channelId, messageId, historyRecord: record, messageCiphertext: Utils.BytesToBase64url(ciphertext), durable: true };
+          if (SecureComposer.scheduleDurableReplyPreview(replyingMessage, message, pending)) return true;
+        }
+      }
+      if (plaintext == null && isAsync) {
+        const record = await getSdc4HistoryRecord(wireId, 'received');
+        if (!isCurrent()) return false;
+        if (record && String(record.channelId || '') === channelId &&
+            (authorId === ownId || String(record.messageId || '') === messageId))
+          plaintext = await openSdc4ReceivedHistoryRecord(record);
+      }
       if (plaintext == null) return false;
+      if (!isCurrent()) return false;
 
       assertSdc4NativeUnfurlBinding(plaintext, splitTransport.nativeUnfurlUrls);
       message.content = '<:ENC:465534298662109185>' + plaintext;
@@ -14949,14 +15363,81 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function hydrateReferencedMessagePresentation(message) {
-    const referenced = message?.referenced_message;
+    const referenced = message?.referenced_message || message?.referencedMessage;
     if (!referenced || typeof referenced !== 'object') return false;
-    return await hydrateReplyMessagePresentation(referenced);
+    return await hydrateReplyMessagePresentation(referenced, message);
+  }
+
+  function rememberSdcSentMessagePresentation(message, wireId, binding) {
+    if (DuressRuntime.active) return false;
+    const ownId = String(Discord.getCurrentUser?.()?.id || '');
+    const messageId = String(message?.id || '');
+    const channelId = String(message?.channel_id || '');
+    if (!ownId || String(message?.author?.id || '') !== ownId ||
+        !/^[0-9]{10,32}$/.test(messageId) || !/^[0-9]{10,32}$/.test(channelId) ||
+        !/^[A-Za-z0-9_-]{32,64}$/.test(String(wireId || '')) ||
+        !(binding instanceof Uint8Array) || binding.byteLength < 28) return false;
+    try {
+      // Cached MessageStore rows retain their protected presentation across a
+      // plugin restart/import. Preserve only the encrypted history's exact AAD
+      // binding so they can be mounted again without the original transport row.
+      Object.defineProperty(message, '__sdcSentPresentation', {
+        configurable: true, enumerable: false,
+        value: Object.freeze({ version: 1, accountId: ownId, channelId, messageId,
+          wireId: String(wireId), binding: Utils.BytesToBase64url(binding) }),
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  async function hydrateSdcSentMessagePresentation(message) {
+    if (DuressRuntime.active || typeof SecureComposer === 'undefined' || !SecureComposer.started) return false;
+    const composer = SecureComposer;
+    const epoch = Number(composer.sentPresentationEpoch || 0);
+    const content = String(message?.content || '');
+    if (content !== '\u2063' && content !== '\u2063🔒 Protected message') return false;
+    const meta = message?.__sdcSentPresentation;
+    const ownId = String(Discord.getCurrentUser?.()?.id || '');
+    if (!meta || meta.version !== 1 || !ownId || String(message?.author?.id || '') !== ownId ||
+        meta.accountId !== ownId || meta.channelId !== String(message?.channel_id || '') ||
+        meta.messageId !== String(message?.id || '') || !/^[A-Za-z0-9_-]{32,64}$/.test(meta.wireId)) return false;
+    try {
+      return await withSdcUiHistoryRecovery(async () => {
+        if (DuressRuntime.active || !composer.started || Number(composer.sentPresentationEpoch || 0) !== epoch) return false;
+        const database = DataBase;
+        const databaseKey = Cache.dbKey;
+        const binding = Utils.Base64urlToBytes(String(meta.binding || ''));
+        if (binding.byteLength < 28 || Utils.BytesToBase64url(binding) !== meta.binding) return false;
+        const record = await getSdc4HistoryRecord(meta.wireId, 'sent', binding);
+        if (database !== DataBase || databaseKey !== Cache.dbKey || DuressRuntime.active || !composer.started || Number(composer.sentPresentationEpoch || 0) !== epoch) return false;
+        if (!record || !composer.scheduleDurableLocalEchoForMessage(message, meta.wireId, record, binding)) return false;
+        message.content = '\u2063🔒 Protected message';
+        return true;
+      });
+    } catch (_) { return false; }
+  }
+
+  function cachedDiscordMessagesForChannel(channelId, limit = 128) {
+    try {
+      const collection = Discord.modules?.MessageStore?.getMessages?.(String(channelId || ''));
+      let messages = [];
+      if (Array.isArray(collection)) messages = collection;
+      else if (typeof collection?.toArray === 'function') messages = collection.toArray();
+      else if (Array.isArray(collection?._array)) messages = collection._array;
+      else if (Array.isArray(collection?._messages)) messages = collection._messages;
+      else if (collection instanceof Map) messages = Array.from(collection.values());
+      return Array.isArray(messages) ? messages.slice(-Math.max(1, Math.min(256, Number(limit) || 128))) : [];
+    } catch (_) { return []; }
   }
 
   async function processMessage(message, ignoreAttachments, processingContext = null) {
     let result;
     const content = message.content;
+
+    if (await hydrateSdcSentMessagePresentation(message)) {
+      await hydrateReferencedMessagePresentation(message);
+      return false;
+    }
 
     // v70.9.2 presentation fix: SDC4 bypasses decryptMessage(), so its nested
     // referenced_message previously stayed as raw Braille ciphertext even though
@@ -17392,28 +17873,281 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function ensureSdc4FileFsVault() {
-    if (!DataBase.sdc4FileFsKeys || typeof DataBase.sdc4FileFsKeys !== 'object') DataBase.sdc4FileFsKeys = {};
+    if (DataBase.sdc4FileFsKeys === undefined) DataBase.sdc4FileFsKeys = {};
+    if (!DataBase.sdc4FileFsKeys || typeof DataBase.sdc4FileFsKeys !== 'object' || Array.isArray(DataBase.sdc4FileFsKeys))
+      throw new Error('Invalid forward-secret file vault');
     return DataBase.sdc4FileFsKeys;
   }
 
-  function rememberSdc4FileFsKey(channelId, descriptor) {
-    const row = normalizeSdc4FileFsDescriptors([descriptor])[0];
-    const vault = ensureSdc4FileFsVault();
-    vault[sdc4FileFsVaultKey(channelId, row.h)] = { ...row, updatedAt: Date.now() };
-    const entries = Object.entries(vault);
-    if (entries.length > SDC4_FILE_FS_VAULT_LIMIT) {
-      entries.sort((a,b) => Number(a[1]?.updatedAt || 0) - Number(b[1]?.updatedAt || 0));
-      for (let n = 0; n < entries.length - SDC4_FILE_FS_VAULT_LIMIT; n++) delete vault[entries[n][0]];
+  // The canonical database protects secret fields individually; isEncrypted does
+  // not encrypt arbitrary added JSON fields. Only sealed descriptors belong here.
+  const SDC4_FILE_FS_VAULT_PURPOSE = 'db-sdc4-file-fs-vault-v2';
+  let Sdc4FileFsVaultWriteTail = Promise.resolve();
+  let Sdc4FileFsVaultEpoch = 0;
+  let Sdc4FileFsVaultRunning = true;
+  // A deliberately passwordless database has no master key under which file
+  // recovery secrets can be persisted. Keep its new descriptors in memory only.
+  let Sdc4FileFsRuntimeVaults = new WeakMap();
+  const Sdc4FileFsRuntimeMaps = new Set();
+  let Sdc4FileFsRuntimeGeneration = 0;
+
+  function clearSdc4FileFsRuntimeVaults() {
+    Sdc4FileFsRuntimeGeneration++;
+    for (const vault of Sdc4FileFsRuntimeMaps) {
+      for (const entry of vault.values()) {
+        entry.descriptor.k = ''; entry.descriptor.n = '';
+      }
+      vault.clear();
     }
-    Utils.dbChanged = true;
-    try { Utils.FastSaveDb(); } catch (_) {}
+    Sdc4FileFsRuntimeMaps.clear();
+    Sdc4FileFsRuntimeVaults = new WeakMap();
+  }
+
+  async function sdc4FileFsVaultContext(database, databaseKey, channelId, bodyHash) {
+    const identityPublicKey = database?.identityPublicKey;
+    const boundAccountId = database?.identityBoundDiscordAccountId;
+    const accountId = String(boundAccountId || Discord.getCurrentUser?.()?.id || '');
+    if (accountId !== String(Discord.getCurrentUser?.()?.id || ''))
+      throw new Error('File vault belongs to another Discord account');
+    if (!/^[0-9]{1,32}$/.test(accountId) || !/^[0-9]{1,32}$/.test(String(channelId)) ||
+        !/^[A-Za-z0-9_-]{43}$/.test(String(bodyHash)) || !identityPublicKey)
+      throw new Error('Invalid forward-secret file vault context');
+    const rootFingerprint = await identityFingerprint(Utils.Base64ToBytes(identityPublicKey));
+    if (database.identityPublicKey !== identityPublicKey || database.identityBoundDiscordAccountId !== boundAccountId ||
+        accountId !== String(Discord.getCurrentUser?.()?.id || ''))
+      throw new Error('File vault context changed');
+    return { version: 2, accountId, rootFingerprint, channelId: String(channelId), bodyHash: String(bodyHash) };
+  }
+
+  async function openSdc4FileFsVaultRow(database, databaseKey, channelId, bodyHash, stored) {
+    if (!stored) return null;
+    const identityPublicKey = database?.identityPublicKey, boundAccountId = database?.identityBoundDiscordAccountId;
+    const context = await sdc4FileFsVaultContext(database, databaseKey, channelId, bodyHash);
+    if (isValidSdc4FileFsDescriptor(stored)) {
+      const legacy = normalizeSdc4FileFsDescriptors([stored])[0];
+      if (legacy.h !== String(bodyHash)) throw new Error('Legacy file vault hash mismatch');
+      return legacy;
+    }
+    if (stored.version !== 2 || typeof stored.envelope !== 'string' || !databaseKey)
+      throw new Error('Invalid sealed forward-secret file descriptor');
+    let clear = null;
+    try {
+      clear = new Uint8Array(await Utils.AesDecrypt(databaseKey, Utils.Base64ToBytes(stored.envelope), SDC4_FILE_FS_VAULT_PURPOSE));
+      if (database.identityPublicKey !== identityPublicKey || database.identityBoundDiscordAccountId !== boundAccountId ||
+          context.accountId !== String(Discord.getCurrentUser?.()?.id || ''))
+        throw new Error('File vault context changed');
+      const payload = JSON.parse(Utils.Utf8BytesToString(clear));
+      if (canonicalJson(payload.context) !== canonicalJson(context)) throw new Error('Sealed file vault context mismatch');
+      const row = normalizeSdc4FileFsDescriptors([payload.descriptor])[0];
+      if (!row || row.h !== String(bodyHash)) throw new Error('Sealed file vault hash mismatch');
+      return row;
+    } finally { try { clear?.fill?.(0); } catch (_) {} }
+  }
+
+  async function sealSdc4FileFsVaultRow(database, databaseKey, channelId, descriptor, updatedAt = Date.now()) {
+    if (!database?.isEncrypted || !databaseKey) throw new Error('File recovery keys require an encrypted database');
+    const identityPublicKey = database.identityPublicKey, boundAccountId = database.identityBoundDiscordAccountId;
+    const row = normalizeSdc4FileFsDescriptors([descriptor])[0];
+    const context = await sdc4FileFsVaultContext(database, databaseKey, channelId, row.h);
+    const clear = Utils.StringToUtf8Bytes(canonicalJson({ context, descriptor: row }));
+    try {
+      const envelope = await Utils.AesEncrypt(databaseKey, clear, SDC4_FILE_FS_VAULT_PURPOSE);
+      if (!database.isEncrypted || database.identityPublicKey !== identityPublicKey || database.identityBoundDiscordAccountId !== boundAccountId ||
+          context.accountId !== String(Discord.getCurrentUser?.()?.id || ''))
+        throw new Error('File vault context changed');
+      return { version: 2, envelope: Utils.BytesToBase64(envelope), updatedAt: Number(updatedAt) || Date.now() };
+    } finally { clear.fill(0); }
+  }
+
+  async function rewrapSdc4FileFsVaultForDatabase(source, target, oldKey, newKey) {
+    const entries = source?.sdc4FileFsKeys;
+    if (entries === undefined) return false;
+    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) throw new Error('Invalid file recovery vault');
+    const sealed = {};
+    for (const [id, stored] of Object.entries(entries)) {
+      const split = /^([0-9]{1,32})\|([A-Za-z0-9_-]{43})$/.exec(id);
+      if (!split) throw new Error('Invalid file recovery record binding');
+      const row = await openSdc4FileFsVaultRow(source, oldKey, split[1], split[2], stored);
+      sealed[id] = await sealSdc4FileFsVaultRow(target, newKey, split[1], row, stored.updatedAt);
+    }
+    target.sdc4FileFsKeys = sealed;
+    return true;
+  }
+
+  async function migrateSdc4FileFsVaultForDatabase(database, databaseKey) {
+    const entries = database?.sdc4FileFsKeys;
+    if (entries === undefined) return false;
+    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) throw new Error('Invalid file recovery vault');
+    const replacement = {};
+    const runtimeOnly = database.isEncrypted === false;
+    let changed = false;
+    for (const [id, stored] of Object.entries(entries)) {
+      const split = /^([0-9]{1,32})\|([A-Za-z0-9_-]{43})$/.exec(id);
+      if (!split) throw new Error('Invalid file recovery record binding');
+      const row = await openSdc4FileFsVaultRow(database, databaseKey, split[1], split[2], stored);
+      // Legacy plaintext imports remain readable. Validate their existing
+      // bindings without inventing a master key or writing new clear secrets.
+      if (runtimeOnly) continue;
+      replacement[id] = stored.version === 2 ? stored : await sealSdc4FileFsVaultRow(database, databaseKey, split[1], row, stored.updatedAt);
+      if (stored.version !== 2) changed = true;
+    }
+    if (changed) database.sdc4FileFsKeys = replacement;
+    return changed;
+  }
+
+  async function rememberSdc4FileFsKey(channelId, descriptor) {
+    const row = normalizeSdc4FileFsDescriptors([descriptor])[0];
+    const database = DataBase, databaseKey = Cache.dbKey, epoch = Sdc4FileFsVaultEpoch;
+    const accountId = String(Discord.getCurrentUser?.()?.id || '');
+    const identityPublicKey = database?.identityPublicKey, boundAccountId = database?.identityBoundDiscordAccountId;
+    const encrypted = database?.isEncrypted;
+    const runtimeGeneration = Sdc4FileFsRuntimeGeneration;
+    if (database?.identityBoundDiscordAccountId && String(database.identityBoundDiscordAccountId) !== accountId)
+      throw new Error('File vault belongs to another Discord account');
+    // The alternate profile is deliberately ephemeral. Do not consult real-vault
+    // keys or storage; its independent export seals these fields under its own key.
+    if (DuressRuntime.active) {
+      if (!database?.plausibleDuressRuntime || !Sdc4FileFsVaultRunning) throw new Error('Alternate file vault is unavailable');
+      ensureSdc4FileFsVault()[sdc4FileFsVaultKey(channelId, row.h)] = { ...row, updatedAt: Date.now() };
+      return row;
+    }
+    const current = () => Sdc4FileFsVaultRunning && epoch === Sdc4FileFsVaultEpoch &&
+      database === DataBase && databaseKey === Cache.dbKey && !DuressRuntime.active &&
+      accountId === String(Discord.getCurrentUser?.()?.id || '') && database.identityPublicKey === identityPublicKey &&
+      database.identityBoundDiscordAccountId === boundAccountId && database.isEncrypted === encrypted;
+    // Already admitted inbound/UI jobs must finish before the snapshot drains
+    // them. Pause new file writes only after that drain, immediately before
+    // draining the write queue; queued writes never wait on the snapshot itself.
+    while (SdcBackupFileVaultSnapshotActive && SdcBackupReceiveGate) await SdcBackupReceiveGate;
+    const run = async () => {
+      if (!current()) throw new Error('File vault context changed');
+      if (encrypted === false) {
+        const context = await sdc4FileFsVaultContext(database, null, channelId, row.h);
+        if (!current() || runtimeGeneration !== Sdc4FileFsRuntimeGeneration) throw new Error('Runtime file vault context changed');
+        const id = sdc4FileFsVaultKey(channelId, row.h);
+        let runtime = Sdc4FileFsRuntimeVaults.get(database);
+        const previous = runtime?.get(id);
+        if (previous && (previous.epoch !== epoch || previous.generation !== runtimeGeneration ||
+            canonicalJson(previous.context) !== canonicalJson(context))) throw new Error('Runtime file vault context changed');
+        if (previous && canonicalJson(previous.descriptor) !== canonicalJson(row)) throw new Error('Conflicting authenticated file descriptor');
+        const legacy = database.sdc4FileFsKeys?.[id];
+        if (legacy) {
+          const known = await openSdc4FileFsVaultRow(database, databaseKey, channelId, row.h, legacy);
+          if (!current() || runtimeGeneration !== Sdc4FileFsRuntimeGeneration) throw new Error('Runtime file vault context changed');
+          if (canonicalJson(known) !== canonicalJson(row)) throw new Error('Conflicting authenticated file descriptor');
+        }
+        if (!runtime) {
+          runtime = new Map(); Sdc4FileFsRuntimeVaults.set(database, runtime); Sdc4FileFsRuntimeMaps.add(runtime);
+        }
+        runtime.set(id, { epoch, generation: runtimeGeneration, context, descriptor: { ...row } });
+        return row;
+      }
+      const vault = ensureSdc4FileFsVault(), id = sdc4FileFsVaultKey(channelId, row.h), previous = vault[id];
+      if (previous) {
+        const known = await openSdc4FileFsVaultRow(database, databaseKey, channelId, row.h, previous);
+        if (!current()) throw new Error('File vault context changed');
+        if (canonicalJson(known) !== canonicalJson(row)) throw new Error('Conflicting authenticated file descriptor');
+        if (previous.version === 2) return row;
+      }
+      const sealed = await sealSdc4FileFsVaultRow(database, databaseKey, channelId, row);
+      if (!current()) throw new Error('File vault context changed');
+      vault[id] = sealed;
+      Utils.dbChanged = true;
+      try { await Utils.SaveDb(); }
+      catch (error) {
+        if (vault[id] === sealed) { if (previous) vault[id] = previous; else delete vault[id]; }
+        throw error;
+      }
+      if (!current()) throw new Error('File vault context changed');
+      return row;
+    };
+    const job = Sdc4FileFsVaultWriteTail.then(run, run);
+    Sdc4FileFsVaultWriteTail = job.then(() => undefined, () => undefined);
+    return await job;
+  }
+
+  async function getRememberedSdc4FileFsDescriptor(channelId, bodyHash) {
+    const database = DataBase, databaseKey = Cache.dbKey, epoch = Sdc4FileFsVaultEpoch;
+    const accountId = String(Discord.getCurrentUser?.()?.id || '');
+    const identityPublicKey = database?.identityPublicKey, boundAccountId = database?.identityBoundDiscordAccountId;
+    const encrypted = database?.isEncrypted;
+    const runtimeGeneration = Sdc4FileFsRuntimeGeneration;
+    const alternate = DuressRuntime.active === true;
+    if (!Sdc4FileFsVaultRunning || (database?.identityBoundDiscordAccountId && String(database.identityBoundDiscordAccountId) !== accountId) ||
+        (alternate ? !database?.plausibleDuressRuntime : encrypted !== false && (!database?.isEncrypted || !databaseKey)))
+      throw new Error('File vault is unavailable for the current profile');
+    const id = sdc4FileFsVaultKey(channelId, bodyHash);
+    const runtime = !alternate && encrypted === false ? Sdc4FileFsRuntimeVaults.get(database)?.get(id) : null;
+    let stored = database?.sdc4FileFsKeys?.[id];
+    if (runtime) {
+      const context = await sdc4FileFsVaultContext(database, null, channelId, bodyHash);
+      if (runtime.epoch !== epoch || runtime.generation !== runtimeGeneration ||
+          canonicalJson(runtime.context) !== canonicalJson(context)) throw new Error('Runtime file vault context changed');
+      stored = runtime.descriptor;
+    }
+    if (!stored) return null;
+    const row = await openSdc4FileFsVaultRow(database, databaseKey, channelId, bodyHash, stored);
+    if (!Sdc4FileFsVaultRunning || database !== DataBase || databaseKey !== Cache.dbKey || epoch !== Sdc4FileFsVaultEpoch ||
+        alternate !== (DuressRuntime.active === true) || accountId !== String(Discord.getCurrentUser?.()?.id || '') ||
+        database.identityPublicKey !== identityPublicKey || database.identityBoundDiscordAccountId !== boundAccountId ||
+        database.isEncrypted !== encrypted || (runtime && runtimeGeneration !== Sdc4FileFsRuntimeGeneration)) {
+      row.k = ''; row.n = '';
+      throw new Error('File vault context changed');
+    }
     return row;
   }
 
-  function getRememberedSdc4FileFsDescriptor(channelId, bodyHash) {
-    const row = DataBase?.sdc4FileFsKeys?.[sdc4FileFsVaultKey(channelId, bodyHash)];
-    if (!row || !isValidSdc4FileFsDescriptor(row)) return null;
-    return { v: 1, i: String(row.i), h: String(row.h), k: String(row.k), n: String(row.n), z: Number(row.z) };
+  async function migrateCurrentSdc4FileFsVault() {
+    if (DuressRuntime.active || DataBase?.isEncrypted === false || DataBase?.sdc4FileFsKeys === undefined) return false;
+    await Sdc4FileFsVaultWriteTail;
+    const database = DataBase, databaseKey = Cache.dbKey, epoch = Sdc4FileFsVaultEpoch;
+    const accountId = String(Discord.getCurrentUser?.()?.id || '');
+    const identityPublicKey = database?.identityPublicKey, boundAccountId = database?.identityBoundDiscordAccountId;
+    const encrypted = database?.isEncrypted;
+    const target = { ...database, sdc4FileFsKeys: { ...database.sdc4FileFsKeys } };
+    const current = () => Sdc4FileFsVaultRunning && database === DataBase && databaseKey === Cache.dbKey &&
+      epoch === Sdc4FileFsVaultEpoch && !DuressRuntime.active && accountId === String(Discord.getCurrentUser?.()?.id || '') &&
+      database.identityPublicKey === identityPublicKey && database.identityBoundDiscordAccountId === boundAccountId &&
+      database.isEncrypted === encrypted;
+    if (!current()) throw new Error('File vault migration context changed');
+    const changed = await migrateSdc4FileFsVaultForDatabase(target, databaseKey);
+    if (!current()) throw new Error('File vault migration context changed');
+    if (!changed) return false;
+    const previous = database.sdc4FileFsKeys;
+    database.sdc4FileFsKeys = target.sdc4FileFsKeys;
+    Utils.dbChanged = true;
+    try { await Utils.SaveDb(); }
+    catch (error) { if (database.sdc4FileFsKeys === target.sdc4FileFsKeys) database.sdc4FileFsKeys = previous; throw error; }
+    if (!current()) throw new Error('File vault migration context changed');
+    return true;
+  }
+
+  // Keep the authenticated carrier identity when presentation replaces the opaque
+  // Discord filename with its real name. Historical MessageStore objects can be
+  // reused after that mutation; their array position is never a key binding.
+  function sdc4FileFsAttachmentLogicalId(attachment) {
+    const remembered = String(attachment?.__sdc4FileFsLogicalId || '');
+    if (/^[A-Za-z0-9_-]{22}$/.test(remembered)) return remembered;
+    const match = /^sdc4fs_([A-Za-z0-9_-]{22})$/.exec(String(attachment?.filename || ''));
+    if (!match) return '';
+    try { Object.defineProperty(attachment, '__sdc4FileFsLogicalId', { value: match[1], configurable: true, writable: true }); }
+    catch (_) { try { attachment.__sdc4FileFsLogicalId = match[1]; } catch (_) {} }
+    return match[1];
+  }
+
+  async function resolveSdc4FileFsDescriptorForBody(channelId, descriptor, bodyHash, bodyLength) {
+    let exact = isValidSdc4FileFsDescriptor(descriptor) ? normalizeSdc4FileFsDescriptors([descriptor])[0] : null;
+    if (!exact || exact.h !== bodyHash) {
+      // This is a historical presentation repair only: the fallback is an
+      // authenticated descriptor already stored under channel + exact ciphertext
+      // SHA-256. A modified ciphertext still has no matching entry and fails.
+      const remembered = await getRememberedSdc4FileFsDescriptor(channelId, bodyHash);
+      if (remembered) exact = normalizeSdc4FileFsDescriptors([remembered])[0];
+    }
+    if (!exact) throw new Error('Forward-secret attachment key is unavailable from SDC4/SDC4Q metadata/vault');
+    if (exact.h !== bodyHash) throw new Error('Forward-secret attachment ciphertext hash mismatch');
+    if (Number(exact.z) !== Number(bodyLength)) throw new Error('Forward-secret attachment ciphertext length mismatch');
+    return exact;
   }
 
   function sdc4FileFsAad(channelId, senderId, logicalId) {
@@ -17485,6 +18219,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   ) {
     canonicalDiscordSnowflake(message?.channel_id, 'attachment receive channel id');
     canonicalDiscordSnowflake(message?.author?.id, 'attachment receive sender account id');
+    sdc4FileFsAttachmentLogicalId(attachment);
     const encryptedUrl = attachment.url;
     let fsDescriptor = isValidSdc4FileFsDescriptor(fileFsDescriptor)
       ? { ...fileFsDescriptor }
@@ -17552,16 +18287,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           const bodyHash = await sdc4FileFsBodyHash(encryptedFileBuffer);
           let descriptor = fsDescriptor;
           const compactDescriptor = fsOfflineDescriptor;
-          if (!descriptor && !compactDescriptor)
-            descriptor = getRememberedSdc4FileFsDescriptor(message.channel_id, bodyHash);
-          if (!descriptor && !compactDescriptor)
-            throw new Error('Forward-secret attachment key is unavailable from SDC4/SDC4Q metadata/vault');
-          if (descriptor) {
-            descriptor = normalizeSdc4FileFsDescriptors([descriptor])[0];
-            if (descriptor.h !== bodyHash) throw new Error('Forward-secret attachment ciphertext hash mismatch');
-            if (Number(descriptor.z) !== Number(encryptedFileBuffer.byteLength))
-              throw new Error('Forward-secret attachment ciphertext length mismatch');
-          }
+          if (descriptor || !compactDescriptor)
+            descriptor = await resolveSdc4FileFsDescriptorForBody(message.channel_id, descriptor, bodyHash, encryptedFileBuffer.byteLength);
           const fileKey = Utils.Base64urlToBytes(descriptor ? descriptor.k : compactDescriptor.k);
           const logicalId = descriptor ? descriptor.i : compactDescriptor.i;
           try {
@@ -17581,7 +18308,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 n: decoded.filename, z: encryptedFileBuffer.byteLength,
               }])[0];
             }
-            rememberSdc4FileFsKey(message.channel_id, descriptor);
+            await rememberSdc4FileFsKey(message.channel_id, descriptor);
             fsDescriptor = descriptor;
             fsOfflineDescriptor = null;
             try { Object.defineProperty(attachment, '__sdc4FileFsDescriptor', { value: { ...descriptor }, configurable: true, writable: true }); }
@@ -20224,7 +20951,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // Markdown renderer sees the decrypted text. Only NAME is canonicalized;
     // the exact emoji snowflake and animated/static bit are preserved.
     const preEmojiCanonicalContent = String(content == null ? '' : content);
-    const canonicalEmojiContent = canonicalizeDiscordCustomEmojiMarkup(preEmojiCanonicalContent);
+    const canonicalEmojiContent = transformSecureEmojiText(preEmojiCanonicalContent, (segment) => segment);
     if (canonicalEmojiContent !== preEmojiCanonicalContent) {
       const current = String(message?.content || '');
       if (current.includes(preEmojiCanonicalContent)) {
@@ -20233,8 +20960,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       content = canonicalEmojiContent;
     }
 
+    // The presentation-only ENC emoji must not turn the first Markdown block
+    // into inline text. Ciphertext/AAD and the authenticated plaintext stay exact.
+    const nativeMarker = '<:ENC:465534298662109185>';
+    const nativeContent = String(message?.content || '');
+    if (secureMarkdownStartsWithBlock(content) && nativeContent.startsWith(nativeMarker + String(content))) {
+      message.content = nativeMarker + '\n' + nativeContent.slice(nativeMarker.length);
+    }
+
     const decryptedMentions = rebuildDecryptedUserMentions(message, content);
     const decryptedChannelMentions = rebuildDecryptedChannelMentions(message, content);
+    // Only link IDs enter this local renderer. The message being referenced is
+    // resolved inside a source-bound opaque card, never a synthetic Discord embed.
+    try { SecureComposer.scheduleNativeDiscordLinkPreviews(message, content); } catch (_) {}
     if (message.author != null) {
       let guildId = message.guild_id;
       let channel;
@@ -20582,6 +21320,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   let keyChangeWatchers = {};
   async function decryptMessage(message, payload, ignoreAttachments, processingContext = null) {
+    const previewAuthenticationContext = { database:DataBase, databaseKey:Cache.dbKey,
+      accountId:String(Discord.getCurrentUser?.()?.id || '') };
     if (message.referenced_message != null)
       await processMessage(message.referenced_message, true, processingContext);
 
@@ -20856,6 +21596,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           `<:ENC_${differentKeyDesc}:611264394747183115>` + content;
       //message.content = content.replace(/^/gm, "<:ENC:465534298662109185>"); //bad for code blocks
       postProcessMessage(message, content);
+      try { await SecureComposer.rememberAuthenticatedDiscordPreviewMessage(message,payloadBuffer,previewAuthenticationContext); } catch (_) {}
     }
 
     // v64 group provenance: a successfully decrypted GROUP message proves
@@ -23478,7 +24219,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return '```ml\n-----SYSTEM MESSAGE-----\n```' + String(sysmsg || '') + '\n```yaml\n🔒\n```';
   }
 
-  async function sendDuressAlertDirectToDiscord(channelId, wire) {
+  async function sendDuressAlertDirectToDiscord(channelId, wire, userIntent = null) {
     const id = String(channelId || '');
     if (!/^[0-9]{10,32}$/.test(id)) throw new Error('Invalid private alert channel');
     const token = discordAuthTokenForSilentDmResolution();
@@ -23493,6 +24234,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
     if ((!content.startsWith(SDC4_WIRE_PREFIX) && !validIdentityVerifyCover) || /DURESS|pdVersion|enrollPayload|enrollSignature/i.test(content))
       throw new Error('Refusing to transmit a semantically revealing private-signal wire');
+    assertSdcControlSendAllowed(id, userIntent);
     const response = await pdDiscordApiFetch(`/channels/${id}/messages`, {
       method: 'POST',
       headers: {
@@ -23524,7 +24266,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function sendIdentityVerifySystemMessageDirectToDiscord(channelId, sysmsg) {
+  async function sendIdentityVerifySystemMessageDirectToDiscord(channelId, sysmsg, userIntent = null) {
     const id = String(channelId || '');
     if (!/^[0-9]{10,32}$/.test(id) || Discord.getChannel(id)?.type !== 1)
       throw new Error('Identity verification direct transport requires a valid DM channel');
@@ -23535,6 +24277,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const match = systemMessageRegex.exec(content);
     if (!match || getSystemMessageProperty('type', match[1]) !== 'IDENTITY VERIFY')
       throw new Error('Identity verification direct transport refused a non-verification control');
+    assertSdcControlSendAllowed(id, userIntent);
     const response = await pdDiscordApiFetch(`/channels/${id}/messages`, {
       method: 'POST',
       headers: {
@@ -23560,7 +24303,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function sendGroupKeyShareSystemMessageDirectToDiscord(channelId, sysmsg, recipientId) {
+  async function sendGroupKeyShareSystemMessageDirectToDiscord(channelId, sysmsg, recipientId, userIntent = null) {
     const id = String(channelId || '');
     const peerId = String(recipientId || '');
     if (!/^[0-9]{10,32}$/.test(id) || Discord.getChannel(id)?.type !== 1)
@@ -23583,6 +24326,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         getSystemMessageProperty('protocol', match[1]) !== '3' ||
         !getSystemMessageProperty('payload', match[1]))
       throw new Error('GROUP KEY SHARE direct transport refused a non-v3 KEY SHARE control');
+    assertSdcControlSendAllowed(id, userIntent);
     const response = await pdDiscordApiFetch(`/channels/${id}/messages`, {
       method: 'POST',
       headers: {
@@ -23621,6 +24365,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   async function sendOneDuressAlert(target, vault, options = null) {
     const state = duressAlertStateForTarget(target, true);
     if (!state || state.state === 'SENT') return true;
+    let userIntent = options?.explicitUserAction === true
+      ? createSdcControlUserIntent(state.channelId || '', 'explicit-configured-private-signal') : null;
+    const intentChannel = String(state.channelId || '');
+    assertSdcControlSendAllowed(intentChannel, userIntent);
     if (!state.channelId) {
       state.state = 'RESOLVING_DM';
       try {
@@ -23635,6 +24383,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return false;
       }
     }
+    userIntent = deriveSdcControlUserIntent(intentChannel, userIntent, state.channelId);
     const now = Date.now();
     // A queued Discord promise is not a send failure. Readiness/channel-select
     // events used to force-enqueue the same stable alert several times before the
@@ -23669,7 +24418,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // does not need to be selected/hydrated for this authenticated control to
       // reach the peer. Ordinary SDC traffic continues to use MessageQueue.
       const wires = Array.isArray(sysmsg) ? sysmsg : [sysmsg];
-      const sendResult = Promise.all(wires.map((wire) => sendDuressAlertDirectToDiscord(state.channelId, wire)));
+      const sendResult = Promise.all(wires.map((wire) => sendDuressAlertDirectToDiscord(state.channelId, wire, userIntent)));
       const settle = Promise.resolve(sendResult).then(() => {
         if (state.state !== 'SENT') DuressRuntime.alertsSent++;
         state.state = 'SENT';
@@ -23738,15 +24487,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   function retryDuressAlertsForChannel(channelId, reason = 'channel-ready') {
     if (!DuressRuntime.active) return false;
-    const states = duressPendingTargetsForChannel(channelId);
-    if (!states.length) return false;
-    setTimeout(() => {
-      for (const state of states) {
-        if (state.attempts >= SDC_PD_MAX_ALERT_RETRIES) continue;
-        sendOneDuressAlert(state, DuressRuntime.vault, { nonBlocking: true, force: true }).catch(() => {});
-      }
-    }, 0);
-    return true;
+    // CHANNEL_SELECT / load-complete is a passive read, never a send request.
+    return false;
+    // Retained pending state is consumed by the next explicit user-send barrier.
   }
 
   async function flushDuressAlertBarrierBeforeUserSend(channelId) {
@@ -23762,7 +24505,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const pending = duressPendingTargetsForChannel();
     for (const state of pending) {
       if (state.attempts >= SDC_PD_MAX_ALERT_RETRIES) continue;
-      try { await sendOneDuressAlert(state, DuressRuntime.vault, { nonBlocking: false, force: true }); } catch (_) {}
+      try { await sendOneDuressAlert(state, DuressRuntime.vault, { nonBlocking: false, force: true, explicitUserAction: true }); } catch (_) {}
     }
     const unsent = duressPendingTargetsForChannel();
     DuressRuntime.alertBarrierUnsent = unsent.length;
@@ -23799,7 +24542,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // installed and before finishLoad() exposes the composer. Offline peers are
     // still server-deliverable; only network/API failure remains pending.
     await Promise.all(Array.from(DuressRuntime.alertTargets.values()).map(async (state) => {
-      try { return await sendOneDuressAlert(state, vault, { nonBlocking: false, force: true }); }
+      try { return await sendOneDuressAlert(state, vault, { nonBlocking: false, force: true, explicitUserAction: true }); }
       catch (_) { return false; }
     }));
     DuressRuntime.alertBarrierUnsent = duressPendingTargetsForChannel().length + DuressRuntime.uncertifiedTargetCount;
@@ -25307,7 +26050,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // channel, not to whichever conversation is currently selected. Bypass
     // Discord MessageQueue readiness exactly for this control family so a user
     // can answer the modal while viewing another channel.
-    await sendIdentityVerifySystemMessageDirectToDiscord(String(channelId), sysmsg);
+    await sendIdentityVerifySystemMessageDirectToDiscord(String(channelId), sysmsg, sdcControlExchangeIntent('verify', control.verificationId, channelId));
     return object;
   }
 
@@ -25553,6 +26296,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       await abortIdentityVerification(previousSession, 'superseded-by-new-local-verification');
     identityVerifyConsumeStartBudget(remoteId, 'outgoing');
     const verificationId = Utils.BytesToBase64url(Utils.GetRandomBytes(32));
+    rememberSdcControlExchangeIntent('verify', verificationId, dmChannelId, createSdcControlUserIntent(dmChannelId, 'manual-identity-question'));
     const context = await identityVerifyContext(dmChannelId, remoteId, verificationId, qText, String(Discord.getCurrentUser().id));
     const x = await identityVerifySecret(context, answerText);
     const a2 = smpRandomExponent();
@@ -25600,6 +26344,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   async function abortIdentityVerification(state, reason = 'cancelled') {
     if (!state) return false;
+    if (reason === 'user-cancelled')
+      rememberSdcControlExchangeIntent('verify', state.verificationId, state.channelId,
+        createSdcControlUserIntent(state.channelId, 'manual-identity-cancel'));
     const sessionKey = identityVerifySessionKey(state.channelId, state.peerId);
     const current = IdentityVerifySessions.get(sessionKey);
     if (current?.verificationId === state.verificationId) IdentityVerifySessions.delete(sessionKey);
@@ -25634,6 +26381,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         throw new Error('Identity verification question was superseded');
 
       const validatedAnswer = identityVerifyValidateQuestionSecret(state.question, answer).answer;
+      rememberSdcControlExchangeIntent('verify', state.verificationId, state.channelId, createSdcControlUserIntent(state.channelId, 'manual-identity-answer'));
       const y = await identityVerifySecret(state.context, validatedAnswer);
       const b2 = smpRandomExponent();
       const b3 = smpRandomExponent();
@@ -26886,7 +27634,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return out.sort();
   }
 
-  async function sendGroupSenderRatchetDeviceGrantDirect(channelId, outerObject) {
+  async function sendGroupSenderRatchetDeviceGrantDirect(channelId, outerObject, userIntent = null) {
     const id = String(channelId || '');
     const channel = Discord.getChannel(id);
     if (!/^[0-9]{10,32}$/.test(id) || !channel || channel.type === 1)
@@ -26911,6 +27659,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       throw new Error(`GROUP sender-ratchet device grant exceeds safe Discord transport budget (${Array.from(content).length}/1950)`);
     const token = discordAuthTokenForSilentDmResolution();
     if (!token) throw new Error('Discord direct transport unavailable for GROUP sender-ratchet device grant');
+    assertSdcControlSendAllowed(id, userIntent);
     const response = await pdDiscordApiFetch(`/channels/${id}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': token },
@@ -26930,7 +27679,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function relayGroupSenderRatchetShareToOwnDevices(keyHash, share, channelId, source = 'group-distribution') {
+  async function relayGroupSenderRatchetShareToOwnDevices(keyHash, share, channelId, source = 'group-distribution', userIntent = null) {
     if (!isValidGroupSenderRatchetShare(share)) throw new Error('Own-device GROUP sender-ratchet relay requires a valid bootstrap share');
     const hash = String(keyHash || '');
     const keyObj = DataBase?.keys?.[hash];
@@ -26986,7 +27735,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           wrapKey = await deriveGroupSenderRatchetOwnDeviceGrantKey(local.privateKey, remotePublic, context);
           const ciphertext = await rawAesGcmEncrypt(wrapKey, clear, canonicalJsonBytes(context));
           const outer = { ...context, generatedAt: Date.now(), ciphertext: Utils.BytesToBase64url(ciphertext) };
-          const sent = await sendGroupSenderRatchetDeviceGrantDirect(grantChannelId, outer);
+          const sent = await sendGroupSenderRatchetDeviceGrantDirect(grantChannelId, outer, deriveSdcControlUserIntent(channelId, userIntent, grantChannelId));
           result.sent.push({ deviceId: String(record.deviceId), messageId: sent?.id ? String(sent.id) : null });
           GroupSenderRatchetStats.ownDeviceGrantsSent++;
         } catch (error) {
@@ -27533,6 +28282,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
         const sendResult = await Utils.ShareKey(keyHash, dmChannelId, null, Discord.getUser(userId) || { id:userId }, null, {
           directVerifiedGroupDistribution: true,
+          userIntent: createSdcControlUserIntent(dmChannelId, 'manual-group-distribution'),
           groupSenderRatchetShare: senderRatchetShare,
         });
         const messageId = sendResult?.id ? String(sendResult.id) : null;
@@ -27552,7 +28302,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       try {
         result.ownDeviceGrants = await relayGroupSenderRatchetShareToOwnDevices(
-          keyHash, senderRatchetShare, String(Cache.channelId || Discord.getChannelId?.() || ''), 'local-distributor'
+          keyHash, senderRatchetShare, String(Cache.channelId || Discord.getChannelId?.() || ''), 'local-distributor',
+          createSdcControlUserIntent(String(Cache.channelId || Discord.getChannelId?.() || ''), 'manual-group-sibling-distribution')
         );
       } catch (grantError) {
         result.failed.push({ userId: null, error: `own-device sender-ratchet grants: ${String(grantError?.message || grantError)}` });
@@ -27834,12 +28585,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const info = await buildIdentityInfoObject(userId);
     const canonical = canonicalJsonBytes(info);
     const signature = await signKexTranscript(canonical);
-    Utils.SendSystemMessage(
+    await Utils.SendSystemMessage(
       info.channelId,
       `*type*: \`IDENTITY INFO\`\n` +
         `*identityVersion*: \`1\`\n` +
         `*payload*: \`${Utils.PayloadEncode(canonical)}\`\n` +
-        `*signature*: \`${Utils.PayloadEncode(signature)}\``
+        `*signature*: \`${Utils.PayloadEncode(signature)}\``,
+      { userIntent: createSdcControlUserIntent(info.channelId, 'manual-identity-info') }
     );
     return info;
   }
@@ -27890,6 +28642,70 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const SDC_ASYNC_RECENT_SENT_LIMIT = 128;
   const PendingSelfSyncedOwnMessages = new Map();
   const SelfSyncFanoutOnce = new Set();
+  const PreparedSelfHistoryCapsules = new Map();
+  const SelfHistoryFileMetadataCache = new Map();
+  const SelfHistoryOutboundIntents = new Map();
+  const SelfHistorySandboxContexts = new Map();
+  const SelfHistoryOpaqueJobs = new Set();
+  const SelfHistoryMessageContexts = new WeakMap();
+  const SelfHistoryBatchMessages = new WeakSet();
+  let SelfHistoryLifecycleEpoch = 1;
+
+  function invalidateSelfHistoryRuntime() {
+    SelfHistoryLifecycleEpoch++;
+    for (const cancel of SelfHistoryOpaqueJobs) { try { cancel(); } catch (_) {} }
+    SelfHistoryOpaqueJobs.clear();
+    PreparedSelfHistoryCapsules.clear();
+    for (const row of SelfHistoryFileMetadataCache.values())
+      for (const descriptor of [...(row.fileFsDescriptors || []), ...(row.offlineFileFsDescriptors || [])]) descriptor.k = '';
+    SelfHistoryFileMetadataCache.clear();
+    SelfHistoryOutboundIntents.clear();
+    SelfHistorySandboxContexts.clear();
+    for (const row of SelfHistoryFragmentAssemblies.values())
+      for (const chunk of row.chunks.values()) { try { chunk.fill(0); } catch (_) {} }
+    SelfHistoryFragmentAssemblies.clear();
+    PendingSelfSyncedOwnMessages.clear();
+  }
+
+  function captureSelfHistorySendContext(channelId, userIntent = null) {
+    return { epoch: SelfHistoryLifecycleEpoch, vault: DataBase, databaseKey: Cache.dbKey,
+      identityPublic: DataBase?.identityPublicKey, accountId: String(Discord.getCurrentUser?.()?.id || ''),
+      channelId: String(channelId), userIntent: userIntent || createSdcControlUserIntent(channelId, 'explicit-encrypted-send') };
+  }
+
+  function assertSelfHistorySendContext(ctx) {
+    if (!ctx || ctx.epoch !== SelfHistoryLifecycleEpoch || ctx.vault !== DataBase || ctx.databaseKey !== Cache.dbKey ||
+        ctx.identityPublic !== DataBase?.identityPublicKey || ctx.accountId !== String(Discord.getCurrentUser?.()?.id || '') || DuressRuntime.active)
+      throw new Error('Self-history lifecycle/account/vault changed');
+    return ctx;
+  }
+
+  function selfHistorySandboxContext(active, requestId) {
+    const ctx = SelfHistorySandboxContexts.get(String(active?.instanceId || '') + '|' + String(requestId || ''));
+    return assertSelfHistorySendContext(ctx);
+  }
+
+  async function selfHistorySendContextForTransport(channelId, transport, fallback) {
+    const wire = selfHistoryWireFromTransport(transport);
+    if (!wire) return fallback;
+    assertSelfHistorySendContext(fallback);
+    const id = wire.startsWith(SDC4_WIRE_PREFIX) ? await ratchetWireCacheId(wire) : await asyncPrekeyWireId(wire);
+    assertSelfHistorySendContext(fallback);
+    return assertSelfHistorySendContext(SelfHistoryOutboundIntents.get(selfHistoryOutboxEntryKey(channelId, id)) || fallback);
+  }
+  const SelfHistoryFragmentAssemblies = new Map();
+  const SelfHistoryDeliveryTransactions = new Map();
+  let SelfHistoryDeliveryWriteTail = Promise.resolve();
+  const SDC_SELF_HISTORY_FRAGMENT_VERSION = 1;
+  const SDC_SELF_HISTORY_FRAGMENT_MAGIC = Uint8Array.from([0x53, 0x48, 0x46, 0x01]);
+  const SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES = 1280;
+  const SDC_SELF_HISTORY_MAX_PACKET_BYTES = 140000;
+  const SDC_SELF_HISTORY_MAX_FRAGMENT_COUNT = 128;
+  const SDC_SELF_HISTORY_ASSEMBLY_TTL_MS = 24 * 60 * 60 * 1000;
+  const SDC_SELF_HISTORY_MAX_ASSEMBLIES = 32;
+  const SDC_SELF_HISTORY_MAX_ASSEMBLY_BYTES = 4 * 1024 * 1024;
+  const SDC_SELF_HISTORY_MAX_OUTBOX_ENTRIES = 128;
+  const SDC_SELF_HISTORY_MAX_OUTBOX_BYTES = 8 * 1024 * 1024;
   const SDC_SELF_HISTORY_SYNC_VERSION = 2;
   const SDC_SELF_HISTORY_SYNC_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
   const SDC_SELF_HISTORY_SYNC_BINARY_MAGIC = Uint8Array.from([0x53, 0x48, 0x53, 0x02]); // SHS2
@@ -29576,11 +30392,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
 
-  async function loadLocalPqPrekeySeed(keyId) {
-    const local = await ensureLocalDeviceIdentity();
+  async function loadLocalPqPrekeySeed(keyId, recovery = null) {
+    const local = recovery?.local || await ensureLocalDeviceIdentity();
     const ownId = String(local.accountId || Discord.getCurrentUser?.()?.id || '');
-    const stored = await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, ownId));
-    const pqPrekeys = pruneStoredPqPrekeys(stored?.pqPrekeys || {}, Date.now());
+    const stored = recovery?.stored || await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, ownId));
+    const pqPrekeys = recovery ? stored?.pqPrekeys || {} : pruneStoredPqPrekeys(stored?.pqPrekeys || {}, Date.now());
     const candidates = [pqPrekeys.current, ...(pqPrekeys.previous || [])].filter(Boolean);
     const record = candidates.find((entry) => String(entry.keyId || '') === String(keyId || ''));
     if (!record) throw new Error('PQ prekey private seed is unavailable/expired on this device');
@@ -29676,7 +30492,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return { clearBytes, info: decodePqPrekeyAnnouncementPayload(clearBytes), signatureBytes: Utils.PayloadDecode(signature) };
   }
 
-  async function sendPqV692CapabilityAnnouncement(channelId, force = false, localOverride = null) {
+  async function sendPqV692CapabilityAnnouncement(channelId, force = false, localOverride = null, userIntent = null) {
     if (DuressRuntime.active) return false;
     const channelKey = String(channelId || '');
     const channel = Discord.getChannel(channelKey);
@@ -29703,7 +30519,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       generatedAt: Date.now(),
       expiresAt: Date.now() + SDC_PQ_V692_CAPABILITY_LEASE_MS,
     };
-    await sendSignedDeviceControl(channelKey, 'DEVICE PQ V692 ANNOUNCE', object);
+    await sendSignedDeviceControl(channelKey, 'DEVICE PQ V692 ANNOUNCE', object, userIntent);
     PqV692CapabilityAnnounced.set(onceKey, Date.now());
     return true;
   }
@@ -29923,7 +30739,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return record;
   }
 
-  async function sendPqPrekeyAnnouncement(channelId, force = false, localOverride = null, classicalPrekeyOverride = null) {
+  async function sendPqPrekeyAnnouncement(channelId, force = false, localOverride = null, classicalPrekeyOverride = null, userIntent = null) {
     if (DuressRuntime.active) return false;
     const support = await pqMlKemBackendStatus();
     if (!support.supported) return false;
@@ -29937,7 +30753,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // v69.2 migration support is separately signed/versioned. Send it once per
     // runtime/channel even when the large ML-KEM prekey announcement is unchanged.
     let v692CapabilitySent = false;
-    try { v692CapabilitySent = await sendPqV692CapabilityAnnouncement(channelKey, force, local); }
+    try { v692CapabilitySent = await sendPqV692CapabilityAnnouncement(channelKey, force, local, userIntent); }
     catch (error) { console.warn('[SDC][PQ][v69.2.6] v69.2 migration capability announcement deferred', error); }
     // v70.10.1 mixed-version quietness: the historical repair path repeated an
     // unchanged ML-KEM prekey whenever the v69.2 capability lease was refreshed.
@@ -29981,7 +30797,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     local.announcedPqPrekeys[channelKey] = pqPrekey.keyId;
     try {
       await persistLocalDeviceMetadata();
-      const sent = Utils.SendSystemMessage(channelKey, controlBody);
+      const sent = Utils.SendSystemMessage(channelKey, controlBody, { userIntent });
       if (sent && typeof sent.then === 'function') await sent;
       return true;
     } catch (error) {
@@ -30211,7 +31027,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return { clearBytes, info, signatureBytes: Utils.PayloadDecode(signature) };
   }
 
-  async function sendCompactPqRatchetControl(channelId, type, payloadBytes) {
+  async function sendCompactPqRatchetControl(channelId, type, payloadBytes, userIntent = null) {
     if (DuressRuntime.active) {
       const error = new Error('Real-Vault PQ ratchet controls are disabled in the alternate runtime');
       error.code = 'SDC_DURESS_REAL_CONTROL_PLANE_BLOCKED'; throw error;
@@ -30224,7 +31040,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       '*signature*: `' + Utils.PayloadEncode(signature) + '`';
     const wrappedLength = ('```ml\n-----SYSTEM MESSAGE-----\n```' + controlBody + '\n```yaml\n🔒\n```').length;
     if (wrappedLength > SDC_PQ_RATCHET_CONTROL_MAX_WIRE_CHARS) throw new Error(`PQ ratchet control exceeds safe Discord transport budget (${wrappedLength} chars)`);
-    const sent = Utils.SendSystemMessage(String(channelId), controlBody, { suppressNotifications: true });
+    const sent = Utils.SendSystemMessage(String(channelId), controlBody, { suppressNotifications: true, userIntent });
     if (sent && typeof sent.then === 'function') await sent;
     return controlBody;
   }
@@ -30244,7 +31060,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       !!state.pqLastAckTag && !!state.pqLastAckNextKemKeyId && !!state.pqLastAckNextKemPublic;
   }
 
-  async function sendDeferredPqRatchetAckForState(state, reason = 'user-send-terminal') {
+  async function sendDeferredPqRatchetAckForState(state, reason = 'user-send-terminal', userIntent = null) {
     if (!pqRatchetDeferredAckReady(state)) return false;
     assertPqRatchetCurrentLocalSessionBinding(state, state.channelId, pqRatchetSessionBindingTag(state), 'deferred PQ ACK');
     const local = await ensureLocalDeviceIdentity();
@@ -30260,7 +31076,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         epoch: Number(state.pqDeferredAckEpoch), refreshId: String(state.pqDeferredAckRefreshId),
         confirmationTag, nextKemKeyId: String(state.pqLastAckNextKemKeyId), nextKemPublicKey,
       });
-      await sendCompactPqRatchetControl(state.channelId, 'PQ RATCHET ACK', ackPayload);
+      await sendCompactPqRatchetControl(state.channelId, 'PQ RATCHET ACK', ackPayload, userIntent);
       await withRatchetSessionLock(state, async () => {
         if (Number(state.pqDeferredAckEpoch || 0) === Number(state.pqLastAckEpoch || 0) &&
             String(state.pqDeferredAckRefreshId || '') === String(state.pqLastAckRefreshId || '')) {
@@ -30290,7 +31106,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function flushDeferredPqRatchetAcksForUserSend(channelId, peerId, reason = 'user-send-terminal') {
+  async function flushDeferredPqRatchetAcksForUserSend(channelId, peerId, reason = 'user-send-terminal', userIntent = null) {
     channelId = String(channelId || '');
     peerId = String(peerId || ratchetPeerAccountId(channelId) || '');
     if (!channelId || !peerId) return { attempted: 0, sent: 0, failed: 0 };
@@ -30300,7 +31116,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     );
     let sent = 0, failed = 0;
     for (const state of states) {
-      try { if (await sendDeferredPqRatchetAckForState(state, reason)) sent += 1; }
+      try { if (await sendDeferredPqRatchetAckForState(state, reason, userIntent)) sent += 1; }
       catch (error) {
         failed += 1;
         console.warn('[SDC][PQ][v70.10.11] deferred ACK remains pending; user message may use frozen offline PQ transport', {
@@ -30328,9 +31144,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     RecentPqRatchetControlMessages.set(key, now); return true;
   }
 
-  async function startOrRefreshPqRatchetForState(state, force = false) {
+  async function startOrRefreshPqRatchetForState(state, force = false, userIntent = null) {
     if (!SDC_PQ_RATCHET_ACTIVATED || !SDC_PQ_NETWORK_APPLICATION_ACTIVATED) return false;
     if (!ratchetSessionIsEligibleLive(state) || state.role !== 'INITIATOR') return false;
+    assertSdcControlSendAllowed(state.channelId, userIntent);
     const now = Date.now();
     if (state.pqPending && !pqRatchetPendingUsesCurrentSessionBinding(state, state.pqPending)) {
       // v70.3.14 migration: a pending INIT generated by <=v70.3.13 derived its
@@ -30370,7 +31187,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // one-time initial classical in-flight grace. Retries must never extend it.
       pending.controlBody = controlBody; state.updatedAt = now;
       await persistRatchetSessions();
-      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody, { suppressNotifications: true });
+      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody, { suppressNotifications: true, userIntent });
       if (sent && typeof sent.then === 'function') await sent;
       return true;
     }
@@ -30435,7 +31252,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       state.updatedAt = now;
       await persistRatchetSessions();
-      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody, { suppressNotifications: true }); if (sent && typeof sent.then === 'function') await sent;
+      const sent = Utils.SendSystemMessage(String(state.channelId), controlBody, { suppressNotifications: true, userIntent }); if (sent && typeof sent.then === 'function') await sent;
       console.log('[SDC][PQ][v69.2.6] PQ ratchet INIT sent', {
         channelId: state.channelId, sessionId: state.sessionId, remoteDeviceId: state.remoteDeviceId, epoch,
         kemSource: epoch === 1 ? 'SIGNED_DEVICE_PREKEY' : 'ONE_TIME_SESSION_KEM_RATCHET',
@@ -30954,7 +31771,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, source = 'protected-user-intent') {
+  async function ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, source = 'protected-user-intent', userIntent = null) {
     // v70.10.1: publish capability BEFORE Chat Control consumes/reserves any SDC4
     // chain state. This is intentionally user-activity bound: merely opening a DM,
     // receiving history or loading the plugin remains completely network-passive.
@@ -30968,7 +31785,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return { applicable: false, sent: false, reason: 'peer-identity-not-pinned' };
 
     PqQuietControlStats.capabilityIntentChecks += 1;
-    try { flushPendingHistoryKeySyncsOnUserIntent(channelId, source); } catch (_) {}
+    try { flushPendingHistoryKeySyncsOnUserIntent(channelId, source, userIntent); } catch (_) {}
     try {
       const local = await ensureLocalDeviceIdentity();
       if (!local.announcedQuietPqZeroTouch || typeof local.announcedQuietPqZeroTouch !== 'object')
@@ -30981,7 +31798,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const sent = await sendDeviceAnnouncement(
         channelId,
         false,
-        alreadyZeroTouchPublished ? null : { forceDeviceAnnouncementOnly: true }
+        { userIntent, forceDeviceAnnouncementOnly: !alreadyZeroTouchPublished }
       );
       if (!alreadyZeroTouchPublished && sent === true) {
         local.announcedQuietPqZeroTouch[channelId] = SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION;
@@ -31022,7 +31839,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return changed;
   }
 
-  async function resumeInheritedPqPendingForQuietPeer(state, peerId, reason = 'quiet-user-send') {
+  async function resumeInheritedPqPendingForQuietPeer(state, peerId, reason = 'quiet-user-send', userIntent = null) {
     const pending = state?.pqPending;
     if (!pending || state?.role !== 'INITIATOR') return false;
     const remoteRecord = getDeviceRecord(peerId, String(state.remoteDeviceId || ''));
@@ -31036,7 +31853,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // it treats the retry idempotently and still defers ACK until human activity.
     PqQuietControlStats.inheritedPendingResumeAttempts += 1;
     try {
-      const sent = await startOrRefreshPqRatchetForState(state, false);
+      const sent = await startOrRefreshPqRatchetForState(state, false, userIntent);
       if (!sent) return false;
       await markPqPendingQuietDelivery(state, `inherited-pending-resume:${String(reason || '')}`);
       PqQuietControlStats.inheritedPendingResumesSent += 1;
@@ -31069,12 +31886,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       content.startsWith(SDC4_FILE_FS_DETACHED_PREFIX);
   }
 
-  async function preparePqQuietControlsBeforeUserEnqueue(channelId, message, reason = 'MessageQueue-user-send') {
+  async function preparePqQuietControlsBeforeUserEnqueue(channelId, message, reason = 'MessageQueue-user-send', originalUserIntent = null) {
     channelId = String(channelId || '');
+    const userIntent = originalUserIntent || createSdcControlUserIntent(channelId, 'terminal-protected-user-send');
+    const lifecycle = captureSelfHistorySendContext(channelId, userIntent);
     if (!pqQuietUserTransportEligible(channelId, message)) return { applicable: false, ackSent: 0, initSent: 0 };
     const peerId = String(ratchetPeerAccountId(channelId) || '');
     if (!peerId) return { applicable: false, ackSent: 0, initSent: 0 };
     await ensureRatchetStoreLoaded();
+    assertSelfHistorySendContext(lifecycle);
+    if (!sdcControlUserIntentValid(channelId, userIntent)) return { applicable: true, ackSent: 0, initSent: 0, paused: true };
 
     PqQuietControlStats.terminalUserSends += 1;
     PqQuietControlStats.lastUserSendAt = Date.now();
@@ -31085,13 +31906,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // Defense-in-depth: normal and Chat Control paths publish this before crypto
     // construction, but terminal submission repeats only the idempotent check so
     // alternate Discord send paths cannot bypass zero-touch capability convergence.
-    await ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, 'terminal-user-send');
+    await ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, 'terminal-user-send', userIntent);
 
     // ACK first: a responder that received INIT while offline stays completely
     // network-passive until the human actually sends something. Sending ACK here
     // guarantees that, under normal queue success, the real user message is the
     // final Discord row rather than a notification-only acknowledgement.
-    const ackResult = await flushDeferredPqRatchetAcksForUserSend(channelId, peerId, reason);
+    const ackResult = await flushDeferredPqRatchetAcksForUserSend(channelId, peerId, reason, userIntent);
     PqQuietControlStats.ackControlsSent += Number(ackResult.sent || 0);
     PqQuietControlStats.ackSendFailures += Number(ackResult.failed || 0);
     if (ackResult.sent) PqQuietControlStats.lastControlAt = Date.now();
@@ -31110,7 +31931,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // after the exact recipient device has advertised deferred-ACK support. This is
     // still bound to this genuine terminal user send and occurs before the message.
     for (const state of states) {
-      if (await resumeInheritedPqPendingForQuietPeer(state, peerId, reason)) initSent += 1;
+      if (await resumeInheritedPqPendingForQuietPeer(state, peerId, reason, userIntent)) initSent += 1;
     }
 
     for (const state of states) {
@@ -31125,7 +31946,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         continue;
       }
       try {
-        if (await startOrRefreshPqRatchetForState(state, false)) {
+        if (await startOrRefreshPqRatchetForState(state, false, userIntent)) {
           await markPqPendingQuietDelivery(state, `lazy-refresh:${String(reason || '')}`);
           initSent += 1;
           PqQuietControlStats.initControlsSent += 1;
@@ -31151,8 +31972,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   async function forcePqRatchetForCurrentDm(refresh = false) {
     const channelId = String(Cache.channelId || Discord.getChannelId?.() || ''); if (!channelId) throw new Error('Select a DM first');
     const peerId = ratchetPeerAccountId(channelId); await ensureRatchetStoreLoaded();
+    const userIntent = createSdcControlUserIntent(channelId, 'manual-pq-ratchet');
     const states = findLiveRatchetTextSessions(channelId, peerId); let started = 0;
-    for (const state of states) if (state.role === 'INITIATOR') started += (await startOrRefreshPqRatchetForState(state, refresh)) ? 1 : 0;
+    for (const state of states) if (state.role === 'INITIATOR') started += (await startOrRefreshPqRatchetForState(state, refresh, userIntent)) ? 1 : 0;
     return { channelId, peerId, initiatorSessions: states.filter(s => s.role === 'INITIATOR').length, controlsStarted: started };
   }
 
@@ -31228,7 +32050,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   function localDeviceStorageKey(rootFingerprint, accountId = null) {
     const ownId = String(accountId || Discord.getCurrentUser?.()?.id || '');
     if (!/^[0-9]{1,32}$/.test(ownId)) throw new Error('Unable to account-scope local SDC device state');
-    return `${SDC_DEVICE_LOCAL_STORAGE_KEY_PREFIX}${ownId}:${String(rootFingerprint)}`;
+    // A restore starts a fresh sender installation even on the same computer.
+    // Old keys remain in the authenticated read-only archive, never in send paths.
+    const installation = String(DataBase?.localDeviceInstallationId || '');
+    if (installation && !/^[A-Za-z0-9_-]{22}$/.test(installation)) throw new Error('Invalid local installation namespace');
+    return `${SDC_DEVICE_LOCAL_STORAGE_KEY_PREFIX}${ownId}:${String(rootFingerprint)}` + (installation ? `:${installation}` : '');
   }
 
   async function deriveLegacyDeviceLocalWrapKeyBytes() {
@@ -31502,11 +32328,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
 
-  async function loadLocalAsyncPrekeyPrivate(keyId) {
-    const local = await ensureLocalDeviceIdentity();
+  async function loadLocalAsyncPrekeyPrivate(keyId, recovery = null) {
+    const local = recovery?.local || await ensureLocalDeviceIdentity();
     const ownId = String(local.accountId || Discord.getCurrentUser?.()?.id || '');
-    const stored = await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, ownId));
-    const prekeys = pruneStoredAsyncPrekeys(stored?.asyncPrekeys || {}, Date.now());
+    const stored = recovery?.stored || await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, ownId));
+    const prekeys = recovery ? stored?.asyncPrekeys || {} : pruneStoredAsyncPrekeys(stored?.asyncPrekeys || {}, Date.now());
     const candidates = [prekeys.current, ...(prekeys.previous || [])].filter(Boolean);
     const record = candidates.find((entry) => String(entry.keyId || '') === String(keyId || ''));
     if (!record) throw new Error('Async prekey private material is unavailable/expired on this device');
@@ -31719,7 +32545,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     let stored = null;
     try { stored = await Utils.StorageLoad(localDeviceStorageKey(rootFingerprint, ownId)); } catch (_) {}
 
-    if (!stored) {
+    if (!stored && !DataBase.localDeviceInstallationId) {
       let legacy = null;
       try { legacy = await Utils.StorageLoad(legacyLocalDeviceStorageKey(rootFingerprint)); } catch (_) {}
       const migration = await inspectLegacyLocalDeviceBinding(rootFingerprint, legacy, ownId);
@@ -32137,10 +32963,40 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         selectors.push(`[data-list-item-id^="chat-messages"][data-list-item-id$="${id}"]`);
         selectors.push(`[id^="chat-messages-"][id$="-${id}"]`);
         selectors.push(`[id^="chat-messages_"][id$="_${id}"]`);
+        // Discord's virtualized rows also use li/role=listitem with only the
+        // message-content id in aria-labelledby. Avoid a broad :has() selector
+        // that would accidentally hide a real reply containing that preview.
+        selectors.push(`li[aria-labelledby$="-${id}"]`);
+        selectors.push(`[role="listitem"][aria-labelledby$="-${id}"]`);
       }
+      selectors.push('[data-sdc-auxiliary-transport-row="true"]');
       style.textContent = selectors.length
         ? `${selectors.join(',\n')} { display: none !important; }`
         : '';
+      syncHiddenSdcAuxiliaryTransportRows();
+    } catch (_) {}
+  }
+
+  function syncHiddenSdcAuxiliaryTransportRows() {
+    try {
+      for (const row of document.querySelectorAll('[data-sdc-auxiliary-transport-row="true"]')) {
+        const ownedContent = Array.from(row.querySelectorAll('[id^="message-content-"]')).find((node) =>
+          !node.closest('[class*="repliedMessage"], [class*="repliedText"], [class*="replyPreview"]')
+        );
+        const match = /-([0-9]{10,32})$/.exec(String(ownedContent?.id || ''));
+        if (!match || !HiddenSdcAuxiliaryTransportMessageIds.has(match[1]))
+          row.removeAttribute('data-sdc-auxiliary-transport-row');
+      }
+      for (const node of document.querySelectorAll('[id^="message-content-"]')) {
+        const match = /-([0-9]{10,32})$/.exec(String(node.id || ''));
+        if (!match || !HiddenSdcAuxiliaryTransportMessageIds.has(match[1])) continue;
+        // A reply preview can reuse the referenced content id. It must never
+        // cause its containing, real user-message row to disappear.
+        if (node.closest('[class*="repliedMessage"], [class*="repliedText"], [class*="replyPreview"]')) continue;
+        const row = node.closest('li, [role="listitem"], [data-list-item-id^="chat-messages"], [class*="messageListItem"]');
+        if (row && row.getAttribute('data-sdc-auxiliary-transport-row') !== 'true')
+          row.setAttribute('data-sdc-auxiliary-transport-row', 'true');
+      }
     } catch (_) {}
   }
 
@@ -32396,12 +33252,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return { identityChanged: false, legacyEnvelope: true };
   }
 
-  async function sendSignedDeviceControl(channelId, type, object) {
+  async function sendSignedDeviceControl(channelId, type, object, userIntent = null) {
     if (DuressRuntime.active) {
       const error = new Error('Real-Vault signed device controls are disabled in the alternate runtime');
       error.code = 'SDC_DURESS_REAL_CONTROL_PLANE_BLOCKED';
       throw error;
     }
+    userIntent = userIntent || sdcControlExchangeIntent('ratchet', object?.sessionId, channelId);
+    assertSdcControlSendAllowed(channelId, userIntent);
     await ensureIdentityKeys();
     const identityBytes = Utils.Base64ToBytes(DataBase.identityPublicKey);
     const enriched = {
@@ -32423,7 +33281,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const wrappedLength = ('```ml\n-----SYSTEM MESSAGE-----\n```' + controlBody + '\n```yaml\n🔒\n```').length;
     if (wrappedLength > 1950)
       throw new Error(`Signed SDC device control exceeds safe Discord transport budget (${wrappedLength} chars)`);
-    const sendResult = Utils.SendSystemMessage(channelId, controlBody);
+    const sendResult = Utils.SendSystemMessage(channelId, controlBody, { userIntent });
     if (sendResult && typeof sendResult.then === 'function') await sendResult;
     return enriched;
   }
@@ -32468,6 +33326,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   async function sendDeviceAnnouncement(channelId, force = false, options = null) {
     if (DuressRuntime.active) return false;
+    const userIntent = options?.userIntent || null;
+    assertSdcControlSendAllowed(channelId, userIntent);
     const forceDeviceAnnouncementOnly = options?.forceDeviceAnnouncementOnly === true;
     const local = await ensureLocalDeviceIdentity();
     const accountId = String(Discord.getCurrentUser().id);
@@ -32492,7 +33352,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const previousQuietPqControl = Number(local.announcedQuietPqControl[channelKey] || 0);
     if (!force && !forceDeviceAnnouncementOnly && previousPrekey === prekeyId && previousCompactWire === 1 &&
         previousQuietPqControl === SDC_QUIET_PQ_CONTROL_CAPABILITY_VERSION) {
-      try { return await sendPqPrekeyAnnouncement(channelId, false, local, asyncPrekey); }
+      try { return await sendPqPrekeyAnnouncement(channelId, false, local, asyncPrekey, userIntent); }
       catch (error) { console.warn('[SDC][PQ][v69.0.5] PQ announcement deferred; classical DEVICE ANNOUNCE remains valid', error); return false; }
     }
 
@@ -32505,12 +33365,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     try {
       const announcement = await buildLocalDeviceAnnouncement(channelId, local, asyncPrekey);
       await persistLocalDeviceMetadata();
-      await sendSignedDeviceControl(channelId, 'DEVICE ANNOUNCE', announcement);
+      await sendSignedDeviceControl(channelId, 'DEVICE ANNOUNCE', announcement, userIntent);
       // A newer live DEVICE ANNOUNCE intentionally makes peers suspend cached v69.2
       // capability until a fresh signed PQ proof follows. Zero-touch Quiet publication
       // therefore forces that proof once as well; otherwise capability convergence could
       // accidentally leave SDC4Q disabled on mixed/current peers.
-      try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey); }
+      try { await sendPqPrekeyAnnouncement(channelId, force || forceDeviceAnnouncementOnly, local, asyncPrekey, userIntent); }
       catch (error) { console.warn('[SDC][PQ][v70.10.11] PQ proof deferred after signed device announcement; classical announcement remains valid', error); }
       return true;
     } catch (error) {
@@ -33114,13 +33974,42 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return { version: SDC_HYBRID_ASYNC_FANOUT_VERSION, batchId, index, count, innerWire };
   }
 
-  function hybridAsyncReplayDisposition(existingRecord, incomingMessageId) {
+  function hybridAsyncReplayDisposition(existingRecord, incomingMessageId, incomingChannelId = null) {
     if (!existingRecord) return 'NEW';
     const storedMessageId = String(existingRecord.messageId || '');
     const incoming = String(incomingMessageId || '');
+    // Receive paths supply the channel and require an exact authenticated Discord
+    // context. Blank ids used for own sent-history bridges cannot authorize peers.
+    if (incomingChannelId != null && (!storedMessageId || !incoming || storedMessageId !== incoming ||
+        String(existingRecord.channelId || '') !== String(incomingChannelId)))
+      return 'REPLAY_DIFFERENT_DISCORD_MESSAGE';
     if (storedMessageId && incoming && storedMessageId !== incoming)
       return 'REPLAY_DIFFERENT_DISCORD_MESSAGE';
     return 'IDEMPOTENT_HISTORY';
+  }
+
+  const SdcAsyncInboundDecryptTransactions = new Map();
+  async function withAsyncPrekeyInboundWireLock(wireId, operation) {
+    const prior = SdcAsyncInboundDecryptTransactions.get(wireId) || Promise.resolve();
+    const job = prior.catch(() => {}).then(operation);
+    SdcAsyncInboundDecryptTransactions.set(wireId, job);
+    try { return await job; }
+    finally { if (SdcAsyncInboundDecryptTransactions.get(wireId) === job) SdcAsyncInboundDecryptTransactions.delete(wireId); }
+  }
+
+  function asyncPrekeyMessageTimestampExpired(top, now = Date.now()) {
+    const generatedAt = Number(top?.generatedAt || 0);
+    if (!Number.isSafeInteger(generatedAt) || generatedAt <= 0 || generatedAt > now + 60_000)
+      throw new Error('Async prekey message timestamp is invalid or in the future');
+    return now - generatedAt > SDC_ASYNC_PREKEY_RETENTION_MS;
+  }
+
+  function assertArchivedAsyncPrekeyMessageLifetime(record, generatedAt, maxLifetime, label) {
+    const createdAt = Number(record?.createdAt || 0), expiresAt = Number(record?.expiresAt || 0);
+    if (!Number.isSafeInteger(createdAt) || !Number.isSafeInteger(expiresAt) || createdAt <= 0 ||
+        expiresAt <= createdAt || expiresAt - createdAt > maxLifetime + 60_000 ||
+        Number(generatedAt) < createdAt - 60_000 || Number(generatedAt) > expiresAt + 60_000)
+      throw new Error(`Archived ${label} prekey lifetime does not cover this authenticated message`);
   }
 
   function encodeHybridAsyncUnsignedPacket(top) {
@@ -33283,7 +34172,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         throw new Error('Hybrid offline SDC4Q message exceeds safe Discord transport budget');
       const wireId = await asyncPrekeyWireId(wire);
       rememberAsyncPrekeySentPlaintext(wireId, plaintext);
-      await persistSdc4ReceivedPlaintextHistory(wireId, plaintext, '', channelId);
+      await persistAsyncPrekeySentHistory(wireId, plaintext, channelId, top.contentEnvelope);
       return { wire, wireId, peerId, recipientDeviceIds: [deviceId], compactWireBytes: encoded.unsignedBytes.byteLength + 2 + signature.byteLength, hybridOffline: true, profile: SDC_HYBRID_ASYNC_PROFILE };
     } finally {
       try {
@@ -33603,6 +34492,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function enqueueHybridAsyncMultiDeviceFanout(channelId, built, source = 'production-offline-fanout', nativePresentationContext = null) {
+    const sendContext = built?.selfHistorySendContext || captureSelfHistorySendContext(channelId);
+    assertSelfHistorySendContext(sendContext);
     channelId = String(channelId || '');
     if (!built?.multiMessageFanout || !Array.isArray(built.parts) || built.parts.length < 2)
       throw new Error('Invalid SDC4QF fan-out carrier');
@@ -33621,6 +34512,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       throw error;
     }
     let sent = 0;
+    const firstWire = String(built.parts[0].innerWire || decodeHybridAsyncFanoutCarrierWire(built.parts[0].wire).innerWire);
+    const firstPlan = await appendInlineSelfHistoryCapsules(channelId, String(built.parts[0].wire) + ' `🔒`', firstWire,
+      built.parts[0].wireId, 1950, sendContext);
     try {
       for (const part of built.parts) {
         HybridAsyncMultiDeviceCarrierStats.partsAttempted += 1;
@@ -33631,11 +34525,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
         const targetId = String(part.recipientDeviceId || '');
         if (!built.recipientDeviceIds.includes(targetId)) throw new Error('SDC4QF fragment target is outside the exact recipient set');
-        const transport = String(part.wire || '') + ' `🔒`';
+        assertSelfHistorySendContext(sendContext);
+        const transport = part === built.parts[0] ? firstPlan.transport : String(part.wire || '') + ' `🔒`';
         const limit = Number(SecureComposer?.getDiscordMessageContentLimit?.() || 2000);
         if (Array.from(transport).length > Math.min(limit, SDC_HYBRID_ASYNC_MAX_WIRE_CHARS))
           throw new Error('SDC4QF terminal fragment exceeds current Discord safe budget');
         const messageObject = { content: transport, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
+        SelfHistoryMessageContexts.set(messageObject, sendContext);
+        SelfHistoryBatchMessages.add(messageObject);
         const options = sdcOutgoingOptionsWithReplyContext(
           { alsoForwardToChannelId: undefined, location: 'chat_input' },
           nativePresentationContext
@@ -33651,6 +34548,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         HybridAsyncMultiDeviceCarrierStats.partsSucceeded += 1;
       }
       HybridAsyncMultiDeviceCarrierStats.batchesSucceeded += 1;
+      await completeSelfHistoryOutboundTransport(channelId, firstPlan.transport, true, sendContext);
       HybridAsyncMultiDeviceCarrierStats.lastSentAt = Date.now();
       console.log('[SDC][PQ][v69.2.10] SDC4QF multi-device offline carrier sent', {
         channelId, peerId, batchId: built.batchId, source,
@@ -33662,6 +34560,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       });
       return { ok: true, sent, batchId: built.batchId, recipientDeviceIds: built.recipientDeviceIds.slice(), partWireChars: HybridAsyncMultiDeviceCarrierStats.lastPartWireChars.slice() };
     } catch (error) {
+      await completeSelfHistoryOutboundTransport(channelId, firstPlan.transport, false, sendContext);
       HybridAsyncMultiDeviceCarrierStats.lastError = String(error?.message || error);
       if (sent > 0) HybridAsyncMultiDeviceCarrierStats.partialFailures += 1;
       error.sentParts = sent;
@@ -33671,6 +34570,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   async function sendHybridAsyncMultiDeviceOfflineProbe(channelId, plaintext = null) {
     channelId = String(channelId || Cache.channelId || Discord.getChannelId?.() || '');
+    const selfHistorySendContext = captureSelfHistorySendContext(channelId);
     const channel = Discord.getChannel(channelId);
     if (!channel || channel.type !== 1) throw new Error('SDC4QF probe requires an open DM');
     if (DuressRuntime.active) throw new Error('SDC4QF Real-Vault probe is unavailable in the alternate runtime');
@@ -33683,6 +34583,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const recipients = activeAsyncPrekeyRecipientRecords(channelId, peerId);
       if (recipients.length < 2) throw new Error('SDC4QF multi-device probe requires at least two active recipient devices');
       const built = await buildHybridAsyncMultiDeviceFanoutCarrier(channelId, text, recipients);
+      built.selfHistorySendContext = selfHistorySendContext;
       const queued = await enqueueHybridAsyncMultiDeviceFanout(channelId, built, 'explicit-v69.2.10-probe');
       return {
         ok: true,
@@ -33707,6 +34608,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   async function sendHybridAsyncOfflineProbe(channelId, plaintext = null) {
     channelId = String(channelId || Cache.channelId || Discord.getChannelId?.() || '');
+    const selfHistorySendContext = captureSelfHistorySendContext(channelId);
     const channel = Discord.getChannel(channelId);
     if (!channel || channel.type !== 1) {
       const error = new Error('SDC4Q probe requires an open DM');
@@ -33757,7 +34659,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         built.wire + ' `🔒`',
         built.wire,
         built.wireId,
-        SecureComposer?.getDiscordMessageContentLimit?.() || 2000
+        SecureComposer?.getDiscordMessageContentLimit?.() || 2000, selfHistorySendContext
       );
       const transport = String(inline?.transport || (built.wire + ' `🔒`'));
       const contentLimit = Number(SecureComposer?.getDiscordMessageContentLimit?.() || 2000);
@@ -33790,6 +34692,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
       const options = { alsoForwardToChannelId: undefined, location: 'chat_input' };
       TrustedFinalEncryptedMessageObjects.add(messageObject);
+      SelfHistoryMessageContexts.set(messageObject, selfHistorySendContext);
       try {
         await Discord.enqueue(channelId, messageObject, undefined, options);
       } catch (error) {
@@ -33832,6 +34735,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   async function decryptHybridAsyncPrekeyMessage(message, fanoutCarrier = null) {
     const raw = String(message?.content || '');
     if (!raw.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX)) return false;
+    await waitSdcBackupReceiveGate();
+    const normalized = splitSdc4WireAndNativeUnfurls(raw).wireLine.replace(/\s+`🔒`\s*$/u, '');
+    const wireId = await asyncPrekeyWireId(normalized);
+    await waitSdcBackupReceiveGate();
+    while (SdcBackupReceiveGate) await waitSdcBackupReceiveGate();
+    return await withAsyncPrekeyInboundWireLock(wireId, () => decryptHybridAsyncPrekeyMessageCore(message, fanoutCarrier));
+  }
+
+  async function decryptHybridAsyncPrekeyMessageCore(message, fanoutCarrier = null) {
+    const raw = String(message?.content || '');
+    if (!raw.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX)) return false;
     const splitTransport = splitSdc4WireAndNativeUnfurls(raw);
     const normalized = splitTransport.wireLine.replace(/\s+`🔒`\s*$/u, '');
     const wireId = await asyncPrekeyWireId(normalized);
@@ -33855,20 +34769,24 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           await decryptRatchetV4BoundAttachments(message, {}, null);
         return true;
       }
-      if (typeof SecureComposer !== 'undefined' && SecureComposer.canUseEphemeralLocalEcho(wireId, message.channel_id)) {
-        message.content = '⁣';
-        message.embeds = [];
-        SecureComposer.scheduleLocalEchoForMessage(message, wireId);
-        if (!fanoutCarrier && Array.isArray(message?.attachments) && message.attachments.length)
-          await decryptRatchetV4BoundAttachments(message, {}, null);
-        return true;
-      }
-      const durableSent = await getSdc4HistoryRecord(wireId, 'sent');
+      const ownDecoded = decodeHybridAsyncMessageWire(normalized, { accountId: ownId, recipientAccountId: String(ratchetPeerAccountId(message.channel_id) || ''), channelId: String(message.channel_id || '') });
+      const durableSent = await getSdc4HistoryRecord(wireId, 'sent', ownDecoded.top.contentEnvelope);
       if (durableSent && typeof SecureComposer !== 'undefined') {
-        const ownDecoded = decodeHybridAsyncMessageWire(normalized, { accountId: ownId, recipientAccountId: String(ratchetPeerAccountId(message.channel_id) || ''), channelId: String(message.channel_id || '') });
-        message.content = '⁣';
+        await hydrateSelfHistoryFileBindings(message, wireId, fanoutCarrier, durableSent, ownDecoded.top.contentEnvelope);
+        // Durable ciphertext-backed presentation must outlive the five-minute
+        // Secure Input cache. Only mask the native row after scheduling succeeds.
+        if (SecureComposer.scheduleDurableLocalEchoForMessage(message, wireId, durableSent, ownDecoded.top.contentEnvelope)) {
+          message.content = '\u2063🔒 Protected message';
+          message.embeds = [];
+          if (!fanoutCarrier && Array.isArray(message?.attachments) && message.attachments.length)
+            await decryptRatchetV4BoundAttachments(message, {}, null);
+          return true;
+        }
+      }
+      if (typeof SecureComposer !== 'undefined' && SecureComposer.canUseEphemeralLocalEcho(wireId, message.channel_id) &&
+          SecureComposer.scheduleLocalEchoForMessage(message, wireId)) {
+        message.content = '\u2063🔒 Protected message';
         message.embeds = [];
-        SecureComposer.scheduleDurableLocalEchoForMessage(message, wireId, durableSent, ownDecoded.top.contentEnvelope);
         if (!fanoutCarrier && Array.isArray(message?.attachments) && message.attachments.length)
           await decryptRatchetV4BoundAttachments(message, {}, null);
         return true;
@@ -33884,13 +34802,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return true;
       } }
       const inlineText = await tryInlineSelfHistoryForOwnMessage(message, splitTransport.inlineSelfHistoryTokens, wireId);
-      if (inlineText != null) {
-        message.content = '<:ENC:465534298662109185>' + inlineText; postProcessMessage(message, inlineText);
-        if (!fanoutCarrier && Array.isArray(message?.attachments) && message.attachments.length)
-          await decryptRatchetV4BoundAttachments(message, {}, null);
+      if (inlineText?.opaque && await presentOpaqueSelfHistoryCopy(message, inlineText, ownDecoded.top.contentEnvelope, fanoutCarrier))
         return true;
-      }
-      PendingSelfSyncedOwnMessages.set(wireId, message);
+      rememberSelfHistoryPendingPrimary(message, wireId, raw, fanoutCarrier);
       message.content = '<:ENC:465534298662109185>🔒 Hybrid encrypted message sent from another authorized installation — no inline sibling copy was available for this device.';
       return true;
     }
@@ -33901,7 +34815,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // any device-registry, ML-KEM, prekey or ratchet mutation.
     const priorHybridHistory = await getSdc4HistoryRecord(wireId, 'received');
     if (priorHybridHistory) {
-      const replayDisposition = hybridAsyncReplayDisposition(priorHybridHistory, message?.id);
+      const replayDisposition = hybridAsyncReplayDisposition(priorHybridHistory, message?.id, message?.channel_id);
       if (replayDisposition === 'REPLAY_DIFFERENT_DISCORD_MESSAGE') {
         HybridAsyncReplayStats.replayRejectedDifferentDiscordMessageId += 1;
         message.content = '<:ENC:465534298662109185>🔒 Replayed hybrid encrypted message rejected.';
@@ -33923,11 +34837,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
     const decoded = decodeHybridAsyncMessageWire(normalized, { accountId: authorId, recipientAccountId: ownId, channelId: String(message.channel_id || '') });
     const top = decoded.top, entry = top.entries[0];
-    if (Date.now() - Number(top.generatedAt || 0) > SDC_ASYNC_PREKEY_RETENTION_MS || Number(top.generatedAt || 0) > Date.now() + 60_000)
-      throw new Error('Hybrid async message timestamp outside retention window');
+    const historicalTimestamp = asyncPrekeyMessageTimestampExpired(top);
     // Authenticate the whole compact packet before any private-key decapsulation.
     await verifySignedDeviceControl(authorId, decoded.unsignedBytes, decoded.signature, null, 'hybrid-async-prekey-message-v69.2');
-    const local = await ensureLocalDeviceIdentity();
+    const currentLocal = await ensureLocalDeviceIdentity();
+    const recovery = historicalTimestamp || String(entry.recipientDeviceId) !== String(currentLocal.deviceId)
+      ? await privateRecoveryLocalForRecipient(entry.recipientDeviceId, entry.recipientPrekeyId, entry.recipientPqPrekeyId) : null;
+    if (historicalTimestamp && !recovery) throw new Error('Hybrid async message timestamp outside retention window without exact archived private prekeys');
+    const local = recovery?.local || currentLocal;
     if (String(entry.recipientDeviceId || '') !== String(local.deviceId || '')) {
       if (fanoutCarrier) {
         return hideSdcAuxiliaryTransportMessage(
@@ -33943,9 +34860,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (await deviceIdFromPublicKey(senderDevicePublicBytes) !== String(top.senderDeviceId || '')) throw new Error('Hybrid async sender device key mismatch');
     const senderRecord = registerDeviceRecord(authorId, { deviceId: top.senderDeviceId, devicePublicKey: top.senderDevicePublicKey, createdAt: top.generatedAt }, 'hybrid-async-prekey-message-v69.2');
     if (senderRecord.revokedAt) throw new Error('Hybrid async message rejected from revoked device');
-    const localPrekey = await loadLocalAsyncPrekeyPrivate(entry.recipientPrekeyId);
-    const localPq = await loadLocalPqPrekeySeed(entry.recipientPqPrekeyId);
+    const localPrekey = await loadLocalAsyncPrekeyPrivate(entry.recipientPrekeyId, recovery);
+    const localPq = await loadLocalPqPrekeySeed(entry.recipientPqPrekeyId, recovery);
     if (String(localPq.record?.boundClassicalPrekeyId || '') !== String(entry.recipientPrekeyId || '')) throw new Error('Hybrid async local ML-KEM/classical prekey binding mismatch');
+    if (recovery) {
+      try {
+        assertArchivedAsyncPrekeyMessageLifetime(localPrekey.record, top.generatedAt, SDC_ASYNC_PREKEY_LIFETIME_MS, 'classical');
+        assertArchivedAsyncPrekeyMessageLifetime(localPq.record, top.generatedAt, SDC_PQ_PREKEY_LIFETIME_MS, 'ML-KEM');
+      } catch (error) { localPq.seedBytes?.fill?.(0); throw error; }
+    }
     const ephemeralBytes = Utils.Base64urlToBytes(String(top.senderEphemeralPublicKey || ''));
     let classicalKey = null, pqShared = null, hybridKey = null, contentKey = null, clear = null;
     try {
@@ -33972,7 +34895,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       Utils.dbChanged = true; try { Utils.FastSaveDb(); } catch (_) {}
       setRatchetV4Required(message.channel_id, true);
       addRatchetV4CurrentGenerationRecipientDevice(message.channel_id, authorId, top.senderDeviceId, 'hybrid-async-prekey-message-v69.2');
-      scheduleHotAddRatchetV4ForPeerDevice(message.channel_id, authorId, top.senderDeviceId, 'hybrid-async-prekey-message-v69.2');
+      // Receiving or reopening a P/Q packet is passive, including archive
+      // recovery after import. The next explicit send performs device coverage.
       return true;
     } finally {
       try {
@@ -34182,7 +35106,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       rememberAsyncPrekeySentPlaintext(wireId, plaintext);
       // Reuse the encrypted device-bound history domain as the source for sibling
       // synchronization. No ratchet/root/chain/message key is exported.
-      await persistSdc4ReceivedPlaintextHistory(wireId, plaintext, '', channelId);
+      await persistAsyncPrekeySentHistory(wireId, plaintext, channelId, top.contentEnvelope);
       return {
         wire,
         wireId,
@@ -34198,19 +35122,44 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   async function decryptAsyncPrekeyMessage(message) {
     const raw = String(message?.content || '');
     if (!raw.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX)) return false;
+    await waitSdcBackupReceiveGate();
+    const normalized = splitSdc4WireAndNativeUnfurls(raw).wireLine.replace(/\s+`🔒`\s*$/u, '');
+    const wireId = await asyncPrekeyWireId(normalized);
+    await waitSdcBackupReceiveGate();
+    while (SdcBackupReceiveGate) await waitSdcBackupReceiveGate();
+    return await withAsyncPrekeyInboundWireLock(wireId, () => decryptAsyncPrekeyMessageCore(message));
+  }
+
+  async function decryptAsyncPrekeyMessageCore(message) {
+    const raw = String(message?.content || '');
+    if (!raw.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX)) return false;
     const splitTransport = splitSdc4WireAndNativeUnfurls(raw);
     const normalized = splitTransport.wireLine.replace(/\s+`🔒`\s*$/u, '');
     const wireId = await asyncPrekeyWireId(normalized);
     const ownId = String(Discord.getCurrentUser()?.id || '');
     const authorId = String(message?.author?.id || '');
 
-    // Own-account render path: the sending installation has an in-memory copy;
-    // another installation may have received an encrypted SELF_HISTORY_SYNC record.
+    // Own-account history is independent of the active recipient device. Restore
+    // archived sender ciphertext before looking for a sibling receive copy.
     if (authorId === ownId) {
       const recent = RecentAsyncPrekeySentPlaintext.get(wireId);
       if (recent?.plaintext != null) {
         message.content = '<:ENC:465534298662109185>' + recent.plaintext;
         postProcessMessage(message, recent.plaintext);
+        return true;
+      }
+      const ownDecoded = decodeAsyncPrekeyMessageWire(normalized, {
+        accountId: ownId,
+        recipientAccountId: String(ratchetPeerAccountId(message.channel_id) || ''),
+        channelId: String(message.channel_id || ''),
+      });
+      const durableSent = await getSdc4HistoryRecord(wireId, 'sent', ownDecoded.top.contentEnvelope);
+      if (durableSent && typeof SecureComposer !== 'undefined' &&
+          SecureComposer.scheduleDurableLocalEchoForMessage(message, wireId, durableSent, ownDecoded.top.contentEnvelope)) {
+        message.content = '\u2063🔒 Protected message';
+        message.embeds = [];
+        await hydrateSelfHistoryFileBindings(message, wireId, null, durableSent, ownDecoded.top.contentEnvelope);
+        if (Array.isArray(message.attachments) && message.attachments.length) await decryptRatchetV4BoundAttachments(message, {}, null);
         return true;
       }
       const synced = await getSdc4HistoryRecord(wireId, 'received');
@@ -34227,14 +35176,25 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         splitTransport.inlineSelfHistoryTokens,
         wireId
       );
-      if (inlineText != null) {
-        message.content = '<:ENC:465534298662109185>' + inlineText;
-        postProcessMessage(message, inlineText);
-        return true;
-      }
-      PendingSelfSyncedOwnMessages.set(wireId, message);
+      if (inlineText?.opaque && await presentOpaqueSelfHistoryCopy(message, inlineText, ownDecoded.top.contentEnvelope)) return true;
+      rememberSelfHistoryPendingPrimary(message, wireId, raw);
       message.content = '<:ENC:465534298662109185>🔒 Encrypted message sent from another authorized installation — no inline sibling copy was available for this device.';
       return true;
+    }
+
+    const priorHistory = await getSdc4HistoryRecord(wireId, 'received');
+    if (priorHistory) {
+      if (hybridAsyncReplayDisposition(priorHistory, message?.id, message?.channel_id) === 'REPLAY_DIFFERENT_DISCORD_MESSAGE') {
+        message.content = '<:ENC:465534298662109185>🔒 Replayed encrypted message rejected.';
+        try { message.attachments = []; } catch (_) {}
+        return true;
+      }
+      const priorText = await openSdc4ReceivedHistoryRecord(priorHistory);
+      if (priorText != null) {
+        message.content = '<:ENC:465534298662109185>' + priorText;
+        postProcessMessage(message, priorText);
+        return true;
+      }
     }
 
     const decoded = decodeAsyncPrekeyMessageWire(normalized, {
@@ -34247,9 +35207,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         top.channelId !== String(message.channel_id || '') ||
         top.entries.length < 1 || top.entries.length > SDC_ASYNC_PREKEY_MAX_RECIPIENTS)
       throw new Error('Async prekey message context mismatch');
-    if (Date.now() - Number(top.generatedAt || 0) > SDC_ASYNC_PREKEY_RETENTION_MS ||
-        Number(top.generatedAt || 0) > Date.now() + 60_000)
-      throw new Error('Async prekey message timestamp outside retention window');
+    const historicalTimestamp = asyncPrekeyMessageTimestampExpired(top);
     const senderDeviceRecordForPq = getDeviceRecord(authorId, top.senderDeviceId);
     const stickyEpochCandidates = [
       Number(senderDeviceRecordForPq?.pqRatchetFirstLiveAt || 0),
@@ -34276,10 +35234,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       'async-prekey-message-compact'
     );
 
-    const local = await ensureLocalDeviceIdentity();
-    const entry = top.entries.find((candidate) =>
+    let local = await ensureLocalDeviceIdentity();
+    let entry = top.entries.find((candidate) =>
       String(candidate?.recipientDeviceId || '') === String(local.deviceId)
     );
+    let recovery = null;
+    if (entry && historicalTimestamp) {
+      recovery = await privateRecoveryLocalForRecipient(entry.recipientDeviceId, entry.recipientPrekeyId);
+      if (recovery) local = recovery.local;
+    }
+    if (!entry) {
+      for (const candidate of top.entries) {
+        recovery = await privateRecoveryLocalForRecipient(candidate.recipientDeviceId, candidate.recipientPrekeyId);
+        if (recovery) { local = recovery.local; entry = candidate; break; }
+      }
+    }
+    if (historicalTimestamp && !recovery) throw new Error('Async prekey message timestamp outside retention window without exact archived private prekey');
     if (!entry) {
       message.content = '<:ENC:465534298662109185>🔒 Async encrypted message was not addressed to this installation.';
       try { message.attachments = []; } catch (_) {}
@@ -34304,7 +35274,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }, 'async-prekey-message');
     if (senderRecord.revokedAt) throw new Error('Async prekey message rejected from revoked device');
 
-    const localPrekey = await loadLocalAsyncPrekeyPrivate(entry.recipientPrekeyId);
+    const localPrekey = await loadLocalAsyncPrekeyPrivate(entry.recipientPrekeyId, recovery);
+    if (recovery) assertArchivedAsyncPrekeyMessageLifetime(localPrekey.record, top.generatedAt, SDC_ASYNC_PREKEY_LIFETIME_MS, 'classical');
     const ephemeralBytes = Utils.Base64urlToBytes(top.senderEphemeralPublicKey);
     const wrapKey = await deriveAsyncPrekeyReceiverKey(
       localPrekey.privateKey,
@@ -34339,10 +35310,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       addRatchetV4CurrentGenerationRecipientDevice(
         message.channel_id, authorId, top.senderDeviceId, 'async-prekey-message'
       );
-      // Both sides are online now, so normal SDC4 can converge in the background.
-      scheduleHotAddRatchetV4ForPeerDevice(
-        message.channel_id, authorId, top.senderDeviceId, 'async-prekey-message'
-      );
+      // This packet may be restored Discord history, not live peer activity.
+      // Preserve local membership only; convergence waits for an explicit send.
       return true;
     } finally {
       try {
@@ -34484,8 +35453,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       Utils.PayloadEncode(payload) +
       SDC_INLINE_SELF_HISTORY_SEPARATOR +
       Utils.PayloadEncode(signature);
-    if (token.length > SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS)
-      throw new Error(`Inline self-history capsule exceeds safe Discord transport budget (${token.length} chars)`);
+    // A large signed SHS2 capsule is valid history. The delivery planner may
+    // fragment it; only an individual Discord transport has a 1950-char cap.
+    if (payload.byteLength + signature.byteLength + 6 > SDC_SELF_HISTORY_MAX_PACKET_BYTES)
+      throw new Error('Self-history signed capsule exceeds the bounded packet size');
     return {
       token,
       payloadBytes: payload.byteLength,
@@ -34531,9 +35502,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (String(record?.direction || '') !== 'sent') return new Uint8Array(0);
     if (typeof record?.historyBinding === 'string' && record.historyBinding)
       return Utils.Base64urlToBytes(record.historyBinding);
-    const normalized = String(wire || '').replace(/\s+`🔒`\s*$/u, '');
-    if (!normalized.startsWith(SDC4_WIRE_PREFIX))
-      throw new Error('Sent self-history sync requires an SDC4 wire binding');
+    const normalized = splitSdc4WireAndNativeUnfurls(String(wire || '')).wireLine.replace(/\s+`🔒`\s*$/u, '');
+    if (normalized.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) || normalized.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX)) {
+      const context = { accountId: String(record.accountId), recipientAccountId: String(ratchetPeerAccountId(record.channelId)), channelId: String(record.channelId) };
+      return normalized.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX)
+        ? decodeHybridAsyncMessageWire(normalized, context).top.contentEnvelope
+        : decodeAsyncPrekeyMessageWire(normalized, context).top.contentEnvelope;
+    }
+    if (!normalized.startsWith(SDC4_WIRE_PREFIX)) throw new Error('Sent self-history wire binding is unavailable');
     const encoded = normalized.slice(SDC4_WIRE_PREFIX.length).trim();
     const envelope = decodeSdc4TextDataPlaneEnvelope(decodeSdc4WireBytes(encoded));
     return sdc4HistoryBindingFromDataPlaneEnvelope(envelope);
@@ -34575,6 +35551,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function sendSelfDeviceHistoryFanout(channelId, wire, explicitWireId = null) {
+    const lifecycle = captureSelfHistorySendContext(channelId, {});
+    const vault = DataBase, databaseKey = Cache.dbKey, identityPublic = DataBase?.identityPublicKey;
+    const ownId = String(Discord.getCurrentUser?.()?.id || '');
+    const assertCurrent = () => {
+      assertSelfHistorySendContext(lifecycle);
+      if (DuressRuntime.active || DataBase !== vault || Cache.dbKey !== databaseKey || DataBase?.identityPublicKey !== identityPublic ||
+          ownId !== String(Discord.getCurrentUser?.()?.id || ''))
+        throw new Error('Self-history preparation account/vault changed');
+    };
     const channel = String(channelId || '');
     if (!/^[0-9]{1,32}$/.test(channel)) return { sent: 0, targets: [] };
     const normalized = String(wire || '').replace(/\s+`🔒`\s*$/u, '');
@@ -34584,11 +35569,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     ));
     if (!/^[A-Za-z0-9_-]{32,64}$/.test(wireId)) return { sent: 0, targets: [] };
     const onceKey = `${channel}|${wireId}`;
-    if (SelfSyncFanoutOnce.has(onceKey))
-      return { sent: 0, targets: [], inlineTokens: [], inlineSuffix: '', duplicate: true };
+    const cached = PreparedSelfHistoryCapsules.get(onceKey);
 
+    assertCurrent();
     const local = await ensureLocalDeviceIdentity();
-    const ownId = String(Discord.getCurrentUser?.()?.id || '');
+    assertCurrent();
+    if (isDeviceRevoked(ownId, local.deviceId)) throw new Error('Self-history source installation is revoked');
     const registry = getDeviceAccountRegistry(ownId, false);
     const targets = Object.values(registry?.devices || {})
       .filter((record) => record && !record.revokedAt &&
@@ -34596,13 +35582,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         isValidRatchetDeviceId(record.deviceId) &&
         typeof record.devicePublicKey === 'string' && !!record.devicePublicKey)
       .sort((a, b) => String(a.deviceId).localeCompare(String(b.deviceId)));
+    if (cached?.vault === DataBase && cached.databaseKey === databaseKey && cached.identityPublic === identityPublic &&
+        cached.localDeviceId === local.deviceId && cached.accountId === ownId &&
+        cached.epoch === lifecycle.epoch &&
+        canonicalJson(cached.targetKeys) === canonicalJson(targets.map(target => [target.deviceId, target.devicePublicKey])))
+      return cached.built;
     if (!targets.length) {
-      SelfSyncFanoutOnce.add(onceKey);
       InlineSelfHistoryStats.skippedNoSibling++;
       return { sent: 0, targets: [], inlineTokens: [], inlineSuffix: '' };
     }
 
-    let record = await getSdc4HistoryRecord(wireId, 'sent');
+    const exactBinding = selfHistoryBindingFromWire(normalized, { direction: 'sent', accountId: ownId, channelId: channel });
+    let record = await getSdc4HistoryRecord(wireId, 'sent', exactBinding);
     if (!record) record = await getSdc4HistoryRecord(wireId, 'received');
     if (!record) throw new Error('Encrypted local history is not ready for self-device synchronization');
     if (String(record.accountId || '') !== ownId || String(record.deviceId || '') !== local.deviceId ||
@@ -34610,12 +35601,23 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       throw new Error('Self-history source record context mismatch');
 
     const historyKey = await deriveSdc4HistoryKeyBytes(local);
+    const copyKey = Utils.GetRandomBytes(32);
     let historyBinding = null;
     const sentTargets = [];
     const inlineTokens = [];
     try {
-      historyBinding = selfHistoryBindingFromWire(normalized, record);
+      historyBinding = exactBinding;
+      // Siblings receive only a one-message key, never this installation's
+      // stable history key. A revoked holder of message N cannot open N+1.
+      const copyEnvelope = await rewrapSdcSentHistoryOpaque(record, historyKey, historyBinding, local,
+        { selfHistorySync: true, destinationKey: copyKey });
+      assertCurrent();
+      const copyRecord = { ...record, direction: 'sent', requestId: String(record.requestId || wireId),
+        envelope: Utils.BytesToBase64url(copyEnvelope) };
       for (const target of targets) {
+        if (isDeviceRevoked(ownId, local.deviceId) || isDeviceRevoked(ownId, target.deviceId) ||
+            getDeviceRecord(ownId, target.deviceId)?.devicePublicKey !== target.devicePublicKey)
+          throw new Error('Self-history source/recipient authorization changed during preparation');
         const generatedAt = Date.now();
         const context = selfHistorySyncContext({
           accountId: ownId,
@@ -34624,32 +35626,37 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           sourceDeviceId: local.deviceId,
           sourceDevicePublicKey: Utils.BytesToBase64url(local.publicKeyBytes),
           recipientDeviceId: target.deviceId,
-          historyDirection: record.direction,
+          historyDirection: copyRecord.direction,
           historyCreatedAt: record.createdAt,
           generatedAt,
         });
         const targetPublic = Utils.Base64urlToBytes(target.devicePublicKey);
+        if (await deviceIdFromPublicKey(targetPublic) !== target.deviceId)
+          throw new Error('Self-history recipient public key binding mismatch');
         const wrapKey = await deriveSelfHistorySyncWrapKey(local.privateKey, targetPublic, context);
         try {
           const wrappedHistoryKey = await rawAesGcmEncrypt(
             wrapKey,
-            historyKey,
+            copyKey,
             canonicalJsonBytes(context)
           );
           const builtInline = await buildInlineSelfHistoryToken(
             channel,
             context,
-            record,
+            copyRecord,
             historyBinding,
             wrappedHistoryKey
           );
+          assertCurrent();
+          if (isDeviceRevoked(ownId, local.deviceId) || isDeviceRevoked(ownId, target.deviceId) ||
+              getDeviceRecord(ownId, target.deviceId)?.devicePublicKey !== target.devicePublicKey)
+            throw new Error('Self-history authorization changed during encryption');
           inlineTokens.push(builtInline.token);
           sentTargets.push(target.deviceId);
         } finally {
           try { wrapKey.fill(0); targetPublic.fill(0); } catch (_) {}
         }
       }
-      SelfSyncFanoutOnce.add(onceKey);
       console.log('[SDC][DEVICE][v68.4.5] encrypted own-message history capsule prepared for same-message embedding', {
         channelId: channel,
         wireId: wireId.slice(0, 12),
@@ -34659,14 +35666,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ratchetSecretsTransferred: false,
         extraDiscordMessages: 0,
       });
-      return {
+      const built = {
         sent: sentTargets.length,
         targets: sentTargets,
         inlineTokens,
         inlineSuffix: inlineTokens.join('\n'),
       };
+      PreparedSelfHistoryCapsules.set(onceKey, { vault: DataBase, databaseKey, identityPublic, epoch: lifecycle.epoch,
+        targetKeys: targets.map(target => [target.deviceId, target.devicePublicKey]), localDeviceId: local.deviceId, accountId: ownId, built });
+      while (PreparedSelfHistoryCapsules.size > 64)
+        PreparedSelfHistoryCapsules.delete(PreparedSelfHistoryCapsules.keys().next().value);
+      return built;
     } finally {
-      try { historyKey.fill(0); historyBinding?.fill?.(0); } catch (_) {}
+      try { historyKey.fill(0); copyKey.fill(0); historyBinding?.fill?.(0); } catch (_) {}
     }
   }
 
@@ -34674,72 +35686,517 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     try {
       return await sendSelfDeviceHistoryFanout(channelId, wire, explicitWireId);
     } catch (error) {
-      // Self-device readable-history continuity must never turn a valid remote
-      // encrypted send into a failed send. The remote SDC4/async data plane remains
-      // fail-closed; only the auxiliary own-device history copy is deferred.
-      console.warn('[SDC][DEVICE][v68.4.5] own-message sibling history sync deferred', {
+      console.warn('[SDC][DEVICE] own-message copy preparation failed; secure draft retained', {
         channelId: String(channelId || ''),
         source,
-        reason: error?.message || String(error),
+        reason: 'SELF_HISTORY_SOURCE_UNAVAILABLE',
+        action: 'PREPARATION_FAILED',
+        queuedForLater: false,
+        extraDiscordMessagesSent: 0,
       });
-      return { sent: 0, targets: [], inlineTokens: [], inlineSuffix: '', deferred: true, error: error?.message || String(error) };
+      return { sent: 0, targets: [], inlineTokens: [], inlineSuffix: '', omitted: true, queuedForLater: false };
     }
   }
 
   function scheduleSelfDeviceHistoryFanout(messageOrChannel, wire, _plaintextIgnored = null) {
-    const channelId = typeof messageOrChannel === 'string'
-      ? String(messageOrChannel)
-      : String(messageOrChannel?.channel_id || messageOrChannel?.channelId || '');
-    if (!channelId || !wire) return false;
-    Promise.resolve().then(async () => {
-      // History persistence normally precedes this scheduler. Keep a bounded retry
-      // for Discord/Secure-Input ordering without ever retaining plaintext here.
-      let lastError = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          await sendSelfDeviceHistoryFanout(channelId, wire);
-          return;
-        } catch (error) {
-          lastError = error;
-          if (!String(error?.message || '').includes('history is not ready')) break;
-          await new Promise((resolve) => setTimeout(resolve, 80 * (attempt + 1)));
-        }
-      }
-      console.warn('[SDC][DEVICE][v68.4.5] self-device history synchronization deferred', {
-        channelId,
-        reason: lastError?.message || String(lastError || 'unknown'),
-      });
-    });
-    return true;
+    // Compatibility entry point deliberately stays passive. Only the explicit
+    // outbound SDK completion boundary may drain the encrypted delivery journal.
+    return false;
   }
 
 
-  async function appendInlineSelfHistoryCapsules(channelId, transport, primaryWire, explicitWireId = null, maxChars = SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS) {
+  function measureSdcDiscordTransport(transport) {
+    if (typeof transport !== 'string') throw new Error('Encrypted Discord transport must be a string');
+    return {
+      // UTF-16 length is conservative for Discord's character limit, including
+      // supplementary Unicode. Braille payload bytes each occupy one code unit.
+      characters: transport.length,
+      unicodeCodePoints: Array.from(transport).length,
+      utf8Bytes: Utils.StringToUtf8Bytes(transport).byteLength,
+    };
+  }
+
+  function preflightSdcDiscordTransportBudget(transport, maxChars = 2000, maxUtf8Bytes = 6000) {
+    const requestedChars = Number(maxChars), requestedBytes = Number(maxUtf8Bytes);
+    if (!Number.isSafeInteger(requestedChars) || requestedChars < 1 ||
+        !Number.isSafeInteger(requestedBytes) || requestedBytes < 1)
+      throw new Error('Invalid encrypted Discord transport budget');
+    // These are conservative local CONTENT budgets, not a documented HTTP-body
+    // threshold. Premium status must not increase the encrypted transport budget.
+    const characterLimit = Math.min(requestedChars, 2000);
+    const utf8ByteLimit = Math.min(requestedBytes, 6000);
+    const measured = measureSdcDiscordTransport(transport);
+    const reason = measured.characters > characterLimit ? 'CHARACTERS_EXCEEDED'
+      : measured.utf8Bytes > utf8ByteLimit ? 'UTF8_BYTES_EXCEEDED' : null;
+    return { ...measured, characterLimit, utf8ByteLimit, ok: reason === null, reason };
+  }
+
+  function assertSdcDiscordTransportBudget(transport, maxChars = 2000, maxUtf8Bytes = 6000) {
+    const budget = preflightSdcDiscordTransportBudget(transport, maxChars, maxUtf8Bytes);
+    if (!budget.ok) {
+      const error = new Error('Encrypted Discord transport exceeds the local standard content budget');
+      error.code = 'SDC_DISCORD_TRANSPORT_BUDGET';
+      error.sdcTransportBudget = budget;
+      throw error;
+    }
+    return budget;
+  }
+
+  function sdcDiscordSendFailureDetails(error) {
+    let status = 0, code = 0;
+    try {
+      status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? 0);
+      code = Number(error?.body?.code ?? error?.response?.body?.code ?? error?.data?.code ?? error?.code ?? 0);
+    } catch (_) {}
+    const httpStatus = Number.isSafeInteger(status) && status >= 400 && status <= 599 ? status : null;
+    const discordCode = Number.isSafeInteger(code) && code > 0 ? code : null;
+    let reason = 'Discord encrypted send failed';
+    if (httpStatus || discordCode) {
+      reason = 'Discord rejected encrypted send' +
+        (httpStatus ? ` (HTTP ${httpStatus}` : ' (') +
+        (discordCode ? `${httpStatus ? ', ' : ''}code ${discordCode}` : '') + ')';
+    } else {
+      try {
+        if (error?.code === 'SDC_DISCORD_TRANSPORT_BUDGET')
+          reason = 'Encrypted send exceeds the local standard transport budget';
+      } catch (_) {}
+    }
+    // No response body, packet contents, key material or arbitrary object dump.
+    return { httpStatus, discordCode, reason };
+  }
+
+  function selfHistoryControlTransport(body) {
+    return '```ml\n-----SYSTEM MESSAGE-----\n```' + body + '\n```yaml\n🔒\n```';
+  }
+
+  function selfHistorySyncControlBody(token) {
+    const parsed = parseInlineSelfHistoryToken(token);
+    if (!parsed) throw new Error('Invalid self-history capsule');
+    return '*type*: `SELF HISTORY SYNC`\n*selfHistoryVersion*: `2`\n*payload*: `' +
+      Utils.PayloadEncode(parsed.payloadBytes) + '`\n*signature*: `' + Utils.PayloadEncode(parsed.signatureBytes) + '`';
+  }
+
+  function selfHistoryFragmentSignedBytes(bytes, accountId, channelId) {
+    return Utils.ConcatBuffers([
+      canonicalJsonBytes({ protocol: 'SDC-SELF-HISTORY-FRAGMENT', version: 1,
+        accountId: String(accountId), channelId: String(channelId) }), bytes,
+    ]);
+  }
+
+  function encodeSelfHistoryFragment(info, payloadHash, index, count, chunk) {
+    if (!Number.isInteger(index) || !Number.isInteger(count) || index < 1 || index > count ||
+        count > SDC_SELF_HISTORY_MAX_FRAGMENT_COUNT || !(chunk instanceof Uint8Array) ||
+        !chunk.byteLength || chunk.byteLength > SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES)
+      throw new Error('Invalid self-history fragment bounds');
+    const sourceId = asyncPrekeyFixedIdBytes(info.sourceDeviceId, 'self-history fragment source');
+    const sourcePublic = asyncPrekeyFixedPublicBytes(info.sourceDevicePublicKey, 'self-history fragment public key');
+    const targetId = asyncPrekeyFixedIdBytes(info.recipientDeviceId, 'self-history fragment target');
+    const wire = Utils.Base64urlToBytes(info.wireId), hash = Utils.Base64urlToBytes(payloadHash);
+    if (wire.byteLength !== 32 || hash.byteLength !== 32) throw new Error('Invalid self-history fragment correlation');
+    const out = new Uint8Array(247 + chunk.byteLength), view = new DataView(out.buffer);
+    let offset = 0;
+    out.set(SDC_SELF_HISTORY_FRAGMENT_MAGIC, offset); offset += 4;
+    out.set(sourceId, offset); offset += 16; out.set(sourcePublic, offset); offset += 133;
+    out.set(targetId, offset); offset += 16; out.set(wire, offset); offset += 32;
+    out.set(hash, offset); offset += 32; asyncPrekeyWriteU64(view, offset, info.generatedAt); offset += 8;
+    view.setUint16(offset, index, false); offset += 2; view.setUint16(offset, count, false); offset += 2;
+    view.setUint16(offset, chunk.byteLength, false); offset += 2; out.set(chunk, offset);
+    return out;
+  }
+
+  function decodeSelfHistoryFragment(bytesLike, accountId, channelId) {
+    const bytes = bytesLike instanceof Uint8Array ? bytesLike : new Uint8Array(bytesLike || []);
+    if (bytes.byteLength < 248 || bytes.byteLength > 247 + SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES ||
+        !SDC_SELF_HISTORY_FRAGMENT_MAGIC.every((value, i) => bytes[i] === value))
+      throw new Error('Invalid self-history fragment packet');
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let offset = 4;
+    const take = (n) => { const value = Utils.BytesToBase64url(bytes.slice(offset, offset + n)); offset += n; return value; };
+    const sourceDeviceId = take(16), sourceDevicePublicKey = take(133), recipientDeviceId = take(16);
+    const wireId = take(32), payloadHash = take(32), generatedAt = asyncPrekeyReadU64(view, offset); offset += 8;
+    const index = view.getUint16(offset, false); offset += 2;
+    const count = view.getUint16(offset, false); offset += 2;
+    const length = view.getUint16(offset, false); offset += 2;
+    if (index < 1 || index > count || count > SDC_SELF_HISTORY_MAX_FRAGMENT_COUNT ||
+        length < 1 || length > SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES || offset + length !== bytes.byteLength)
+      throw new Error('Invalid self-history fragment length/count');
+    return { accountId: String(accountId), channelId: String(channelId), sourceDeviceId, sourceDevicePublicKey,
+      recipientDeviceId, wireId, payloadHash, generatedAt, index, count, chunk: bytes.slice(offset) };
+  }
+
+  async function buildSelfHistoryDeliveryParts(token, accountId, channelId) {
+    const parsed = parseInlineSelfHistoryToken(token);
+    const decoded = decodeCompactSelfHistorySyncPayload(parsed.payloadBytes, { accountId, channelId });
+    // Even count=1 uses the signed account/channel fragment domain. SHS2 itself
+    // has an implicit channel only in AEAD; this outer signature also lets an
+    // imported outbox be validated before sending without a target private key.
+    const blob = new Uint8Array(6 + parsed.payloadBytes.byteLength + parsed.signatureBytes.byteLength);
+    const view = new DataView(blob.buffer);
+    view.setUint32(0, parsed.payloadBytes.byteLength, false); view.setUint16(4, parsed.signatureBytes.byteLength, false);
+    blob.set(parsed.payloadBytes, 6); blob.set(parsed.signatureBytes, 6 + parsed.payloadBytes.byteLength);
+    if (blob.byteLength > SDC_SELF_HISTORY_MAX_PACKET_BYTES) throw new Error('Self-history signed blob is too large');
+    const hash = Utils.BytesToBase64url(new Uint8Array(await Utils.Sha256(blob)));
+    const count = Math.ceil(blob.byteLength / SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES), parts = [];
+    if (count > SDC_SELF_HISTORY_MAX_FRAGMENT_COUNT) throw new Error('Too many self-history fragments');
+    for (let index = 1; index <= count; index++) {
+      const chunk = blob.slice((index - 1) * SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES, index * SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES);
+      const packet = encodeSelfHistoryFragment(decoded.info, hash, index, count, chunk);
+      const signature = await signKexTranscript(selfHistoryFragmentSignedBytes(packet, accountId, channelId));
+      const body = '*type*: `SELF HISTORY SYNC FRAGMENT`\n*fragmentVersion*: `1`\n*payload*: `' +
+        Utils.PayloadEncode(packet) + '`\n*signature*: `' + Utils.PayloadEncode(signature) + '`';
+      assertSdcDiscordTransportBudget(selfHistoryControlTransport(body), 1950);
+      parts.push({ body, stage: 'READY' });
+    }
+    return parts;
+  }
+
+  async function selfHistoryOutboxContext() {
+    const lifecycle = captureSelfHistorySendContext('', {});
+    if (DuressRuntime.active || DataBase?.isEncrypted !== true)
+      throw new Error('Self-history delivery requires the encrypted real vault');
+    const vault = DataBase, databaseKey = Cache.dbKey;
+    const accountId = String(Discord.getCurrentUser?.()?.id || '');
+    const rootFingerprint = await accountIdentityFingerprint();
+    assertSelfHistorySendContext(lifecycle);
+    if (DataBase !== vault || Cache.dbKey !== databaseKey || !/^[0-9]{1,32}$/.test(accountId))
+      throw new Error('Self-history delivery vault context changed');
+    let journal = vault.selfHistoryDeliveryOutbox;
+    if (!journal) journal = vault.selfHistoryDeliveryOutbox = { version: 1, accountId, rootFingerprint, entries: {} };
+    if (journal.version !== 1 || journal.accountId !== accountId || journal.rootFingerprint !== rootFingerprint ||
+        !journal.entries || typeof journal.entries !== 'object' || Array.isArray(journal.entries))
+      throw new Error('Self-history delivery journal context mismatch');
+    validateSelfHistoryOutboxShape(journal);
+    return { ...lifecycle, vault, databaseKey, accountId, rootFingerprint, journal };
+  }
+
+  function validateSelfHistoryOutboxShape(journal) {
+    const entries = Object.entries(journal.entries || {});
+    if (entries.length > SDC_SELF_HISTORY_MAX_OUTBOX_ENTRIES ||
+        Utils.StringToUtf8Bytes(JSON.stringify(journal)).byteLength > SDC_SELF_HISTORY_MAX_OUTBOX_BYTES)
+      throw new Error('Self-history delivery journal bounds exceeded');
+    for (const [key, entry] of entries) {
+      if (!entry || entry.version !== 1 || entry.accountId !== journal.accountId || entry.rootFingerprint !== journal.rootFingerprint ||
+          !/^[0-9]{1,32}$/.test(entry.channelId) || !/^[A-Za-z0-9_-]{43}$/.test(entry.wireId) ||
+          key !== selfHistoryOutboxEntryKey(entry.channelId, entry.wireId) || typeof entry.primaryWire !== 'string' ||
+          entry.primaryWire.length > 2000 || !['PREPARED', 'QUEUE_ACCEPTED', 'REJECTED'].includes(entry.primaryStage) ||
+          !Array.isArray(entry.copies) || entry.copies.length > 128)
+        throw new Error('Invalid self-history delivery entry');
+      const targets = new Set();
+      for (const copy of entry.copies) {
+        if (!copy || !isValidRatchetDeviceId(copy.sourceDeviceId) || !isValidRatchetDeviceId(copy.targetDeviceId) ||
+            targets.has(copy.targetDeviceId) || typeof copy.inline !== 'boolean' || !Array.isArray(copy.parts) ||
+            copy.parts.length > SDC_SELF_HISTORY_MAX_FRAGMENT_COUNT || (!copy.inline && !copy.parts.length))
+          throw new Error('Invalid self-history delivery target');
+        targets.add(copy.targetDeviceId);
+        for (const part of copy.parts) {
+          if (!part || typeof part.body !== 'string' || !['READY', 'FAILED', 'QUEUE_ACCEPTED', 'OBSERVED'].includes(part.stage) ||
+              !preflightSdcDiscordTransportBudget(selfHistoryControlTransport(part.body), 1950).ok)
+            throw new Error('Invalid self-history delivery part');
+        }
+      }
+    }
+  }
+
+  async function validateSelfHistoryJournalPart(ctx, entry, copy, part) {
+    assertSelfHistoryOutboxContext(ctx);
+    const type = getSystemMessageProperty('type', part.body);
+    const payloadText = getSystemMessageProperty('payload', part.body), signatureText = getSystemMessageProperty('signature', part.body);
+    if (type !== 'SELF HISTORY SYNC FRAGMENT' || getSystemMessageProperty('fragmentVersion', part.body) !== '1' ||
+        !payloadText || !signatureText)
+      throw new Error('Outbox contains an unauthorized auxiliary control type');
+    const canonicalBody = '*type*: `SELF HISTORY SYNC FRAGMENT`\n*fragmentVersion*: `1`\n*payload*: `' +
+      payloadText + '`\n*signature*: `' + signatureText + '`';
+    if (part.body !== canonicalBody) throw new Error('Noncanonical self-history outbox body');
+    const payload = Utils.PayloadDecode(payloadText), signature = Utils.PayloadDecode(signatureText);
+    if (Utils.PayloadEncode(payload) !== payloadText || Utils.PayloadEncode(signature) !== signatureText)
+      throw new Error('Noncanonical self-history outbox encoding');
+    await verifySignedDeviceControl(ctx.accountId, selfHistoryFragmentSignedBytes(payload, ctx.accountId, entry.channelId), signature, null,
+      'self-history-outbox-fragment');
+    const info = decodeSelfHistoryFragment(payload, ctx.accountId, entry.channelId);
+    if (info.wireId !== entry.wireId || info.sourceDeviceId !== copy.sourceDeviceId || info.recipientDeviceId !== copy.targetDeviceId ||
+        info.count !== copy.parts.length || info.index !== copy.parts.indexOf(part) + 1 ||
+        (copy.payloadHash && info.payloadHash !== copy.payloadHash) ||
+        await deviceIdFromPublicKey(Utils.Base64urlToBytes(info.sourceDevicePublicKey)) !== info.sourceDeviceId)
+      throw new Error('Outbox auxiliary correlation mismatch');
+    const targetPublic = Utils.Base64urlToBytes(String(getDeviceRecord(ctx.accountId, copy.targetDeviceId)?.devicePublicKey || ''));
+    if (targetPublic.byteLength !== 133 || await deviceIdFromPublicKey(targetPublic) !== copy.targetDeviceId)
+      throw new Error('Outbox target public-key binding mismatch');
+    if (entry.primaryWire.startsWith(SDC4_WIRE_PREFIX)
+      ? await ratchetWireCacheId(entry.primaryWire) !== entry.wireId
+      : await asyncPrekeyWireId(entry.primaryWire) !== entry.wireId)
+      throw new Error('Outbox primary wire correlation mismatch');
+    assertSelfHistoryOutboxContext(ctx);
+    return info;
+  }
+
+  function assertSelfHistoryOutboxContext(ctx) {
+    assertSelfHistorySendContext(ctx);
+    if (DuressRuntime.active || ctx.vault !== DataBase || ctx.databaseKey !== Cache.dbKey ||
+        ctx.accountId !== String(Discord.getCurrentUser?.()?.id || ''))
+      throw new Error('Self-history delivery context changed');
+  }
+
+  async function saveSelfHistoryOutbox(ctx) {
+    assertSelfHistoryOutboxContext(ctx);
+    Utils.dbChanged = true;
+    await Utils.SaveDb();
+    assertSelfHistoryOutboxContext(ctx);
+  }
+
+  function selfHistoryOutboxEntryKey(channelId, wireId) { return String(channelId) + '|' + String(wireId); }
+
+  async function journalSelfHistoryDelivery(channelId, primaryWire, wireId, built, inlineTargets) {
+    const ctx = await selfHistoryOutboxContext(), key = selfHistoryOutboxEntryKey(channelId, wireId);
+    const previous = ctx.journal.entries[key];
+    if (previous) return previous;
+    const copies = [];
+    for (let index = 0; index < built.inlineTokens.length; index++) {
+      const token = built.inlineTokens[index], targetDeviceId = built.targets[index];
+      const parsed = parseInlineSelfHistoryToken(token);
+      const decoded = decodeCompactSelfHistorySyncPayload(parsed.payloadBytes, { accountId: ctx.accountId, channelId });
+      const parts = await buildSelfHistoryDeliveryParts(token, ctx.accountId, channelId);
+      const first = decodeSelfHistoryFragment(Utils.PayloadDecode(getSystemMessageProperty('payload', parts[0].body)), ctx.accountId, channelId);
+      copies.push({ targetDeviceId, sourceDeviceId: decoded.info.sourceDeviceId, sourceDevicePublicKey: decoded.info.sourceDevicePublicKey,
+        targetDevicePublicKey: getDeviceRecord(ctx.accountId, targetDeviceId)?.devicePublicKey,
+        payloadHash: first.payloadHash, inline: inlineTargets.includes(targetDeviceId), parts });
+    }
+    const entry = { version: 1, accountId: ctx.accountId, rootFingerprint: ctx.rootFingerprint,
+      channelId: String(channelId), wireId: String(wireId), primaryWire: String(primaryWire),
+      primaryStage: 'PREPARED', createdAt: Date.now(), copies };
+    // Retire completed delivery bookkeeping only; encrypted readable history is
+    // retained independently and never pruned here.
+    for (const [id, old] of Object.entries(ctx.journal.entries)) {
+      if (old?.primaryStage === 'REJECTED' || (old?.primaryStage === 'QUEUE_ACCEPTED' &&
+          old?.copies?.every(copy => copy.inline || copy.parts?.every(part => part.stage === 'OBSERVED'))))
+        delete ctx.journal.entries[id];
+    }
+    if (Object.keys(ctx.journal.entries).length >= SDC_SELF_HISTORY_MAX_OUTBOX_ENTRIES ||
+        Utils.StringToUtf8Bytes(JSON.stringify(ctx.journal) + JSON.stringify(entry)).byteLength > SDC_SELF_HISTORY_MAX_OUTBOX_BYTES)
+      throw new Error('Self-history encrypted delivery journal is full; pending copies were retained');
+    ctx.journal.entries[key] = entry;
+    try { await saveSelfHistoryOutbox(ctx); }
+    catch (error) { delete ctx.journal.entries[key]; throw error; }
+    return entry;
+  }
+
+  function selfHistoryWireFromTransport(transport) {
+    const line = String(transport || '').split(/\r?\n/, 1)[0].replace(/\s+`🔒`\s*$/u, '');
+    if (line.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX))
+      return decodeHybridAsyncFanoutCarrierWire(line).innerWire;
+    return line.startsWith(SDC4_WIRE_PREFIX) || line.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX) ||
+      line.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ? line : null;
+  }
+
+  async function selfHistoryEntryForTransport(ctx, channelId, transport) {
+    const wire = selfHistoryWireFromTransport(transport);
+    if (!wire) return null;
+    const wireId = wire.startsWith(SDC4_WIRE_PREFIX) ? await ratchetWireCacheId(wire) : await asyncPrekeyWireId(wire);
+    return ctx.journal.entries[selfHistoryOutboxEntryKey(channelId, wireId)] || null;
+  }
+
+  function selfHistoryCopyEligible(ctx, entry, copy) {
+    assertSelfHistoryOutboxContext(ctx);
+    if (entry.accountId !== ctx.accountId || entry.rootFingerprint !== ctx.rootFingerprint ||
+        !isValidRatchetDeviceId(copy.sourceDeviceId) || !isValidRatchetDeviceId(copy.targetDeviceId) ||
+        isDeviceRevoked(ctx.accountId, copy.sourceDeviceId) || isDeviceRevoked(ctx.accountId, copy.targetDeviceId))
+      return false;
+    const target = getDeviceRecord(ctx.accountId, copy.targetDeviceId);
+    return !!target && !target.revokedAt && !!target.devicePublicKey && target.devicePublicKey === copy.targetDevicePublicKey;
+  }
+
+  async function assertSelfHistoryOutboundAuthorization(channelId, transport, sendContext) {
+    if (!selfHistoryWireFromTransport(transport)) return true;
+    assertSelfHistorySendContext(sendContext);
+    const ctx = await selfHistoryOutboxContext(), entry = await selfHistoryEntryForTransport(ctx, channelId, transport);
+    assertSelfHistorySendContext(sendContext);
+    const inlineTokens = String(transport).split(/\r?\n/).filter(line => line.startsWith(SDC_INLINE_SELF_HISTORY_PREFIX));
+    if (inlineTokens.length > SDC_INLINE_SELF_HISTORY_MAX_TOKENS || (!entry && inlineTokens.length))
+      throw new Error('Unjournalled inline self-history copy');
+    if (!entry) return true;
+    const inlineTargets = new Set();
+    for (const token of inlineTokens) {
+      const parsed = parseInlineSelfHistoryToken(token);
+      await verifySignedDeviceControl(ctx.accountId, parsed.payloadBytes, parsed.signatureBytes, null, 'self-history-inline-before-primary');
+      const decoded = decodeCompactSelfHistorySyncPayload(parsed.payloadBytes, { accountId: ctx.accountId, channelId: String(channelId) });
+      await verifySelfHistoryPublicContext(decoded.info, ctx.accountId, String(channelId));
+      const copy = entry.copies.find(copy => copy.inline && copy.targetDeviceId === decoded.info.recipientDeviceId);
+      if (!copy || decoded.info.wireId !== entry.wireId || copy.sourceDeviceId !== decoded.info.sourceDeviceId ||
+          inlineTargets.has(copy.targetDeviceId)) throw new Error('Inline self-history recipient/correlation changed');
+      inlineTargets.add(copy.targetDeviceId);
+    }
+    if (entry.copies.filter(copy => copy.inline).length !== inlineTargets.size)
+      throw new Error('Inline self-history copy removed before primary enqueue');
+    for (const copy of entry.copies) {
+      if (!selfHistoryCopyEligible(ctx, entry, copy)) throw new Error('Self-history recipient authorization changed before primary enqueue');
+      for (const part of copy.parts) await validateSelfHistoryJournalPart(ctx, entry, copy, part);
+      assertSelfHistorySendContext(sendContext);
+      if (!selfHistoryCopyEligible(ctx, entry, copy)) throw new Error('Self-history source/target revoked during final validation');
+    }
+    // Recheck every target in one turn after all signature/hash awaits.
+    for (const copy of entry.copies) if (!selfHistoryCopyEligible(ctx, entry, copy))
+      throw new Error('Self-history source/target revoked immediately before primary enqueue');
+    return true;
+  }
+
+  async function flushSelfHistoryDeliveryForHumanSend(channelId, userIntent, ctx = null) {
+    if (!sdcControlUserIntentValid(channelId, userIntent)) return { status: 'INTENT_EXPIRED', accepted: 0 };
+    ctx = ctx || await selfHistoryOutboxContext();
+    let accepted = 0, failed = 0, retained = 0;
+    for (const entry of Object.values(ctx.journal.entries)) {
+      if (entry.channelId !== String(channelId) || entry.primaryStage !== 'QUEUE_ACCEPTED') continue;
+      for (const copy of entry.copies || []) {
+        if (copy.inline) continue;
+        if (!selfHistoryCopyEligible(ctx, entry, copy)) { retained++; continue; }
+        for (const part of copy.parts || []) {
+          if (part.stage === 'OBSERVED') continue;
+          // An accepted but unobserved SDK call is ambiguous. Revisit it only on
+          // a later human action after a grace period, never by a receive/timer.
+          if (part.stage === 'QUEUE_ACCEPTED' && Date.now() - Number(part.lastAttemptAt || 0) < 30000) { retained++; continue; }
+          if (!sdcControlUserIntentValid(channelId, userIntent) || !selfHistoryCopyEligible(ctx, entry, copy))
+            return { status: 'PAUSED', accepted, failed, retained: retained + 1 };
+          assertSdcDiscordTransportBudget(selfHistoryControlTransport(part.body), 1950);
+          part.lastAttemptAt = Date.now();
+          try {
+            await validateSelfHistoryJournalPart(ctx, entry, copy, part);
+            if (!sdcControlUserIntentValid(channelId, userIntent) || !selfHistoryCopyEligible(ctx, entry, copy))
+              throw new Error('Self-history delivery authorization changed before enqueue');
+            await Utils.SendSystemMessage(channelId, part.body, { suppressNotifications: true, userIntent, selfHistoryContext: ctx });
+            assertSelfHistoryOutboxContext(ctx);
+            if (part.stage !== 'OBSERVED') part.stage = 'QUEUE_ACCEPTED';
+            accepted++;
+          } catch (error) {
+            part.stage = 'FAILED'; failed++;
+            console.warn('[SDC][SELF-HISTORY] auxiliary copy queue rejected; retained for the next explicit send', {
+              ...sdcDiscordSendFailureDetails(error), automaticRetry: false,
+            });
+          }
+          await saveSelfHistoryOutbox(ctx);
+          if (part.stage === 'FAILED') break;
+        }
+      }
+    }
+    InlineSelfHistoryStats.last = { at: new Date().toISOString(), action: 'AUXILIARY_QUEUE_RESULT', accepted, failed, retained,
+      serverDeliveryConfirmed: false, automaticRetry: false };
+    return { status: failed ? 'PARTIAL' : retained ? 'PENDING' : 'QUEUE_ACCEPTED', accepted, failed, retained };
+  }
+
+  async function completeSelfHistoryOutboundTransport(channelId, transport, primarySucceeded, sendContext) {
+    if (DuressRuntime.active || !selfHistoryWireFromTransport(transport)) return { applicable: false };
+    const transactionKey = String(channelId) + '|' + String(transport).split(/\r?\n/, 1)[0];
+    if (SelfHistoryDeliveryTransactions.has(transactionKey)) return await SelfHistoryDeliveryTransactions.get(transactionKey);
+    const run = async () => {
+      try {
+        assertSelfHistorySendContext(sendContext);
+        const ctx = await selfHistoryOutboxContext(), entry = await selfHistoryEntryForTransport(ctx, channelId, transport);
+        assertSelfHistorySendContext(sendContext);
+        if (entry) {
+          entry.primaryStage = primarySucceeded ? 'QUEUE_ACCEPTED' : 'REJECTED';
+          entry.primaryAcceptedAt = primarySucceeded ? Date.now() : null;
+          await saveSelfHistoryOutbox(ctx);
+        }
+        if (!primarySucceeded) return { status: 'PRIMARY_REJECTED', accepted: 0 };
+        return await flushSelfHistoryDeliveryForHumanSend(channelId, sendContext.userIntent, ctx);
+      } catch (error) {
+        console.warn('[SDC][SELF-HISTORY] encrypted delivery remains pending', {
+          ...sdcDiscordSendFailureDetails(error), primaryQueueAccepted: !!primarySucceeded, automaticRetry: false,
+        });
+        return { status: 'PENDING', accepted: 0, errorCode: 'SELF_HISTORY_DELIVERY_PENDING' };
+      }
+    };
+    const job = SelfHistoryDeliveryWriteTail.then(run, run);
+    SelfHistoryDeliveryWriteTail = job.catch(() => {});
+    SelfHistoryDeliveryTransactions.set(transactionKey, job);
+    try { return await job; }
+    finally { if (SelfHistoryDeliveryTransactions.get(transactionKey) === job) SelfHistoryDeliveryTransactions.delete(transactionKey); }
+  }
+
+  async function appendInlineSelfHistoryCapsules(channelId, transport, primaryWire, explicitWireId = null, maxChars = SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS, sendContext = null) {
+    sendContext = sendContext || captureSelfHistorySendContext(channelId);
+    assertSelfHistorySendContext(sendContext);
     const base = String(transport || '');
     const primary = String(primaryWire || '').replace(/\s+`🔒`\s*$/u, '');
     if (!base || !primary) return { transport: base, embedded: 0, targets: [], skipped: 'invalid-input' };
+    const baseBudget = preflightSdcDiscordTransportBudget(base, maxChars);
+    if (!baseBudget.ok) return { transport: base, embedded: 0, targets: [], skipped: 'primary-oversize',
+      auxiliaryStatus: 'PRIMARY_REQUIRES_FILE_FALLBACK', queuedForLater: false, budget: baseBudget };
+    const capsuleLimit = Math.min(baseBudget.characterLimit, SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS);
     const built = await trySelfDeviceHistoryFanout(channelId, primary, explicitWireId, 'inline-same-message');
-    if (!built?.inlineSuffix) return { transport: base, embedded: 0, targets: built?.targets || [] };
+    assertSelfHistorySendContext(sendContext);
+    if (built?.omitted) {
+      const error = new Error('Encrypted own-device history could not be prepared; the secure draft is preserved');
+      error.code = 'SDC_SELF_HISTORY_SOURCE_UNAVAILABLE';
+      throw error;
+    }
+    if (!built?.inlineSuffix) {
+      if (built?.omitted) {
+        InlineSelfHistoryStats.last = {
+          at: new Date().toISOString(), channelId: String(channelId || ''),
+          action: 'OMITTED_SOURCE_UNAVAILABLE', baseChars: baseBudget.characters,
+          baseUtf8Bytes: baseBudget.utf8Bytes, queuedForLater: false,
+          primaryTransportChanged: false, extraDiscordMessagesSent: 0,
+        };
+      }
+      return {
+        transport: base, embedded: 0, targets: built?.targets || [],
+        skipped: built?.omitted ? 'source-unavailable' : null,
+        auxiliaryStatus: built?.omitted ? 'OMITTED_SOURCE_UNAVAILABLE' : 'NOT_EMBEDDED',
+        queuedForLater: false, primaryTransportChanged: false, budget: baseBudget,
+      };
+    }
     const candidate = base + '\n' + built.inlineSuffix;
-    if (candidate.length > Number(maxChars || SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS)) {
+    const candidateBudget = preflightSdcDiscordTransportBudget(candidate, capsuleLimit);
+    let finalTransport = base;
+    const inlineTargets = [];
+    for (let index = 0; index < built.inlineTokens.length; index++) {
+      const proposed = finalTransport + '\n' + built.inlineTokens[index];
+      if (inlineTargets.length < SDC_INLINE_SELF_HISTORY_MAX_TOKENS &&
+          preflightSdcDiscordTransportBudget(proposed, capsuleLimit).ok) {
+        finalTransport = proposed;
+        inlineTargets.push(built.targets[index]);
+      }
+    }
+    const wireId = String(explicitWireId || (primary.startsWith(SDC4_WIRE_PREFIX)
+      ? await ratchetWireCacheId(primary) : await asyncPrekeyWireId(primary)));
+    await journalSelfHistoryDelivery(String(channelId), primary, wireId, built, inlineTargets);
+    assertSelfHistorySendContext(sendContext);
+    SelfHistoryOutboundIntents.set(selfHistoryOutboxEntryKey(channelId, wireId), sendContext);
+    while (SelfHistoryOutboundIntents.size > 2048) SelfHistoryOutboundIntents.delete(SelfHistoryOutboundIntents.keys().next().value);
+    if (!candidateBudget.ok) {
       InlineSelfHistoryStats.skippedOversize++;
       InlineSelfHistoryStats.last = {
         at: new Date().toISOString(),
         channelId: String(channelId || ''),
-        action: 'SKIPPED_OVERSIZE',
-        baseChars: base.length,
-        candidateChars: candidate.length,
+        action: 'PREPARED_AUXILIARY',
+        baseChars: baseBudget.characters,
+        baseUtf8Bytes: baseBudget.utf8Bytes,
+        candidateChars: candidateBudget.characters,
+        candidateUtf8Bytes: candidateBudget.utf8Bytes,
+        characterLimit: candidateBudget.characterLimit,
+        utf8ByteLimit: candidateBudget.utf8ByteLimit,
+        queuedForLater: true,
+        primaryTransportChanged: false,
+        extraDiscordMessagesSent: 0,
         targets: built.targets || [],
       };
-      console.warn('[SDC][DEVICE][v68.4.5] inline sibling history capsule omitted because the single Discord message would exceed the safe budget', {
+      console.log('[SDC][SELF-HISTORY] sibling copies durably prepared for bounded delivery after primary queue acceptance', {
         channelId: String(channelId || ''),
-        baseChars: base.length,
-        candidateChars: candidate.length,
-        maxChars: Number(maxChars || SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS),
+        action: 'PREPARED_AUXILIARY',
+        baseChars: baseBudget.characters,
+        baseUtf8Bytes: baseBudget.utf8Bytes,
+        candidateChars: candidateBudget.characters,
+        candidateUtf8Bytes: candidateBudget.utf8Bytes,
+        maxChars: candidateBudget.characterLimit,
+        maxUtf8Bytes: candidateBudget.utf8ByteLimit,
         recipientDeviceIds: built.targets || [],
+        queuedForLater: true,
+        primaryTransportChanged: false,
         extraDiscordMessagesSent: 0,
       });
-      return { transport: base, embedded: 0, targets: built.targets || [], skipped: 'oversize' };
+      return {
+        transport: finalTransport, embedded: inlineTargets.length, targets: built.targets || [], skipped: null,
+        auxiliaryStatus: 'PREPARED_AUXILIARY', queuedForLater: true,
+        primaryTransportChanged: false, budget: baseBudget, omittedCandidateBudget: candidateBudget,
+      };
     }
     InlineSelfHistoryStats.embeddedMessages++;
     InlineSelfHistoryStats.embeddedRecipientCopies += Number(built.sent || 0);
@@ -34747,14 +36204,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       at: new Date().toISOString(),
       channelId: String(channelId || ''),
       action: 'EMBEDDED',
-      transportChars: candidate.length,
+      transportChars: candidateBudget.characters,
+      transportUtf8Bytes: candidateBudget.utf8Bytes,
       targets: built.targets || [],
     };
     return {
-      transport: candidate,
+      transport: finalTransport,
       embedded: Number(built.sent || 0),
       targets: built.targets || [],
       skipped: null,
+      auxiliaryStatus: 'EMBEDDED',
+      budget: candidateBudget,
     };
   }
 
@@ -34771,7 +36231,198 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
   }
 
+  function rememberSelfHistoryPendingPrimary(message, wireId, raw, fanoutCarrier = null) {
+    PendingSelfSyncedOwnMessages.set(String(wireId), { message, raw: String(raw),
+      channelId: String(message?.channel_id || ''), messageId: String(message?.id || ''), fanoutCarrier });
+    while (PendingSelfSyncedOwnMessages.size > SDC4_HISTORY_LIMIT)
+      PendingSelfSyncedOwnMessages.delete(PendingSelfSyncedOwnMessages.keys().next().value);
+  }
+
+  async function presentOpaqueSelfHistoryCopy(message, result, binding, fanoutCarrier = null) {
+    const lifecycle = captureSelfHistorySendContext(message?.channel_id, {});
+    if (!result?.opaque || !result.record || String(message?.channel_id || '') !== result.record.channelId)
+      return false;
+    if (result.fileFsDescriptors?.length) rememberSdc4MessageFileFsBinding(message, result.fileFsDescriptors);
+    if (result.offlineFileFsDescriptors?.length) {
+      rememberSdc4MessageOfflineFileFsBinding(message, result.offlineFileFsDescriptors);
+      if (fanoutCarrier?.batchId)
+        await rememberSdc4OfflineFileBatch(message.channel_id, String(message.author?.id || ''), fanoutCarrier.batchId,
+          result.offlineFileFsDescriptors, '');
+    }
+    assertSelfHistorySendContext(lifecycle);
+    if (!SecureComposer.scheduleDurableLocalEchoForMessage(message, result.record.wireId, result.record, binding))
+      return false;
+    message.content = '\u2063🔒 Protected message';
+    message.embeds = Array.isArray(message.embeds) ? message.embeds.filter(isNativeKlipyEmbed) : [];
+    await decryptRatchetV4BoundAttachments(message, {}, null);
+    assertSelfHistorySendContext(lifecycle);
+    return true;
+  }
+
+  async function hydrateSelfHistoryFileBindings(message, wireId, fanoutCarrier = null, record = null, binding = null) {
+    const ctx = captureSelfHistorySendContext(message?.channel_id, {});
+    const ownId = ctx.accountId;
+    if (String(message?.author?.id || '') !== ownId) throw new Error('Self-history file author mismatch');
+    let entry = SelfHistoryFileMetadataCache.get(String(wireId));
+    if (!entry || entry.vault !== ctx.vault || entry.epoch !== ctx.epoch || entry.accountId !== ownId) {
+      if (!record || !(binding instanceof Uint8Array)) return false;
+      assertSelfHistorySendContext(ctx);
+      const local = await ensureLocalDeviceIdentity();
+      assertSelfHistorySendContext(ctx);
+      const key = await deriveSdc4HistoryKeyBytes(local);
+      try {
+        const typed = await rewrapSdcSentHistoryOpaque(record, key, binding, local, { selfHistorySync: true, includeFileKeys: true });
+        assertSelfHistorySendContext(ctx);
+        // Only typed random file keys leave the opaque frame. The phrase stays
+        // encrypted in history and no clear descriptor is saved in the database.
+        entry = { vault: ctx.vault, epoch: ctx.epoch, accountId: ownId, channelId: String(message.channel_id),
+          fileFsDescriptors: typed.fileFsDescriptors, offlineFileFsDescriptors: typed.offlineFileFsDescriptors };
+        typed.envelope.fill(0);
+        SelfHistoryFileMetadataCache.set(String(wireId), entry);
+        while (SelfHistoryFileMetadataCache.size > 2048) SelfHistoryFileMetadataCache.delete(SelfHistoryFileMetadataCache.keys().next().value);
+      } finally { key.fill(0); }
+    }
+    assertSelfHistorySendContext(ctx);
+    if (entry.channelId !== String(message?.channel_id || '')) throw new Error('Self-history file channel mismatch');
+    const full = normalizeSdc4FileFsDescriptors(entry.fileFsDescriptors || []);
+    const compact = entry.offlineFileFsDescriptors?.length ? normalizeSdc4FileFsOfflineDescriptors(entry.offlineFileFsDescriptors) : [];
+    if (full.length) rememberSdc4MessageFileFsBinding(message, full);
+    if (compact.length) {
+      rememberSdc4MessageOfflineFileFsBinding(message, compact);
+      if (fanoutCarrier?.batchId) await rememberSdc4OfflineFileBatch(entry.channelId, ownId, fanoutCarrier.batchId, compact, '');
+    }
+    return full.length > 0 || compact.length > 0;
+  }
+
+  async function refreshSelfHistoryPendingPrimary(info, record, binding, fileMetadata) {
+    const pending = PendingSelfSyncedOwnMessages.get(info.wireId);
+    if (!pending || pending.channelId !== info.channelId || !pending.messageId ||
+        String(pending.message?.author?.id || '') !== info.accountId) return false;
+    const candidates = [pending.message];
+    try {
+      const canonical = Discord.getMessage?.(info.channelId, pending.messageId);
+      if (canonical && canonical !== pending.message) candidates.push(canonical);
+    } catch (_) {}
+    let refreshed = false;
+    for (const message of candidates) {
+      if (String(message?.id || '') !== pending.messageId || String(message?.channel_id || '') !== info.channelId ||
+          String(message?.author?.id || '') !== info.accountId) continue;
+      const result = { opaque: true, record, ...fileMetadata };
+      if (await presentOpaqueSelfHistoryCopy(message, result, binding, pending.fanoutCarrier)) {
+        // Dispatch model presentation only; this path never enters an outbound
+        // builder, ratchet advance, protocol convergence or the SDK send queue.
+        try { Utils.UpdateMessageContent(message); } catch (_) {}
+        refreshed = true;
+      }
+    }
+    if (refreshed) PendingSelfSyncedOwnMessages.delete(info.wireId);
+    return refreshed;
+  }
+
+  async function verifySelfHistoryPublicContext(info, authorId, channelId) {
+    if (info.accountId !== String(authorId) || info.channelId !== String(channelId) ||
+        !/^[0-9]{1,32}$/.test(info.accountId) || !/^[0-9]{1,32}$/.test(info.channelId) ||
+        !/^[A-Za-z0-9_-]{43}$/.test(info.wireId) || !isValidRatchetDeviceId(info.sourceDeviceId) ||
+        !isValidRatchetDeviceId(info.recipientDeviceId) || !Number.isSafeInteger(info.generatedAt) ||
+        info.generatedAt <= 0 || info.generatedAt > Date.now() + 60000)
+      throw new Error('Invalid self-history public context');
+    const sourcePublic = Utils.Base64urlToBytes(info.sourceDevicePublicKey);
+    if (sourcePublic.byteLength !== 133 || await deviceIdFromPublicKey(sourcePublic) !== info.sourceDeviceId ||
+        isDeviceRevoked(authorId, info.sourceDeviceId) || isDeviceRevoked(authorId, info.recipientDeviceId))
+      throw new Error('Invalid or revoked self-history device binding');
+    return true;
+  }
+
+  async function observeSelfHistoryDeliveryControl(authorId, channelId, body, messageId) {
+    if (String(authorId) !== String(Discord.getCurrentUser?.()?.id || '') || !/^[0-9]{10,32}$/.test(String(messageId || '')))
+      return;
+    // No journal is created from a receive, and an unrelated imported journal
+    // never gains emission permission through this passive receipt observation.
+    if (!DataBase?.selfHistoryDeliveryOutbox) return;
+    const ctx = await selfHistoryOutboxContext();
+    let changed = false;
+    for (const entry of Object.values(ctx.journal.entries)) {
+      if (entry.channelId !== String(channelId) || entry.primaryStage !== 'QUEUE_ACCEPTED') continue;
+      for (const copy of entry.copies) for (const part of copy.parts) {
+        if (part.body === body && part.stage !== 'OBSERVED') {
+          part.stage = 'OBSERVED'; part.observedMessageId = String(messageId); changed = true;
+        }
+      }
+    }
+    if (changed) await saveSelfHistoryOutbox(ctx);
+  }
+
+  async function handleSelfHistoryFragment(message, sysmsg) {
+    const lifecycle = captureSelfHistorySendContext(message?.channel_id, {});
+    return await withSdcUiHistoryRecovery(async () => {
+      assertSelfHistorySendContext(lifecycle);
+      const authorId = String(message?.author?.id || ''), channelId = String(message?.channel_id || '');
+      if (getSystemMessageProperty('fragmentVersion', sysmsg) !== '1') throw new Error('Unsupported self-history fragment version');
+      const payloadText = getSystemMessageProperty('payload', sysmsg), signatureText = getSystemMessageProperty('signature', sysmsg);
+      if (!payloadText || !signatureText || payloadText.length > 247 + SDC_SELF_HISTORY_FRAGMENT_CHUNK_BYTES || signatureText.length > 512)
+        throw new Error('Invalid self-history fragment control bounds');
+      const payload = Utils.PayloadDecode(payloadText), signature = Utils.PayloadDecode(signatureText);
+      await verifySignedDeviceControl(authorId, selfHistoryFragmentSignedBytes(payload, authorId, channelId), signature, null,
+        'self-history-fragment-receive');
+      const info = decodeSelfHistoryFragment(payload, authorId, channelId);
+      await verifySelfHistoryPublicContext(info, authorId, channelId);
+      assertSelfHistorySendContext(lifecycle);
+      const body = '*type*: `SELF HISTORY SYNC FRAGMENT`\n*fragmentVersion*: `1`\n*payload*: `' + payloadText + '`\n*signature*: `' + signatureText + '`';
+      await observeSelfHistoryDeliveryControl(authorId, channelId, body, message.id);
+      assertSelfHistorySendContext(lifecycle);
+      const ownId = String(Discord.getCurrentUser?.()?.id || '');
+      if (authorId !== ownId) return { authenticated: true, targeted: false };
+      const local = await ensureLocalDeviceIdentity();
+      assertSelfHistorySendContext(lifecycle);
+      const archived = info.recipientDeviceId !== local.deviceId && info.sourceDeviceId !== local.deviceId
+        ? await privateRecoveryLocalForRecipient(info.recipientDeviceId, null) : null;
+      assertSelfHistorySendContext(lifecycle);
+      if (info.sourceDeviceId === local.deviceId || (info.recipientDeviceId !== local.deviceId && !archived?.local))
+        return { authenticated: true, targeted: false };
+      const now = Date.now();
+      for (const [key, row] of SelfHistoryFragmentAssemblies)
+        if (now - row.updatedAt > SDC_SELF_HISTORY_ASSEMBLY_TTL_MS) SelfHistoryFragmentAssemblies.delete(key);
+      const key = [authorId, channelId, info.sourceDeviceId, info.recipientDeviceId, info.wireId, info.payloadHash].join('|');
+      let row = SelfHistoryFragmentAssemblies.get(key);
+      if (!row) {
+        if (SelfHistoryFragmentAssemblies.size >= SDC_SELF_HISTORY_MAX_ASSEMBLIES)
+          throw new Error('Self-history fragment assembly count exceeded');
+        row = { info, chunks: new Map(), bytes: 0, updatedAt: now }; SelfHistoryFragmentAssemblies.set(key, row);
+      }
+      if (row.info.count !== info.count || row.info.generatedAt !== info.generatedAt || row.info.sourceDevicePublicKey !== info.sourceDevicePublicKey)
+        throw new Error('Self-history fragment context changed');
+      const previous = row.chunks.get(info.index);
+      if (previous && (previous.byteLength !== info.chunk.byteLength || previous.some((value, index) => value !== info.chunk[index])))
+        throw new Error('Conflicting self-history fragment');
+      if (!previous) {
+        const total = Array.from(SelfHistoryFragmentAssemblies.values()).reduce((sum, entry) => sum + entry.bytes, 0);
+        if (row.bytes + info.chunk.byteLength > SDC_SELF_HISTORY_MAX_PACKET_BYTES || total + info.chunk.byteLength > SDC_SELF_HISTORY_MAX_ASSEMBLY_BYTES)
+          throw new Error('Self-history fragment assembly byte bound exceeded');
+        row.chunks.set(info.index, info.chunk); row.bytes += info.chunk.byteLength;
+      }
+      row.updatedAt = now;
+      if (row.chunks.size !== info.count) return { authenticated: true, targeted: true, incomplete: true };
+      const blob = Utils.ConcatBuffers(Array.from({ length: info.count }, (_, index) => row.chunks.get(index + 1)));
+      SelfHistoryFragmentAssemblies.delete(key);
+      if (Utils.BytesToBase64url(new Uint8Array(await Utils.Sha256(blob))) !== info.payloadHash || blob.byteLength < 6)
+        throw new Error('Self-history signed packet hash mismatch');
+      const view = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
+      const length = view.getUint32(0, false), signatureLength = view.getUint16(4, false);
+      if (length < 1 || signatureLength < 1 || signatureLength > 512 || 6 + length + signatureLength !== blob.byteLength)
+        throw new Error('Self-history complete packet length mismatch');
+      const innerPayload = blob.slice(6, 6 + length), innerSignature = blob.slice(6 + length);
+      await verifySignedDeviceControl(authorId, innerPayload, innerSignature, null, 'self-history-complete-receive');
+      assertSelfHistorySendContext(lifecycle);
+      const decoded = decodeCompactSelfHistorySyncPayload(innerPayload, { accountId: authorId, channelId });
+      for (const field of ['wireId', 'sourceDeviceId', 'sourceDevicePublicKey', 'recipientDeviceId', 'generatedAt'])
+        if (decoded.info[field] !== info[field]) throw new Error('Self-history inner/fragment correlation mismatch');
+      const result = await applySelfHistorySyncDecoded(authorId, channelId, decoded, info.wireId, 'self-history-fragment');
+      return { authenticated: true, ...result };
+    });
+  }
+
   async function applySelfHistorySyncDecoded(authorId, channelId, decoded, expectedWireId = null, source = 'self-history-sync') {
+    const lifecycle = captureSelfHistorySendContext(channelId, {});
     const ownId = String(Discord.getCurrentUser?.()?.id || '');
     if (String(authorId || '') !== ownId)
       throw new Error('Self-history sync must be authored by the same Discord account');
@@ -34781,28 +36432,35 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       throw new Error('Inline self-history capsule is not bound to this user message');
     if (String(info.channelId || '') !== String(channelId || ''))
       throw new Error('Self-history channel binding mismatch');
-    if (Date.now() - Number(info.generatedAt || 0) > SDC_SELF_HISTORY_SYNC_MAX_AGE_MS ||
-        Number(info.generatedAt || 0) > Date.now() + 60_000)
-      throw new Error('Self-history sync timestamp outside retention window');
+    if (!Number.isSafeInteger(info.generatedAt) || info.generatedAt <= 0 || info.generatedAt > Date.now() + 60_000 ||
+        !Number.isSafeInteger(info.historyCreatedAt) || info.historyCreatedAt <= 0 || info.historyCreatedAt > info.generatedAt + 60_000)
+      throw new Error('Self-history sync timestamp is invalid or in the future');
     const local = await ensureLocalDeviceIdentity();
-    if (String(info.recipientDeviceId || '') !== String(local.deviceId))
-      return { applied: false, plaintext: null, targeted: false };
+    assertSelfHistorySendContext(lifecycle);
     if (String(info.sourceDeviceId || '') === String(local.deviceId))
       return { applied: false, plaintext: null, targeted: false };
-    if (isDeviceRevoked(ownId, info.sourceDeviceId) || isDeviceRevoked(ownId, local.deviceId))
+    let recipient = local;
+    if (String(info.recipientDeviceId || '') !== String(local.deviceId)) {
+      const archived = await privateRecoveryLocalForRecipient(info.recipientDeviceId, null);
+      assertSelfHistorySendContext(lifecycle);
+      if (!archived?.local) return { applied: false, plaintext: null, targeted: false };
+      recipient = archived.local;
+    }
+    const vault = DataBase, databaseKey = Cache.dbKey;
+    const assertCurrent = () => {
+      assertSelfHistorySendContext(lifecycle);
+      if (DuressRuntime.active || DataBase !== vault || Cache.dbKey !== databaseKey ||
+          ownId !== String(Discord.getCurrentUser?.()?.id || '') ||
+          isDeviceRevoked(ownId, info.sourceDeviceId) || isDeviceRevoked(ownId, info.recipientDeviceId) || isDeviceRevoked(ownId, local.deviceId))
+        throw new Error('Self-history recovery context/authorization changed');
+    };
+    if (isDeviceRevoked(ownId, info.sourceDeviceId) || isDeviceRevoked(ownId, info.recipientDeviceId) || isDeviceRevoked(ownId, local.deviceId))
       throw new Error('Self-history sync involves a revoked device');
     const sourcePublic = Utils.Base64urlToBytes(String(info.sourceDevicePublicKey || ''));
     if (sourcePublic.byteLength !== SDC_ASYNC_PREKEY_P521_PUBLIC_BYTES ||
         await deviceIdFromPublicKey(sourcePublic) !== String(info.sourceDeviceId || ''))
       throw new Error('Self-history source device key mismatch');
-    const sourceRecord = registerDeviceRecord(ownId, {
-      deviceId: info.sourceDeviceId,
-      devicePublicKey: info.sourceDevicePublicKey,
-      createdAt: info.historyCreatedAt || info.generatedAt,
-    }, source);
-    if (sourceRecord.revokedAt) throw new Error('Self-history source device is revoked');
-
-    const wrapKey = await deriveSelfHistorySyncWrapKey(local.privateKey, sourcePublic, info);
+    const wrapKey = await deriveSelfHistorySyncWrapKey(recipient.privateKey, sourcePublic, info);
     let historyKey = null;
     let binding = decoded.historyBinding;
     try {
@@ -34812,24 +36470,31 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         canonicalJsonBytes(info)
       );
       if (historyKey.byteLength !== 32) throw new Error('Invalid synchronized history key length');
-      const plaintext = await openSelfHistorySourceRecord(record, historyKey, binding);
-      await persistSdc4ReceivedPlaintextHistory(
-        info.wireId,
-        plaintext,
-        '',
-        info.channelId
-      );
-      const pending = PendingSelfSyncedOwnMessages.get(info.wireId);
-      if (pending) {
-        pending.content = '<:ENC:465534298662109185>' + plaintext;
-        try { postProcessMessage(pending, plaintext); } catch (_) {}
-        PendingSelfSyncedOwnMessages.delete(info.wireId);
+      assertCurrent();
+      const rewrapped = await rewrapSdcSentHistoryOpaque(record, historyKey, binding, local,
+        { selfHistorySync: true, includeFileKeys: true });
+      assertCurrent();
+      if (rewrapped.fileFsDescriptors.length || rewrapped.offlineFileFsDescriptors.length) {
+        SelfHistoryFileMetadataCache.set(info.wireId, { vault, epoch: SelfHistoryLifecycleEpoch, accountId: ownId,
+          channelId: info.channelId, fileFsDescriptors: rewrapped.fileFsDescriptors,
+          offlineFileFsDescriptors: rewrapped.offlineFileFsDescriptors });
+        while (SelfHistoryFileMetadataCache.size > 2048) SelfHistoryFileMetadataCache.delete(SelfHistoryFileMetadataCache.keys().next().value);
       }
+      const requestId = String(record.requestId || info.wireId);
+      await persistSdc4SentCipherHistory(info.wireId, info.channelId, requestId, rewrapped.envelope, binding);
+      assertCurrent();
+      const sourceRecord = registerDeviceRecord(ownId, { deviceId: info.sourceDeviceId,
+        devicePublicKey: info.sourceDevicePublicKey, createdAt: info.historyCreatedAt }, source);
+      if (sourceRecord.revokedAt) throw new Error('Self-history source device is revoked');
+      for (const descriptor of rewrapped.fileFsDescriptors) { await rememberSdc4FileFsKey(info.channelId, descriptor); assertCurrent(); }
+      const localRecord = await getSdc4HistoryRecord(info.wireId, 'sent', binding);
+      assertCurrent();
+      await refreshSelfHistoryPendingPrimary(info, localRecord, binding, rewrapped);
       InlineSelfHistoryStats.applied++;
       InlineSelfHistoryStats.last = {
         at: new Date().toISOString(),
         channelId: info.channelId,
-        action: 'APPLIED',
+        action: 'APPLIED_OPAQUE',
         wireId: String(info.wireId).slice(0, 12),
         sourceDeviceId: info.sourceDeviceId,
         recipientDeviceId: local.deviceId,
@@ -34843,7 +36508,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ratchetSecretsTransferred: false,
         extraDiscordMessages: 0,
       });
-      return { applied: true, plaintext, targeted: true, info };
+      return { applied: true, opaque: true, plaintext: null, record: localRecord, historyBinding: binding.slice(),
+        fileFsDescriptors: rewrapped.fileFsDescriptors, offlineFileFsDescriptors: rewrapped.offlineFileFsDescriptors, targeted: true, info };
     } finally {
       try { wrapKey.fill(0); historyKey?.fill?.(0); binding?.fill?.(0); sourcePublic.fill(0); } catch (_) {}
     }
@@ -34872,7 +36538,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           expectedWireId,
           'self-history-sync-inline'
         );
-        if (result?.applied) return result.plaintext;
+        if (result?.applied) return result;
       } catch (error) {
         targetedFailure = error;
       }
@@ -34889,6 +36555,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function handleSelfHistorySync(message, sysmsg) {
+    const lifecycle = captureSelfHistorySendContext(message?.channel_id, {});
+    return await withSdcUiHistoryRecovery(async () => {
+    assertSelfHistorySendContext(lifecycle);
     const payloadText = getSystemMessageProperty('payload', sysmsg);
     const signatureText = getSystemMessageProperty('signature', sysmsg);
     const versionText = getSystemMessageProperty('selfHistoryVersion', sysmsg);
@@ -34898,13 +36567,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const signatureBytes = Utils.PayloadDecode(signatureText);
     const ownId = String(Discord.getCurrentUser?.()?.id || '');
     const authorId = String(message?.author?.id || '');
-    if (authorId !== ownId)
-      throw new Error('Self-history sync must be authored by the same Discord account');
     await verifySignedDeviceControl(authorId, clearBytes, signatureBytes, null, 'self-history-sync-compact-legacy');
     const decoded = decodeCompactSelfHistorySyncPayload(clearBytes, {
-      accountId: ownId,
+      accountId: authorId,
       channelId: String(message?.channel_id || ''),
     });
+    await verifySelfHistoryPublicContext(decoded.info, authorId, String(message?.channel_id || ''));
+    assertSelfHistorySendContext(lifecycle);
+    if (authorId !== ownId) return { authenticated: true, targeted: false };
     const result = await applySelfHistorySyncDecoded(
       authorId,
       String(message?.channel_id || ''),
@@ -34912,7 +36582,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       null,
       'self-history-sync-legacy-control'
     );
-    return result?.applied === true;
+    return { authenticated: true, ...result };
+    });
   }
 
   async function runPqV690FoundationSelfTest() {
@@ -35033,8 +36704,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         compactPqAnnouncementRoundtrip: announcementDecoded.pqPrekeyId === announcementInfo.pqPrekeyId && announcementDecoded.deviceId === announcementInfo.deviceId,
         compactPqAnnouncementFitsDiscord: fakeWrappedLength <= SDC_PQ_ANNOUNCE_MAX_WIRE_CHARS,
         pqReannounceAfterPerDeviceSdc4Live:
-          String(handleRatchetReady).includes('sendPqPrekeyAnnouncement(message.channel_id, true)') &&
-          String(handleRatchetReadyAck).includes('sendPqPrekeyAnnouncement(message.channel_id, true)'),
+          String(handleRatchetReady).includes("sendPqPrekeyAnnouncement(message.channel_id, true, null, null, sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id))") &&
+          String(handleRatchetReadyAck).includes("sendPqPrekeyAnnouncement(message.channel_id, true, null, null, sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id))"),
         stickyPerDeviceAntiDowngradeDeclared: capability.stickyPerDeviceAntiDowngrade === true,
         pqPrivateSeedNotPortable: capability.privateSeedPortableWithDatabase === false,
         pqApplicationNetworkActivated: SDC_PQ_NETWORK_APPLICATION_ACTIVATED === true,
@@ -35885,10 +37556,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           localSecretsCopiedFromDatabase: false,
         },
         policy: {
-          database: 'PORTABLE ACCOUNT IDENTITY + ENCRYPTED USER DATA ONLY',
-          devicePrivateKey: 'OUTSIDE PORTABLE DATABASE; ACCOUNT/ROOT-BOUND LOCAL STORAGE',
-          pqPrivateSeed: 'OUTSIDE PORTABLE DATABASE; DEVICE-LOCAL ENCRYPTED STORAGE',
-          ratchetSecrets: 'OUTSIDE PORTABLE DATABASE; DEVICE-LOCAL ENCRYPTED RATCHET STORE',
+          database: 'ACCOUNT IDENTITY + ENCRYPTED USER DATA + SEALED READ-ONLY PRIVATE RECOVERY',
+          devicePrivateKey: 'ACCOUNT/ROOT-BOUND LOCAL STORAGE AND SEALED RECOVERY ARCHIVE',
+          pqPrivateSeed: 'DEVICE-LOCAL ENCRYPTED STORAGE AND SEALED RECOVERY ARCHIVE',
+          ratchetSecrets: 'DEVICE-LOCAL ACTIVE STORE; SEALED CHECKPOINTS FOR READ-ONLY RECOVERY',
           bootstrap: 'FRESH DEVICE/KEM MATERIAL; NO RATCHET CLONING',
         },
       };
@@ -35907,8 +37578,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       typeof DataBase?.identityPrivateKey === 'string' && DataBase.identityPrivateKey.length > 20;
     let localStored = null;
     try { localStored = await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, ownId)); } catch (_) {}
-    const privateStatePortableWithDatabase = false;
-    const pqPrivateSeedPortableWithDatabase = false;
+    const privateStatePortableWithDatabase = !!DataBase?.portablePrivateRecovery;
+    const pqPrivateSeedPortableWithDatabase = !!DataBase?.portablePrivateRecovery;
+    const archiveUsedForSending = false;
     const databaseEmbedsRatchetMutableSecrets = snapshotJson.includes('"ratchetSessions"') || snapshotJson.includes('"RatchetSessions"') ||
       snapshotJson.includes('"pqLocalNextKemSeed"') || snapshotJson.includes('"CKs"') || snapshotJson.includes('"CKr"');
     let databaseEncryptedAuthenticated = false;
@@ -35925,6 +37597,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       portableAccountIdentityPresent: identityPresent,
       privateStatePortableWithDatabase,
       pqPrivateSeedPortableWithDatabase,
+      archiveUsedForSending,
+      privateArchiveReadOnly: true,
       databaseEmbedsRatchetMutableSecrets,
       localStorageHasDevicePrivateEnvelope,
       localStorageHasPqPrivateEnvelope,
@@ -35932,8 +37606,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       liveRatchetStateExportedWithDatabase: false,
       newInstallationWillRequireDistinctLocalDeviceMaterial: true,
     };
-    out.ok = out.portableAccountIdentityPresent === true && out.privateStatePortableWithDatabase === false &&
-      out.pqPrivateSeedPortableWithDatabase === false && out.databaseEmbedsRatchetMutableSecrets === false &&
+    out.ok = out.portableAccountIdentityPresent === true && out.archiveUsedForSending === false && out.privateArchiveReadOnly === true && out.databaseEmbedsRatchetMutableSecrets === false &&
       out.localStorageHasDevicePrivateEnvelope === true && out.localStorageHasPqPrivateEnvelope === true &&
       out.databaseEncryptedAuthenticated === true && out.liveRatchetStateExportedWithDatabase === false;
     return out;
@@ -36258,7 +37931,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     );
   }
 
-  async function requestDeviceKeySync(channelId, requestedScopedKeyId) {
+  async function requestDeviceKeySync(channelId, requestedScopedKeyId, userIntent = null) {
     if (!requestedScopedKeyId || !/^[A-Za-z0-9+/=_-]{16,64}$/.test(String(requestedScopedKeyId)))
       return null;
     // v68.1.2 hard transport boundary: DEVICE SYNC REQUEST is DM-only. Any
@@ -36282,6 +37955,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // retransmitting while historical ciphertexts are being scanned.
     if (existing) return existing.requestId;
 
+    assertSdcControlSendAllowed(channelId, userIntent);
     const request = await buildDeviceSyncRequest(channelId, requestedScopedKeyId);
     const now = Date.now();
     pendingDeviceSyncRequests.set(request.requestId, {
@@ -36291,7 +37965,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       createdAt: now,
       lastSentAt: now,
     });
-    await sendSignedDeviceControl(channelId, 'DEVICE SYNC REQUEST', request);
+    await sendSignedDeviceControl(channelId, 'DEVICE SYNC REQUEST', request, userIntent);
     await persistLocalDeviceMetadata();
     return request.requestId;
   }
@@ -36319,7 +37993,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function sendPrivateExactKeyRequest(sourceChannelId, requestedScopedKeyId, peerUserId, source = 'missing-key') {
+  async function sendPrivateExactKeyRequest(sourceChannelId, requestedScopedKeyId, peerUserId, source = 'missing-key', sourceIntent = null) {
     const sourceChannel = String(sourceChannelId || '');
     const scoped = String(requestedScopedKeyId || '');
     const peerId = String(peerUserId || '');
@@ -36355,6 +38029,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return null;
     }
 
+    const userIntent = deriveSdcControlUserIntent(sourceChannel, sourceIntent, dmChannelId);
+    assertSdcControlSendAllowed(dmChannelId, userIntent);
     prunePendingPrivateExactKeyRequests();
     let scopedBytes;
     try {
@@ -36389,7 +38065,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           `*requestId*: \`${requestId}\`\n` +
           `*requestedKeyScope*: \`V3\`\n` +
           `*requestedChannel*: \`${sourceChannel}\`\n` +
-          `*requestedKey*: \`${Utils.PayloadEncode(scopedBytes)}\``
+          `*requestedKey*: \`${Utils.PayloadEncode(scopedBytes)}\``,
+        { userIntent }
       );
       PrivateKeyRecoveryStats.privateRequestsSent++;
       PrivateKeyRecoveryStats.last = { at: new Date().toISOString(), sourceChannel, dmChannelId, peerId, source: String(source), result: 'PRIVATE_REQUEST_SENT' };
@@ -36408,17 +38085,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function requestMissingKeyRecovery(channelId, requestedScopedKeyId, peerUserId = null, source = 'missing-key') {
+  async function requestMissingKeyRecovery(channelId, requestedScopedKeyId, peerUserId = null, source = 'missing-key', userIntent = null) {
     const channel = Discord.getChannel(String(channelId || ''));
     if (!channel) return null;
     if (channel.type === 1)
-      return await requestDeviceKeySync(channelId, requestedScopedKeyId);
+      return await requestDeviceKeySync(channelId, requestedScopedKeyId, userIntent);
 
     // Absolute public-channel rule: no DEVICE SYNC request, including same-account
     // device recovery. This avoids persistent control spam proportional to the number
     // of installations/peers missing a group key.
     PrivateKeyRecoveryStats.publicDeviceSyncSuppressed++;
-    return await sendPrivateExactKeyRequest(channelId, requestedScopedKeyId, peerUserId, source);
+    return await sendPrivateExactKeyRequest(channelId, requestedScopedKeyId, peerUserId, source, userIntent);
   }
 
   async function deriveDeviceWrapKey(localPrivateKey, remotePublicBytes, contextObject) {
@@ -36774,7 +38451,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       generatedAt: Date.now(),
       issuerDeviceId: local.deviceId,
     };
-    await sendSignedDeviceControl(channelId, 'DEVICE REVOKE', object);
+    await sendSignedDeviceControl(channelId, 'DEVICE REVOKE', object, createSdcControlUserIntent(channelId, 'manual-device-revoke'));
     return object;
   }
 
@@ -38775,7 +40452,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     Sdc4MessageAttachmentBindings.set(cacheKey, existing);
     try { Object.defineProperty(message, '__sdc4FileFsDescriptors', { value: rows.map((row) => ({ ...row })), configurable: true, writable: true }); }
     catch (_) { message.__sdc4FileFsDescriptors = rows.map((row) => ({ ...row })); }
-    for (const row of rows) rememberSdc4FileFsKey(channelId, row);
+    // This synchronous presentation binding remains memory-only. The async file
+    // encryption/decryption paths persist descriptors only after sealing them.
     return existing;
   }
 
@@ -38788,6 +40466,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   // routing metadata; raw plaintext, Double Ratchet MKs and CKs are forbidden.
   const SDC4_HISTORY_LOCAL_VERSION = 1;
   const SDC4_HISTORY_STORAGE_PREFIX = 'SimpleDiscordCrypt-sdc4-history-v1:';
+  // Compatibility name: this bounds in-memory presentation metadata only.
   const SDC4_HISTORY_LIMIT = 2048;
   // v70.3.3: durable local-echo metadata is ciphertext-only and may need to
   // mirror every retained local history record. Do NOT reuse the 128-entry
@@ -38795,7 +40474,6 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   // Discord model has already been replaced by U+2063 makes the sent row
   // visually disappear on later DM remounts.
   const SDC4_LOCAL_ECHO_PENDING_LIMIT = SDC4_HISTORY_LIMIT;
-  const SDC4_HISTORY_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
   let Sdc4HistoryStoreCache = null;
   let Sdc4HistoryStoreCacheKey = null;
   let Sdc4HistoryWriteChain = Promise.resolve();
@@ -38864,24 +40542,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     });
   }
 
-  function pruneSdc4HistoryStore(store, now = Date.now()) {
+  function pruneSdc4HistoryStore(store) {
     if (!store || typeof store !== 'object') return;
     if (!store.records || typeof store.records !== 'object' || Array.isArray(store.records))
       store.records = {};
     for (const [id, record] of Object.entries(store.records)) {
-      const createdAt = Number(record?.createdAt || 0);
-      if (!record || record.version !== SDC4_HISTORY_LOCAL_VERSION ||
-          (createdAt > 0 && now - createdAt > SDC4_HISTORY_MAX_AGE_MS)) {
-        delete store.records[id];
+      if (!record || record.version !== SDC4_HISTORY_LOCAL_VERSION) {
+        throw new Error('Unsupported encrypted history record; existing history was retained');
       }
     }
-    const entries = Object.entries(store.records);
-    if (entries.length > SDC4_HISTORY_LIMIT) {
-      entries
-        .sort(([, a], [, b]) => Number(a?.createdAt || 0) - Number(b?.createdAt || 0))
-        .slice(0, entries.length - SDC4_HISTORY_LIMIT)
-        .forEach(([id]) => { delete store.records[id]; });
-    }
+    // This is the only readable copy once DR erases an already-consumed MK.
+    // Age/count limits belong to the visible echo cache, never to this encrypted
+    // record store. Export fails explicitly at its byte limit instead of pruning.
   }
 
   async function loadSdc4HistoryStore() {
@@ -38889,16 +40561,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const ownId = String(Discord.getCurrentUser?.()?.id || '');
     const storageKey = sdc4HistoryStorageKey(local, ownId);
     if (Sdc4HistoryStoreCache && Sdc4HistoryStoreCacheKey === storageKey) {
-      pruneSdc4HistoryStore(Sdc4HistoryStoreCache);
       return { store: Sdc4HistoryStoreCache, storageKey, local, ownId };
     }
-    let stored = null;
-    try { stored = await Utils.StorageLoad(storageKey); } catch (_) {}
+    const stored = await Utils.StorageLoad(storageKey);
     const valid = stored && typeof stored === 'object' &&
       stored.version === SDC4_HISTORY_LOCAL_VERSION &&
       String(stored.accountId || '') === ownId &&
       String(stored.deviceId || '') === String(local.deviceId) &&
+      String(stored.rootFingerprint || '') === String(local.rootFingerprint || '') &&
       stored.records && typeof stored.records === 'object' && !Array.isArray(stored.records);
+    if (stored != null && !valid) throw new Error('Encrypted history storage context mismatch; existing history was retained');
     const store = valid ? stored : {
       version: SDC4_HISTORY_LOCAL_VERSION,
       accountId: ownId,
@@ -38936,17 +40608,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const ctx = await loadSdc4HistoryStore();
       ctx.store.records[wireId] = JSON.parse(JSON.stringify(record));
       ctx.store.updatedAt = Date.now();
-      pruneSdc4HistoryStore(ctx.store);
       await Utils.StorageSave(ctx.storageKey, ctx.store);
       return wireId;
     });
   }
 
-  async function getSdc4HistoryRecord(wireId, direction = null) {
+  async function getSdc4HistoryRecord(wireId, direction = null, exactHistoryBinding = null) {
     const id = String(wireId || '');
     if (!/^[A-Za-z0-9_-]{32,64}$/.test(id)) return null;
     const ctx = await loadSdc4HistoryStore();
-    const record = ctx.store.records?.[id];
+    const localRecord = ctx.store.records?.[id];
+    const record = localRecord && (!direction || localRecord.direction === direction)
+      ? localRecord : await restorePrivateRecoveryHistoryRecord(id, direction, exactHistoryBinding);
     if (!record || record.version !== SDC4_HISTORY_LOCAL_VERSION) return null;
     if (direction && String(record.direction || '') !== String(direction)) return null;
     if (String(record.accountId || '') !== ctx.ownId ||
@@ -39009,6 +40682,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         : '',
       createdAt: Date.now(),
     });
+  }
+
+  async function persistAsyncPrekeySentHistory(wireId, plaintext, channelId, historyBinding) {
+    const local = await ensureLocalDeviceIdentity();
+    const key = await deriveSdc4HistoryKeyBytes(local), clear = Utils.StringToUtf8Bytes(String(plaintext));
+    const meta = { accountId: String(Discord.getCurrentUser()?.id || ''), deviceId: local.deviceId,
+      channelId: String(channelId), requestId: String(wireId) };
+    try {
+      const envelope = await rawAesGcmEncrypt(key, clear, sdc4SentHistoryAadBytes(meta, historyBinding));
+      await persistSdc4SentCipherHistory(wireId, channelId, wireId, envelope, historyBinding);
+    } finally { key.fill(0); clear.fill(0); }
   }
 
   async function persistSdc4SentPlaintextHistory(wire, plaintext, channelId) {
@@ -39096,6 +40780,941 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const SDC_PORTABLE_HISTORY_VERSION = 1;
   const SDC_PORTABLE_HISTORY_EXPORT_LIMIT = 2048;
 
+  // v70.11.0: a backup is a password-protected archive, never a compressed JSON
+  // database. Both equal-sized slots always exist, in random order; an unused slot
+  // is random bytes. A configured alternate password opens an ordinary independent
+  // database, with no Real-Vault keys. This reduces file-level disclosure; it does
+  // not promise deniability against local storage, prior copies or OS forensics.
+  const SDC_BACKUP_MAGIC = Uint8Array.of(83, 68, 67, 66, 75, 80, 2, 0);
+  const SDC_BACKUP_HEADER_BYTES = 44;
+  const SDC_BACKUP_MAX_SLOT_BYTES = 64 * 1024 * 1024;
+  const SDC_BACKUP_KDF = Object.freeze({ memoryKiB: 65536, passes: 3, parallelism: 4, hashBytes: 32, version: 19 });
+  const SDC_PRIVATE_RECOVERY_PURPOSE = 'db-portable-private-recovery-v1';
+  let PrivateRecoveryOperationTail = Promise.resolve();
+  let SdcBackupSnapshotTail = Promise.resolve();
+  let SdcBackupReceiveGate = null;
+  let SdcBackupFileVaultSnapshotActive = false;
+  const SdcUiHistoryRecoveryTransactions = new Set();
+
+  async function waitSdcBackupReceiveGate() {
+    if (SdcBackupReceiveGate) await SdcBackupReceiveGate;
+  }
+
+  async function withSdcUiHistoryRecovery(operation) {
+    // UI remounts are outside the inbound wire transactions. Register them
+    // before starting key transfer, so import/export cannot split their commit.
+    // Never call this wrapper from an already registered inbound transaction.
+    await waitSdcBackupReceiveGate();
+    while (SdcBackupReceiveGate) await waitSdcBackupReceiveGate();
+    const job = Promise.resolve().then(operation);
+    SdcUiHistoryRecoveryTransactions.add(job);
+    try { return await job; }
+    finally { SdcUiHistoryRecoveryTransactions.delete(job); }
+  }
+
+  function withConsistentSdcBackupSnapshot(operation) {
+    const job = SdcBackupSnapshotTail.catch(() => {}).then(async () => {
+      let release;
+      SdcBackupReceiveGate = new Promise((resolve) => { release = resolve; });
+      let released = false;
+      const releaseSnapshot = () => {
+        if (released) return;
+        released = true;
+        SdcBackupFileVaultSnapshotActive = false;
+        SdcBackupReceiveGate = null;
+        release();
+      };
+      try {
+        // A receive checkpoint and its encrypted history commit form one unit.
+        // Block new receives and drain those already registered before taking
+        // the private-archive lock; the opposite order would deadlock recovery.
+        await Promise.allSettled([...Sdc4InboundDecryptTransactions.values(), ...SdcAsyncInboundDecryptTransactions.values(), ...SdcUiHistoryRecoveryTransactions]);
+        await RatchetPersistQueue;
+        await Sdc4HistoryWriteChain;
+        SdcBackupFileVaultSnapshotActive = true;
+        await Sdc4FileFsVaultWriteTail;
+        return await operation(releaseSnapshot);
+      } finally { releaseSnapshot(); }
+    });
+    SdcBackupSnapshotTail = job.then(() => undefined, () => undefined);
+    return job;
+  }
+
+  function withPrivateRecoveryOperation(operation) {
+    const job = PrivateRecoveryOperationTail.catch(() => {}).then(operation);
+    PrivateRecoveryOperationTail = job.then(() => undefined, () => undefined);
+    return job;
+  }
+
+  function randomSdcBackupBytes(length) {
+    const bytes = new Uint8Array(length);
+    // WebCrypto limits each getRandomValues call to 65536 bytes.
+    for (let offset = 0; offset < length; offset += 65536)
+      bytes.set(Utils.GetRandomBytes(Math.min(65536, length - offset)), offset);
+    return bytes;
+  }
+
+  function isSdcEncryptedBackup(bytesLike) {
+    const bytes = new Uint8Array(bytesLike);
+    return bytes.length >= 8 && SDC_BACKUP_MAGIC.every((value, i) => bytes[i] === value);
+  }
+
+  function assertSdcBackupDatabase(database) {
+    if (!database || typeof database !== 'object' || Array.isArray(database) ||
+        !database.keys || typeof database.keys !== 'object' || Array.isArray(database.keys) ||
+        !database.channels || typeof database.channels !== 'object' || Array.isArray(database.channels))
+      throw new Error('Invalid SimpleDiscordCrypt database backup');
+    const visit = (value, depth = 0) => {
+      if (depth > 64) throw new Error('Backup nesting exceeds the safe limit');
+      if (!value || typeof value !== 'object') return;
+      for (const key of Object.keys(value)) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype')
+          throw new Error('Unsafe backup object key');
+        visit(value[key], depth + 1);
+      }
+    };
+    visit(database);
+    const bound = String(database.identityBoundDiscordAccountId || '');
+    if (bound && bound !== String(Discord.getCurrentUser?.()?.id || ''))
+      throw new Error('Backup belongs to a different Discord account');
+  }
+
+  async function encryptSdcBackupSlots(database, password, alternateDatabase = null, alternatePassword = null) {
+    assertNewDbPasswordPolicy(password);
+    if (alternateDatabase && (!alternatePassword || String(password) === String(alternatePassword)))
+      throw new Error('The alternate backup password must be independent');
+    if (alternateDatabase) assertNewDbPasswordPolicy(alternatePassword);
+    const payloads = [database, alternateDatabase].map((db) => db
+      ? Utils.StringToUtf8Bytes(JSON.stringify({ format: 'SDC-BACKUP', version: 2, database: db })) : null);
+    let size = 4096;
+    while (size < Math.max(...payloads.map((p) => (p?.byteLength || 0) + 4)) + 28) size *= 2;
+    if (size > SDC_BACKUP_MAX_SLOT_BYTES) throw new Error('Backup is too large; no history or private keys were silently omitted');
+    const header = Utils.GetRandomBytes(SDC_BACKUP_HEADER_BYTES);
+    header.set(SDC_BACKUP_MAGIC, 0);
+    new DataView(header.buffer, header.byteOffset, header.byteLength).setUint32(40, size, false);
+    const realSlot = Utils.GetRandomBytes(1)[0] & 1;
+    const slots = [];
+    try {
+      for (let i = 0; i < 2; i++) {
+        const alternate = i !== realSlot;
+        const payload = payloads[alternate ? 1 : 0];
+        if (!payload) { slots.push(randomSdcBackupBytes(size)); continue; }
+        const padded = randomSdcBackupBytes(size - 28);
+        new DataView(padded.buffer, padded.byteOffset, padded.byteLength).setUint32(0, payload.byteLength, false);
+        padded.set(payload, 4);
+        const salt = header.slice(8 + i * 16, 24 + i * 16);
+        let key = null;
+        try {
+          key = await deriveArgon2idBytes(alternate ? alternatePassword : password, salt, SDC_BACKUP_KDF);
+          slots.push(await rawAesGcmEncrypt(key, padded, Utils.ConcatBuffers([header, Uint8Array.of(i)])));
+        } finally { key?.fill?.(0); padded.fill(0); salt.fill(0); }
+      }
+      return Utils.ConcatBuffers([header, ...slots]);
+    } finally { for (const payload of payloads) payload?.fill?.(0); }
+  }
+
+  async function decryptSdcBackupSlots(bytesLike, password) {
+    const bytes = new Uint8Array(bytesLike);
+    if (!isSdcEncryptedBackup(bytes) || bytes.length < SDC_BACKUP_HEADER_BYTES)
+      throw new Error('Invalid encrypted backup');
+    const header = bytes.slice(0, SDC_BACKUP_HEADER_BYTES);
+    const size = new DataView(header.buffer).getUint32(40, false);
+    if (size < 4096 || size > SDC_BACKUP_MAX_SLOT_BYTES || (size & (size - 1)) !== 0 ||
+        bytes.length !== SDC_BACKUP_HEADER_BYTES + size * 2)
+      throw new Error('Invalid encrypted backup size');
+    let database = null;
+    // Always perform both derivations. A successful alternate slot reveals no
+    // real slot metadata; all metadata beyond fixed KDF/size is authenticated.
+    for (let i = 0; i < 2; i++) {
+      const salt = header.slice(8 + i * 16, 24 + i * 16);
+      let key = null, clear = null;
+      try {
+        key = await deriveArgon2idBytes(password, salt, SDC_BACKUP_KDF);
+        try {
+          clear = await rawAesGcmDecrypt(key, bytes.slice(SDC_BACKUP_HEADER_BYTES + i * size, SDC_BACKUP_HEADER_BYTES + (i + 1) * size), Utils.ConcatBuffers([header, Uint8Array.of(i)]));
+        } catch (_) { continue; }
+        const length = new DataView(clear.buffer, clear.byteOffset, clear.byteLength).getUint32(0, false);
+        if (length < 2 || length > clear.length - 4) throw new Error('Invalid backup payload');
+        const payload = JSON.parse(Utils.Utf8BytesToString(clear.subarray(4, 4 + length)));
+        if (payload?.format !== 'SDC-BACKUP' || payload.version !== 2 || database)
+          throw new Error('Invalid or ambiguous backup payload');
+        assertSdcBackupDatabase(payload.database);
+        database = payload.database;
+      } finally { key?.fill?.(0); clear?.fill?.(0); salt.fill(0); }
+    }
+    if (!database) throw new Error('Incorrect password or damaged encrypted backup');
+    return database;
+  }
+
+  // v70.11.3: one visible, cancellable authentication transaction owns the
+  // backup UI. Notifications contain fixed labels only, never keys or errors.
+  const SdcBackupOperationUi = {
+    active: null,
+    lastCompletedNode: null,
+    sequence: 0,
+    begin(kind) {
+      if (this.active?.busy) return null;
+      this.lastCompletedNode?.remove(); this.lastCompletedNode = null;
+      const database = DataBase, databaseKey = Cache?.dbKey;
+      const accountId = String(Discord.getCurrentUser?.()?.id || '');
+      const alternate = DuressRuntime.active === true;
+      const owner = this;
+      const operation = {
+        id: ++this.sequence, kind, phase: 'waiting', busy: true, ended: false,
+        node: null, label: null, closeButton: null, cancelPrompt: null, hiddenWindow: null,
+        isCurrent() { return owner.active === this && this.busy && !this.ended; },
+        accountMatches() {
+          return String(Discord.getCurrentUser?.()?.id || '') === accountId &&
+            (DuressRuntime.active === true) === alternate;
+        },
+        contextMatches() {
+          return this.isCurrent() && DataBase === database && Cache?.dbKey === databaseKey &&
+            String(Discord.getCurrentUser?.()?.id || '') === accountId &&
+            (DuressRuntime.active === true) === alternate;
+        },
+        assertCurrent() {
+          if (!this.contextMatches()) {
+            const error = new Error('Backup operation context changed');
+            error.sdcBackupOperationInvalidated = true;
+            throw error;
+          }
+        },
+        setPhase(phase) {
+          if (!this.isCurrent()) return;
+          this.phase = phase;
+          if (phase === 'waiting') return;
+          const t = (english, french) => SdcUiI18n.pick(english, french);
+          const labels = {
+            authenticating: t('Opening encrypted backup…', 'Ouverture de la sauvegarde chiffrée…'),
+            exporting: t('Encrypted backup export in progress…', 'Export de la sauvegarde chiffrée en cours…'),
+            importing: t('Database import in progress…', 'Importation de la base en cours…'),
+            restarting: t('Import complete. Restarting the client…', 'Import réussi. Redémarrage du client…'),
+            'restart-needed': t('Import complete. Reload Discord to finish.', 'Import réussi. Recharge Discord pour terminer.'),
+            success: t('Encrypted backup ready. Download started.', 'Sauvegarde chiffrée prête. Téléchargement lancé.'),
+            retry: t('Unable to open backup. Check the password and retry.', 'Impossible d’ouvrir la sauvegarde. Vérifie le mot de passe et réessaie.'),
+            error: kind === 'export'
+              ? t('Encrypted backup export failed. Please retry.', 'L’export chiffré a échoué. Réessaie.')
+              : t('Import failed. The current database is retained.', 'L’import a échoué. La base courante est conservée.'),
+          };
+          if (!this.node && typeof document !== 'undefined' && document.body) {
+            const node = document.createElement('div');
+            node.className = 'SDC_BACKUP_OPERATION_STATUS';
+            node.setAttribute('role', 'status'); node.setAttribute('aria-live', 'polite');
+            node.style.cssText = 'position:fixed;bottom:24px;left:24px;z-index:2147483647;display:flex;align-items:center;gap:10px;max-width:min(420px,calc(100vw - 48px));padding:12px 16px;border:1px solid rgba(255,255,255,.15);border-radius:8px;background:#202225;color:#f2f3f5;box-shadow:0 8px 30px rgba(0,0,0,.5);font:14px/1.4 var(--font-primary,"gg sans",sans-serif);pointer-events:auto';
+            const label = document.createElement('span'); node.appendChild(label);
+            const close = document.createElement('button'); close.type = 'button'; close.textContent = '×';
+            close.setAttribute('aria-label', t('Close notification', 'Fermer la notification'));
+            close.style.cssText = 'border:0;background:transparent;color:inherit;font:22px/1 sans-serif;cursor:pointer;padding:0 0 0 6px';
+            close.addEventListener('click', () => { if (!this.busy) node.remove(); });
+            node.appendChild(close); document.body.appendChild(node);
+            this.node = node; this.label = label; this.closeButton = close;
+          }
+          if (this.node) {
+            this.node.dataset.state = phase;
+            this.node.setAttribute('aria-busy', String(!['success', 'error', 'restart-needed', 'retry'].includes(phase)));
+            this.label.textContent = 'SDC · ' + (labels[phase] || labels.error);
+            this.closeButton.style.display = ['success', 'error'].includes(phase) ? '' : 'none';
+          }
+        },
+        async paint() {
+          // A timer also works in hidden tabs where rAF may be suspended.
+          await new Promise((resolve) => {
+            let done = false, frame = null;
+            const finish = () => { if (done) return; done = true; if (frame != null) try { cancelAnimationFrame(frame); } catch (_) {} resolve(); };
+            setTimeout(finish, 80);
+            if (typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(() => setTimeout(finish, 0));
+          });
+        },
+        hideCreationWindow() {
+          const node = NewdbWindow.domElement;
+          if (!node?.isConnected || this.hiddenWindow) return;
+          this.hiddenWindow = { node, display: node.style.getPropertyValue('display'), priority: node.style.getPropertyPriority('display') };
+          node.style.setProperty('display', 'none', 'important');
+        },
+        restoreCreationWindow() {
+          const saved = this.hiddenWindow; this.hiddenWindow = null;
+          if (!saved?.node?.isConnected || NewdbWindow.domElement !== saved.node) return;
+          if (saved.display) saved.node.style.setProperty('display', saved.display, saved.priority);
+          else saved.node.style.removeProperty('display');
+        },
+        finish(phase) {
+          if (!this.isCurrent()) return;
+          if (phase === 'cancelled') {
+            this.restoreCreationWindow(); this.node?.remove();
+          } else {
+            if (phase === 'error') this.restoreCreationWindow();
+            this.setPhase(phase);
+          }
+          this.busy = phase === 'restarting' || phase === 'restart-needed';
+          this.ended = !this.busy;
+          if (!this.busy) {
+            owner.active = null;
+            const node = this.node;
+            if (node && phase !== 'cancelled') {
+              owner.lastCompletedNode = node;
+              setTimeout(() => { node.remove(); if (owner.lastCompletedNode === node) owner.lastCompletedNode = null; }, 8000);
+            }
+          }
+        },
+      };
+      this.active = operation;
+      return operation;
+    },
+    cancelCurrent() {
+      const operation = this.active;
+      if (!operation) return;
+      try { operation.cancelPrompt?.(); } catch (_) {}
+      operation.finish('cancelled');
+    },
+  };
+
+  function promptSdcBackupCredentials(exporting = false, alternateRequired = false, newPassword = false, authenticate = null, operation = null) {
+    return new Promise((resolve) => {
+      const host = document.createElement('div');
+      const t = (english, french) => HtmlEscape(SdcUiI18n.pick(english, french));
+      host.innerHTML = `<div class="sdc">
+        <div class="sdc-cover SDC_BACKUP_CANCEL"></div><div class="sdc-overlay">
+          <form class="sdc-window SDC_BACKUP_FORM" style="width:calc(100vw - 32px);max-width:660px;min-width:0;box-sizing:border-box">
+            <h4 style="margin-top:20px">${exporting ? t('Export encrypted backup', 'Exporter une sauvegarde chiffrée') : t('Import encrypted backup', 'Importer une sauvegarde chiffrée')}</h4>
+            <p style="margin-top:14px">${exporting ? t('The .dat contains private recovery keys and retained history. Keep it and its passphrase secure.', 'Le .dat contient les clés privées de récupération et l’historique conservé. Protège ce fichier et sa phrase de passe.') : t('Enter the password for the backup you want to open. The current database is kept until authentication succeeds.', 'Saisis le mot de passe de la sauvegarde à ouvrir. La base courante est conservée jusqu’à la réussite de l’authentification.')}</p>
+            <label style="display:block;margin-top:14px">${newPassword ? t('Backup passphrase', 'Phrase de passe de la sauvegarde') : t('Database / backup password', 'Mot de passe de la base / sauvegarde')}<input class="SDC_BACKUP_PASSWORD" type="password" autocomplete="${newPassword ? 'new-password' : 'current-password'}"></label>
+            ${newPassword ? `<label style="display:block;margin-top:14px">${t('Confirm passphrase', 'Confirmer la phrase de passe')}<input class="SDC_BACKUP_CONFIRM" type="password" autocomplete="new-password"></label>` : ''}
+            ${alternateRequired ? `<label style="display:block;margin-top:14px">${t('Configured Duress password', 'Mot de passe Duress configuré')}<input class="SDC_BACKUP_ALTERNATE" type="password" autocomplete="current-password"></label><p>${t('This password opens the independent alternate profile in the backup.', 'Ce mot de passe ouvre le profil alternatif indépendant de la sauvegarde.')}</p>` : ''}
+            <div class="SDC_BACKUP_ERROR" role="alert"></div>
+            <div class="sdc-footer"><button type="button" class="sdc-lnkbtn SDC_BACKUP_CANCEL">${t('Cancel', 'Annuler')}</button><button class="sdc-btn" type="submit">${exporting ? t('Export', 'Exporter') : t('Open', 'Ouvrir')}</button></div>
+          </form>
+        </div></div>`;
+      let closed = false, authenticating = false;
+      const finish = (result) => {
+        if (closed) return;
+        closed = true;
+        for (const input of host.querySelectorAll('input')) input.value = '';
+        if (operation) operation.cancelPrompt = null;
+        host.remove(); resolve(result);
+      };
+      if (operation) operation.cancelPrompt = () => finish(null);
+      for (const el of host.querySelectorAll('.SDC_BACKUP_CANCEL')) el.addEventListener('click', () => finish(null));
+      host.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); finish(null); } });
+      host.querySelector('form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (closed || authenticating) return;
+        const password = host.querySelector('.SDC_BACKUP_PASSWORD').value;
+        if (newPassword && password !== host.querySelector('.SDC_BACKUP_CONFIRM').value) {
+          host.querySelector('.SDC_BACKUP_ERROR').textContent = SdcUiI18n.pick('Passphrases do not match', 'Les phrases de passe ne correspondent pas'); return;
+        }
+        const credentials = { password, alternatePassword: host.querySelector('.SDC_BACKUP_ALTERNATE')?.value || null };
+        if (!authenticate) { finish(credentials); return; }
+        authenticating = true;
+        const controls = [...host.querySelectorAll('input,button[type="submit"]')];
+        for (const control of controls) control.disabled = true;
+        host.querySelector('form').setAttribute('aria-busy', 'true');
+        host.querySelector('.SDC_BACKUP_ERROR').textContent = '';
+        try {
+          const authenticated = await authenticate(credentials);
+          if (!closed) finish({ ...credentials, authenticated });
+        } catch (error) {
+          if (closed) return;
+          if (error?.sdcBackupOperationInvalidated) { operation?.finish('error'); finish(null); return; }
+          operation?.setPhase('retry');
+          host.querySelector('.SDC_BACKUP_ERROR').textContent = SdcUiI18n.pick('Unable to open backup. Check the password or choose another file.', 'Impossible d’ouvrir la sauvegarde. Vérifie le mot de passe ou choisis un autre fichier.');
+          host.querySelector('.SDC_BACKUP_PASSWORD').value = '';
+          host.querySelector('.SDC_BACKUP_PASSWORD').focus();
+        } finally {
+          credentials.password = ''; credentials.alternatePassword = null;
+          authenticating = false;
+          if (!closed) {
+            for (const control of controls) control.disabled = false;
+            host.querySelector('form').setAttribute('aria-busy', 'false');
+          }
+        }
+      });
+      document.body.appendChild(host);
+      host.querySelector('input').focus();
+    });
+  }
+
+  async function encryptedIndependentBackupDatabase(source, password) {
+    // Only this supplied isolated database is read, including in Duress runtime.
+    const database = JSON.parse(JSON.stringify(source));
+    delete database.plausibleDeniability;
+    delete database.plausibleDecoyRuntime;
+    delete database.plausibleDuressRuntime;
+    const key = await createDbKeyV3(password, database);
+    database.isEncrypted = true;
+    for (const entry of Object.values(database.keys || {}))
+      entry.k = Utils.BytesToBase64(await Utils.AesEncrypt(key, Utils.Base64ToBytes(entry.k), 'db-key'));
+    database.dhPrivateKey = Utils.BytesToBase64(await Utils.AesEncrypt(key, Utils.Base64ToBytes(database.dhPrivateKey), 'db-dh'));
+    // A normal, independent signing identity makes the disclosed profile usable.
+    const pair = await Utils.IdentityGenerateKeys();
+    let privateBytes = null;
+    try {
+      database.identityPublicKey = Utils.BytesToBase64(await Utils.IdentityExportPublicKey(pair.publicKey));
+      privateBytes = new Uint8Array(await Utils.IdentityExportPrivateKey(pair.privateKey));
+      database.identityPrivateKey = Utils.BytesToBase64(await Utils.AesEncrypt(key, privateBytes, 'db-identity'));
+    } finally { privateBytes?.fill?.(0); }
+    if (source.sdc4FileFsKeys !== undefined)
+      await rewrapSdc4FileFsVaultForDatabase(source, database, source.isEncrypted ? Cache.dbKey : null, key);
+    return database;
+  }
+
+  function validatePrivateRecoveryBundle(bundle, accountId, rootFingerprint) {
+    if (bundle?.version !== 1 || bundle.accountId !== accountId || bundle.rootFingerprint !== rootFingerprint ||
+        !Array.isArray(bundle.snapshots) || !bundle.seenWires || typeof bundle.seenWires !== 'object' || Array.isArray(bundle.seenWires) ||
+        (bundle.historyRecords && (typeof bundle.historyRecords !== 'object' || Array.isArray(bundle.historyRecords))))
+      throw new Error('Private recovery archive context mismatch');
+    for (const snapshot of bundle.snapshots) {
+      const local = snapshot?.device;
+      if (!local || local.accountId !== accountId || local.rootFingerprint !== rootFingerprint ||
+          !isValidRatchetDeviceId(local.deviceId) || typeof local.privateEnvelope !== 'string' ||
+          typeof local.publicKey !== 'string' || !Array.isArray(snapshot.states) ||
+          snapshot.states.some((state) => state.localAccountId !== accountId || state.localDeviceId !== local.deviceId))
+        throw new Error('Private recovery snapshot account/device mismatch');
+      for (const record of Object.values(snapshot.history?.records || {})) {
+        if (record.accountId !== accountId || record.deviceId !== local.deviceId)
+          throw new Error('Private recovery history account/device mismatch');
+      }
+    }
+    // Deduplicate encrypted history independently from ratchet checkpoints. Old
+    // snapshots are retained for skipped-key recovery without copying thousands
+    // of history records into each export or each recovered receive position.
+    if (!bundle.historyRecords) bundle.historyRecords = {};
+    for (const snapshot of bundle.snapshots) {
+      for (const record of Object.values(snapshot.history?.records || {}))
+        bundle.historyRecords[`${record.deviceId}:${record.wireId}`] = record;
+      delete snapshot.history;
+    }
+    if (bundle.historyDeviceIds === undefined) bundle.historyDeviceIds = [];
+    if (!Array.isArray(bundle.historyDeviceIds) || bundle.historyDeviceIds.some((id) => !isValidRatchetDeviceId(id)))
+      throw new Error('Private recovery history device context mismatch');
+    bundle.historyDeviceIds = Array.from(new Set(bundle.historyDeviceIds));
+    const deviceIds = new Set([...bundle.snapshots.map((entry) => entry.device.deviceId), ...bundle.historyDeviceIds]);
+    for (const [id, record] of Object.entries(bundle.historyRecords)) {
+      if (record.accountId !== accountId || !deviceIds.has(record.deviceId) || id !== `${record.deviceId}:${record.wireId}`)
+        throw new Error('Private recovery history binding mismatch');
+    }
+    return bundle;
+  }
+
+  async function readPrivateRecoveryBundle(database = DataBase, key = Cache?.dbKey) {
+    const accountId = String(Discord.getCurrentUser?.()?.id || '');
+    const rootFingerprint = await identityFingerprint(Utils.Base64ToBytes(database.identityPublicKey));
+    if (!database.portablePrivateRecovery)
+      return { version: 1, accountId, rootFingerprint, snapshots: [], seenWires: {}, historyRecords: {} };
+    let clear = null;
+    try {
+      clear = new Uint8Array(await Utils.AesDecrypt(key, Utils.Base64ToBytes(database.portablePrivateRecovery.envelope), SDC_PRIVATE_RECOVERY_PURPOSE));
+      return validatePrivateRecoveryBundle(JSON.parse(Utils.Utf8BytesToString(clear)), accountId, rootFingerprint);
+    } finally { clear?.fill?.(0); }
+  }
+
+  function mergeSdcImportedSecurityRestrictions(imported, current) {
+    if (!imported || !current || imported.identityPublicKey !== current.identityPublicKey ||
+        (imported.identityBoundDiscordAccountId && current.identityBoundDiscordAccountId &&
+         imported.identityBoundDiscordAccountId !== current.identityBoundDiscordAccountId))
+      throw new Error('Security restrictions can merge only for the same account identity');
+    const copy = value => JSON.parse(JSON.stringify(value));
+    const time = value => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+    const earliest = (a, b) => { const values = [time(a), time(b)].filter(Boolean); return values.length ? Math.min(...values) : 0; };
+    const deviceRow = (account, id) => {
+      if (!imported.deviceRegistry) imported.deviceRegistry = {};
+      if (!imported.deviceRegistry[account]) imported.deviceRegistry[account] = { devices: {} };
+      const registry = imported.deviceRegistry[account];
+      if (!registry.devices) registry.devices = {};
+      // This is a policy placeholder, never an imported bootstrap certificate.
+      if (!registry.devices[id]) registry.devices[id] = { deviceId: id, devicePublicKey: null, revokedAt: null };
+      return registry.devices[id];
+    };
+    // Whitelist only negative/monotonic policy. Never copy live prekeys, positive
+    // capability leases, peer secrets, session positions or recipient membership.
+    for (const [account, registry] of Object.entries(current.deviceRegistry || {})) {
+      if (!/^[0-9]{1,32}$/.test(account)) throw new Error('Invalid current device-registry account while importing');
+      for (const [id, source] of Object.entries(registry?.devices || {})) {
+        if (!source || !isValidRatchetDeviceId(id)) continue;
+        const old = imported.deviceRegistry?.[account]?.devices?.[id];
+        if (old?.devicePublicKey && source.devicePublicKey && old.devicePublicKey !== source.devicePublicKey)
+          throw new Error('Device public-key conflict while merging backup security restrictions');
+        const sticky = source.pqEverHybrid === true || source.pqRatchetEverLive === true ||
+          source.pqOfflineHybridEverSeen === true || source.pqV692HybridOfflineCapable === true;
+        if (!old && !source.revokedAt && !sticky && source.sdcMinimumVersionCompatible !== false &&
+            source.pqPrekeyBindingCurrent !== false && !source.headerEncryptionImportRequiredChannels?.length) continue;
+        const target = deviceRow(account, id);
+        if (source.revokedAt || target.revokedAt) target.revokedAt = Math.max(time(source.revokedAt), time(target.revokedAt)) || Date.now();
+        for (const field of ['pqEverHybrid', 'pqRatchetEverLive', 'pqOfflineHybridEverSeen'])
+          if (source[field] === true) target[field] = true;
+        if (sticky) { target.pqEverHybrid = true; target.pqDowngradePolicy = 'STICKY_PER_DEVICE'; }
+        for (const field of ['pqRatchetFirstLiveAt', 'pqFirstVerifiedAt', 'pqV692FirstVerifiedAt']) {
+          const at = earliest(target[field], source[field]); if (at) target[field] = at;
+        }
+        const superseded = Math.max(time(target.pqV692CapabilitySupersededAt), time(source.pqV692CapabilitySupersededAt));
+        if (superseded) target.pqV692CapabilitySupersededAt = superseded;
+        if (source.pqV692HybridOfflineCapable === false ||
+            (superseded && time(target.pqV692LastVerifiedAt) <= superseded)) {
+          target.pqV692HybridOfflineCapable = false;
+          target.pqV692HybridOfflineFanoutCapable = false;
+        }
+        if (source.pqPrekeyBindingCurrent === false) target.pqPrekeyBindingCurrent = false;
+        if (source.sdcMinimumVersionCompatible === false) target.sdcMinimumVersionCompatible = false;
+        target.headerEncryptionImportRequiredChannels = Array.from(new Set([
+          ...(target.headerEncryptionImportRequiredChannels || []), ...(source.headerEncryptionImportRequiredChannels || []),
+        ].map(String))).sort();
+      }
+    }
+    if (!imported.peerIdentityKeys) imported.peerIdentityKeys = {};
+    const markConflict = (peer, source = null) => {
+      const target = imported.peerIdentityKeys[peer] || { publicKey: source?.publicKey || null };
+      target.status = 'CHANGED';
+      target.changedAt = Math.max(time(target.changedAt), time(source?.changedAt), Date.now());
+      if (source?.publicKey && source.publicKey !== target.publicKey) target.observedIdentityPublicKey = source.publicKey;
+      for (const field of ['verifiedAt', 'verifiedFingerprint', 'verifiedMethod', 'verifiedProtocol', 'verifiedProofId']) delete target[field];
+      delete target.duressEnrollment; delete target.duressDecoy;
+      imported.peerIdentityKeys[peer] = target;
+      return target;
+    };
+    const peerIds = new Set([...Object.keys(imported.peerIdentityKeys), ...Object.keys(current.peerIdentityKeys || {})]);
+    for (const peer of peerIds) {
+      if (!/^[0-9]{1,32}$/.test(peer)) throw new Error('Invalid peer account while merging backup restrictions');
+      const source = current.peerIdentityKeys?.[peer] || null;
+      let target = imported.peerIdentityKeys[peer] || null;
+      if (!target && source) target = imported.peerIdentityKeys[peer] = { publicKey: source.publicKey || null, fingerprint: source.fingerprint, status: 'UNVERIFIED' };
+      if (!target) continue;
+      const samePin = !!source?.publicKey && source.publicKey === target.publicKey;
+      const replacement = record => !!record?.observedIdentityPublicKey && record.observedIdentityPublicKey !== record.publicKey;
+      if (source && (!samePin || source.status === 'CHANGED' || target.status === 'CHANGED' || replacement(source) || replacement(target))) {
+        target = markConflict(peer, source);
+        if (replacement(source) && source.observedIdentityPublicKey !== target.publicKey)
+          target.observedIdentityPublicKey = source.observedIdentityPublicKey;
+      } else if (!source || source.status !== 'VERIFIED' || target.status !== 'VERIFIED') {
+        target.status = target.status === 'CHANGED' ? 'CHANGED' : 'UNVERIFIED';
+      }
+      if (target.status !== 'VERIFIED') {
+        for (const field of ['verifiedAt', 'verifiedFingerprint', 'verifiedMethod', 'verifiedProtocol', 'verifiedProofId']) delete target[field];
+      }
+      const alertSource = time(source?.securityAlertAt) > time(target.securityAlertAt) ? source : target;
+      const clearSource = time(source?.securityClearedAt) > time(target.securityClearedAt) ? source : target;
+      const alertAt = Math.max(time(source?.securityAlertAt), time(target.securityAlertAt));
+      const clearAt = Math.max(time(source?.securityClearedAt), time(target.securityClearedAt));
+      const suspected = source?.securityState === 'DURESS_SUSPECTED' || target.securityState === 'DURESS_SUSPECTED';
+      for (const field of ['securityAlertAt', 'securityAlertId', 'securityAlertEnrollmentId', 'securityAlertProtocol'])
+        if (alertSource?.[field] !== undefined) target[field] = copy(alertSource[field]);
+      for (const field of ['securityClearedAt', 'securityClearedMethod', 'securityClearedProofId'])
+        if (clearSource?.[field] !== undefined) target[field] = copy(clearSource[field]);
+      if (suspected) target.securityState = samePin && alertAt && clearAt >= alertAt ? 'NORMAL' : 'DURESS_SUSPECTED';
+    }
+    // HE markers are negative policy, independent of imported membership/epoch.
+    // A mismatched epoch blocks fresh traffic until a new explicit KEX clears it.
+    for (const [channelId, source] of Object.entries(current.channels || {})) {
+      if (!/^[0-9]{1,32}$/.test(channelId)) continue;
+      const peer = String(source?.ratchetHeaderEncryptionMigrationPeerId || '');
+      const inbound = Array.isArray(source?.ratchetHeaderEncryptionInboundRequiredDeviceIds)
+        ? source.ratchetHeaderEncryptionInboundRequiredDeviceIds.filter(isValidRatchetDeviceId) : [];
+      if (!peer || (!inbound.length && source?.ratchetHeaderEncryptionOutboundActivated !== true)) continue;
+      for (const id of inbound) {
+        const target = deviceRow(peer, String(id));
+        target.headerEncryptionImportRequiredChannels = Array.from(new Set([...(target.headerEncryptionImportRequiredChannels || []), channelId])).sort();
+      }
+      const target = imported.channels?.[channelId];
+      if (!target) continue;
+      target.ratchetV4Required = true;
+      const sameEpoch = Number(target.ratchetKexGeneration || 0) === Number(source.ratchetKexGeneration || 0) &&
+        Number(target.ratchetRecipientEpochGeneration) === Number(source.ratchetRecipientEpochGeneration) &&
+        String(target.ratchetRecipientEpochPeerId || '') === String(source.ratchetRecipientEpochPeerId || '') &&
+        Number(target.ratchetHeaderEncryptionMigrationVersion) === Number(source.ratchetHeaderEncryptionMigrationVersion);
+      if (!sameEpoch) { markConflict(peer, current.peerIdentityKeys?.[peer]); continue; }
+      target.ratchetHeaderEncryptionInboundRequiredDeviceIds = Array.from(new Set([
+        ...(target.ratchetHeaderEncryptionInboundRequiredDeviceIds || []), ...inbound,
+      ])).sort();
+      if (source.ratchetHeaderEncryptionOutboundActivated === true) {
+        target.ratchetHeaderEncryptionOutboundActivated = true;
+        target.ratchetHeaderEncryptionOutboundActivatedAt = earliest(target.ratchetHeaderEncryptionOutboundActivatedAt, source.ratchetHeaderEncryptionOutboundActivatedAt);
+      }
+    }
+    // Reload prunes overfull registries. Reject instead of allowing that
+    // pruning to discard any imported revocation or downgrade restriction.
+    for (const registry of Object.values(imported.deviceRegistry || {}))
+      if (Object.keys(registry?.devices || {}).length > CONFIG.limits.deviceRegistryPerAccount)
+        throw new Error('Merged security registry exceeds the device limit; current database retained');
+    return imported;
+  }
+
+  function mergePrivateRecoveryBundles(target, source) {
+    if (target.accountId !== source.accountId || target.rootFingerprint !== source.rootFingerprint)
+      throw new Error('Cannot merge recovery archives from different identities');
+    validatePrivateRecoveryBundle(target, target.accountId, target.rootFingerprint);
+    validatePrivateRecoveryBundle(source, source.accountId, source.rootFingerprint);
+    target.historyDeviceIds = Array.from(new Set([...target.historyDeviceIds, ...source.historyDeviceIds]));
+    for (const [wireId, binding] of Object.entries(source.seenWires)) {
+      const previous = target.seenWires[wireId];
+      if (previous && (previous.messageId !== binding.messageId || previous.channelId !== binding.channelId))
+        throw new Error('Recovery archive message binding conflict');
+      target.seenWires[wireId] = binding;
+    }
+    for (const snapshot of source.snapshots)
+      if (!target.snapshots.some((entry) => entry.id === snapshot.id)) target.snapshots.push(snapshot);
+    for (const [id, record] of Object.entries(source.historyRecords)) {
+      const previous = target.historyRecords[id];
+      if (previous && (previous.direction !== record.direction || previous.channelId !== record.channelId ||
+          (previous.direction === 'received' && previous.messageId !== record.messageId)))
+        throw new Error('Recovery archive history binding conflict');
+      target.historyRecords[id] = record;
+    }
+    return validatePrivateRecoveryBundle(target, target.accountId, target.rootFingerprint);
+  }
+
+  async function sealPrivateRecoveryBundle(bundle, key = Cache.dbKey) {
+    const clear = Utils.StringToUtf8Bytes(JSON.stringify(bundle));
+    try {
+      if (clear.byteLength > SDC_BACKUP_MAX_SLOT_BYTES / 2)
+        throw new Error('Recovery archive is too large; no private state was omitted');
+      return { version: 1, envelope: Utils.BytesToBase64(await Utils.AesEncrypt(key, clear, SDC_PRIVATE_RECOVERY_PURPOSE)) };
+    } finally { clear.fill(0); }
+  }
+
+  async function rewrapPrivateRecoveryForDatabase(source, target, oldKey, newKey) {
+    if (source.sdc4FileFsKeys !== undefined)
+      await rewrapSdc4FileFsVaultForDatabase(source, target, oldKey, newKey);
+    if (!source.portablePrivateRecovery) return;
+    if (!oldKey || !newKey || !source.isEncrypted || !target.isEncrypted)
+      throw new Error('Private recovery keys require an encrypted database during password changes');
+    const bundle = await readPrivateRecoveryBundle(source, oldKey);
+    target.portablePrivateRecovery = await sealPrivateRecoveryBundle(bundle, newKey);
+  }
+
+  function mergePrivateRecoveryHistoryStore(bundle, store, local) {
+    if (!store) return;
+    if (store.version !== SDC4_HISTORY_LOCAL_VERSION || store.accountId !== bundle.accountId ||
+        store.deviceId !== local.deviceId || store.rootFingerprint !== bundle.rootFingerprint ||
+        !store.records || typeof store.records !== 'object' || Array.isArray(store.records))
+      throw new Error('Retained history storage context mismatch; backup was not created');
+    if (!Array.isArray(bundle.historyDeviceIds)) bundle.historyDeviceIds = [];
+    if (!bundle.historyDeviceIds.includes(local.deviceId)) bundle.historyDeviceIds.push(local.deviceId);
+    for (const [wireId, record] of Object.entries(store.records)) {
+      if (!record || record.version !== SDC4_HISTORY_LOCAL_VERSION || record.accountId !== bundle.accountId ||
+          record.deviceId !== local.deviceId || record.wireId !== wireId ||
+          !/^[A-Za-z0-9_-]{32,64}$/.test(wireId) || !['sent', 'received'].includes(record.direction) ||
+          Object.prototype.hasOwnProperty.call(record, 'plaintext') || Object.prototype.hasOwnProperty.call(record, 'text'))
+        throw new Error('Invalid retained encrypted history; backup was not created');
+      const bytes = Utils.Base64urlToBytes(String(record.envelope || ''));
+      if (bytes.byteLength < 28 || Utils.BytesToBase64url(bytes) !== record.envelope)
+        throw new Error('Invalid retained history ciphertext; backup was not created');
+      const id = `${record.deviceId}:${wireId}`;
+      const previous = bundle.historyRecords[id];
+      if (previous && (previous.direction !== record.direction || previous.channelId !== record.channelId ||
+          (record.direction === 'received' && previous.messageId !== record.messageId)))
+        throw new Error('Retained history message binding conflict');
+      bundle.historyRecords[id] = JSON.parse(JSON.stringify(record));
+    }
+  }
+
+  async function appendPrivateRecoverySnapshot(bundle, device, states) {
+    const privateDevice = {};
+    for (const field of ['version', 'accountId', 'rootFingerprint', 'deviceId', 'publicKey', 'privateEnvelope', 'asyncPrekeys', 'pqPrekeys'])
+      if (device[field] !== undefined) privateDevice[field] = device[field];
+    const snapshot = JSON.parse(JSON.stringify({ device: privateDevice, states }));
+    snapshot.id = Utils.BytesToBase64url(await Utils.Sha256(Utils.StringToUtf8Bytes(JSON.stringify(snapshot))));
+    if (!bundle.snapshots.some((entry) => entry.id === snapshot.id)) bundle.snapshots.push(snapshot);
+  }
+
+  async function listSdcRecoveryStorageKeys() {
+    let keys;
+    if (typeof GM_getValue === 'function' && typeof GM_setValue === 'function') {
+      if (typeof GM_listValues !== 'function')
+        throw new Error('Update the userscript permissions to include GM_listValues before exporting retained private stores');
+      keys = await GM_listValues();
+      if (!Array.isArray(keys)) throw new Error('Unable to enumerate retained private stores; backup was not created');
+      keys = keys.map(String);
+    } else if (typeof chrome !== 'undefined' && chrome.storage?.local != null) {
+      keys = await new Promise((resolve, reject) => chrome.storage.local.get(null, (result) => {
+        if (chrome.runtime?.lastError || !result || typeof result !== 'object' || Array.isArray(result))
+          reject(new Error('Unable to enumerate retained private stores; backup was not created'));
+        else resolve(Object.keys(result));
+      }));
+    } else if (typeof SavedLocalStorage !== 'undefined' && SavedLocalStorage) {
+      keys = [];
+      for (let i = 0; i < SavedLocalStorage.length; i++) {
+        const key = SavedLocalStorage.key(i);
+        if (key != null) keys.push(String(key));
+      }
+    } else throw new Error('Persistent storage is unavailable; backup was not created');
+    return keys;
+  }
+
+  async function collectRetainedPrivateRecoveryStores(bundle, local) {
+    // Imports deliberately change the sending device. The prior stores still
+    // belong to this account/root and must not disappear from later exports.
+    // They are archived here and never loaded into the live outbound ratchet.
+    const keys = await listSdcRecoveryStorageKeys();
+    const historyPrefix = `${SDC4_HISTORY_STORAGE_PREFIX}${local.accountId}:${local.rootFingerprint}:`;
+    const devicePrefix = `${SDC_DEVICE_LOCAL_STORAGE_KEY_PREFIX}${local.accountId}:${local.rootFingerprint}`;
+    const currentHistoryKey = sdc4HistoryStorageKey(local, local.accountId);
+    const currentDeviceKey = localDeviceStorageKey(local.rootFingerprint, local.accountId);
+    for (const key of keys) {
+      if (key.startsWith(historyPrefix) && key !== currentHistoryKey) {
+        const deviceId = key.slice(historyPrefix.length);
+        if (!isValidRatchetDeviceId(deviceId)) continue;
+        const store = await Utils.StorageLoad(key);
+        mergePrivateRecoveryHistoryStore(bundle, store, { ...local, deviceId });
+      }
+    }
+    for (const key of keys) {
+      if (key === currentDeviceKey || !(key === devicePrefix ||
+          (key.startsWith(devicePrefix + ':') && isValidRatchetDeviceId(key.slice(devicePrefix.length + 1))))) continue;
+      const device = await Utils.StorageLoad(key);
+      if (!device) continue;
+      if (device.accountId !== local.accountId || device.rootFingerprint !== local.rootFingerprint ||
+          !isValidRatchetDeviceId(device.deviceId) || typeof device.publicKey !== 'string' || typeof device.privateEnvelope !== 'string')
+        throw new Error('Retained private device context mismatch; backup was not created');
+      if (device.deviceId === local.deviceId) continue;
+      const archivedLocal = { ...device, publicKeyBytes: Utils.Base64ToBytes(device.publicKey) };
+      const stored = await Utils.StorageLoad(ratchetStorageKey(archivedLocal));
+      let states = [], wrap = null, clear = null;
+      try {
+        // Obsolete cutover stores have already been invalidated by the protocol.
+        if (stored?.version === SDC_RATCHET_LOCAL_VERSION && stored.envelope) {
+          if (stored.accountId !== local.accountId) throw new Error('Retained ratchet account mismatch');
+          wrap = await deriveRatchetLocalWrapKeyBytes(archivedLocal);
+          clear = await rawAesGcmDecrypt(wrap, Utils.Base64ToBytes(stored.envelope), canonicalJsonBytes({
+            type: 'SDC-V67-RATCHET-LOCAL', accountId: local.accountId, rootFingerprint: local.rootFingerprint,
+            deviceId: device.deviceId, version: SDC_RATCHET_LOCAL_VERSION,
+          }));
+          const object = JSON.parse(Utils.Utf8BytesToString(clear));
+          if (object.accountId !== local.accountId || object.rootFingerprint !== local.rootFingerprint ||
+              object.deviceId !== device.deviceId || !Array.isArray(object.states))
+            throw new Error('Retained ratchet device context mismatch');
+          states = object.states;
+        }
+        await appendPrivateRecoverySnapshot(bundle, device, states);
+      } finally { wrap?.fill?.(0); clear?.fill?.(0); }
+    }
+  }
+
+  async function buildPrivateRecoveryExportBundle() {
+    if (DataBase?.sdc4FileFsKeys !== undefined) await migrateCurrentSdc4FileFsVault();
+    await ensureRatchetStoreLoaded();
+    await RatchetPersistQueue;
+    await Sdc4HistoryWriteChain;
+    const local = await ensureLocalDeviceIdentity();
+    const device = await Utils.StorageLoad(localDeviceStorageKey(local.rootFingerprint, local.accountId));
+    if (!device || device.deviceId !== local.deviceId) throw new Error('Private device snapshot is unavailable');
+    const states = [];
+    for (const state of RatchetSessions.values()) {
+      if (!state.RK || state.handshakeState === 'DISABLED_LOCAL') continue;
+      states.push(await withRatchetSessionLock(state, () => ratchetStateToObject(state)));
+    }
+    const history = (await loadSdc4HistoryStore()).store;
+    const bundle = await readPrivateRecoveryBundle();
+    await appendPrivateRecoverySnapshot(bundle, device, states);
+    mergePrivateRecoveryHistoryStore(bundle, history, local);
+    await collectRetainedPrivateRecoveryStores(bundle, local);
+    validatePrivateRecoveryBundle(bundle, String(local.accountId), String(local.rootFingerprint));
+    return await sealPrivateRecoveryBundle(bundle);
+  }
+
+  async function restorePrivateRecoveryHistoryRecord(wireId, direction = null, exactHistoryBinding = null) {
+    if (!Cache?.dbKey || DuressRuntime.active) return null;
+    const bundle = DataBase?.portablePrivateRecovery ? await readPrivateRecoveryBundle() : { historyRecords: {} };
+    for (const record of Object.values(bundle.historyRecords).reverse()) {
+      if (record.wireId !== wireId) continue;
+      if (!record || (direction && record.direction !== direction)) continue;
+      const sourceLocal = { accountId: bundle.accountId, rootFingerprint: bundle.rootFingerprint, deviceId: record.deviceId };
+      const key = await deriveSdc4HistoryKeyBytes(sourceLocal);
+      let binding = null;
+      try {
+        binding = record.direction === 'sent' ? (record.historyBinding ? Utils.Base64urlToBytes(record.historyBinding) : exactHistoryBinding?.slice()) : new Uint8Array(0);
+        if (record.direction === 'sent') {
+          if (!binding?.byteLength) continue;
+          return await importOpaqueSentHistoryRecord(record, key, binding);
+        }
+        const plaintext = await openSelfHistorySourceRecord(record, key, binding);
+        return await importAuthenticatedHistoryRecord(record, plaintext, binding);
+      } finally { key.fill(0); binding?.fill?.(0); }
+    }
+    // v68/v70 backups may have sent ciphertext without the later-added binding.
+    // Keep it deferred until the exact wire supplies its authenticated AAD bytes.
+    const legacy = DataBase?.portableSdc4History;
+    if (legacy && exactHistoryBinding?.byteLength && (!direction || direction === 'sent')) {
+      const record = legacy.records?.find((entry) => entry?.direction === 'sent' && entry.wireId === wireId);
+      if (record) {
+        if (legacy.accountId !== String(Discord.getCurrentUser?.()?.id) || legacy.rootFingerprint !== await accountIdentityFingerprint())
+          throw new Error('Legacy history context mismatch');
+        const sourceKey = new Uint8Array(await Utils.AesDecrypt(Cache.dbKey, Utils.Base64ToBytes(legacy.historyKeyEnvelope), 'db-portable-sdc4-history-key-v1'));
+        try { return await importOpaqueSentHistoryRecord(record, sourceKey, exactHistoryBinding); }
+        finally { sourceKey.fill(0); }
+      }
+    }
+    return null;
+  }
+
+  async function importOpaqueSentHistoryRecord(record, sourceKey, binding) {
+    const local = await ensureLocalDeviceIdentity();
+    const envelope = await rewrapSdcSentHistoryOpaque(record, sourceKey, binding, local);
+    await persistSdc4SentCipherHistory(record.wireId, record.channelId, record.requestId, envelope, binding);
+    return (await loadSdc4HistoryStore()).store.records[record.wireId] || null;
+  }
+
+  async function importAuthenticatedHistoryRecord(source, plaintext, binding) {
+    if (source.direction === 'received') {
+      await persistSdc4ReceivedPlaintextHistory(source.wireId, plaintext, source.messageId, source.channelId);
+    } else { throw new Error('Invalid portable history direction/binding'); }
+    return (await loadSdc4HistoryStore()).store.records[source.wireId] || null;
+  }
+
+  async function privateRecoveryLocalForRecipient(deviceId, classicalKeyId, pqKeyId = null) {
+    if (!DataBase?.portablePrivateRecovery || DuressRuntime.active) return null;
+    const bundle = await readPrivateRecoveryBundle();
+    const hasPrekey = (container, id) => !id || [container?.current, ...(container?.previous || [])].some((entry) => entry?.keyId === String(id));
+    const snapshot = bundle.snapshots.slice().reverse().find((entry) => entry.device.deviceId === String(deviceId) &&
+      hasPrekey(entry.device.asyncPrekeys, classicalKeyId) && hasPrekey(entry.device.pqPrekeys, pqKeyId));
+    if (!snapshot) return null;
+    const stored = snapshot.device;
+    const publicKeyBytes = Utils.Base64ToBytes(stored.publicKey);
+    if (await deviceIdFromPublicKey(publicKeyBytes) !== String(deviceId)) throw new Error('Archived device key binding mismatch');
+    let privateBytes = null;
+    try {
+      privateBytes = await openLocalDevicePrivate(Utils.Base64ToBytes(stored.privateEnvelope), stored.rootFingerprint, stored.accountId);
+      const privateKey = await Utils.DhImportPrivateKey(privateBytes);
+      await validateDeviceKeyPair(privateKey, publicKeyBytes);
+      return { local: { ...stored, publicKeyBytes, privateKey }, stored };
+    } finally { privateBytes?.fill?.(0); }
+  }
+
+  const PrivateRecoveryRatchetDiagnostics = { attempts: 0, recovered: 0, last: null };
+  const PrivateRecoveryRatchetMessageDiagnostics = new WeakMap();
+
+  function recordPrivateRecoveryRatchetDiagnostic(message, code, counts = {}) {
+    const entry = { at: Date.now(), code: String(code), matched: Number(counts.matched || 0),
+      attempted: Number(counts.attempted || 0), rejected: Number(counts.rejected || 0),
+      policyBlocked: Number(counts.policyBlocked || 0) };
+    // One bounded aggregate and weak per-message entries: no content, keys,
+    // ciphertext, author/channel/device/message identifiers or raw exceptions.
+    PrivateRecoveryRatchetDiagnostics.last = entry;
+    if (code === 'ARCHIVE_RECOVERED') PrivateRecoveryRatchetDiagnostics.recovered++;
+    if (message && typeof message === 'object') PrivateRecoveryRatchetMessageDiagnostics.set(message, entry);
+    return entry;
+  }
+
+  function privateRecoveryRatchetStatus() {
+    return { attempts: PrivateRecoveryRatchetDiagnostics.attempts,
+      recovered: PrivateRecoveryRatchetDiagnostics.recovered,
+      last: PrivateRecoveryRatchetDiagnostics.last ? { ...PrivateRecoveryRatchetDiagnostics.last } : null };
+  }
+
+  function privateRecoveryUnavailableMessage(message) {
+    const result = PrivateRecoveryRatchetMessageDiagnostics.get(message);
+    const invalid = result?.code === 'ARCHIVE_STATE_REJECTED' || result?.code === 'ARCHIVE_OPEN_FAILED';
+    const blocked = result?.code === 'ARCHIVE_POLICY_BLOCKED';
+    const en = invalid
+      ? '🔒 The matching archived private state could not authenticate this old message. Import another backup containing its readable history. A new exchange cannot restore this message.'
+      : blocked
+        ? '🔒 This old message is blocked by the current device security policy. A new exchange cannot restore this message.'
+        : '🔒 This old message targeted another device; this backup has no usable history copy or private state for it. Import a backup from the original device. A new exchange protects future messages, but cannot restore this one.';
+    const fr = invalid
+      ? '🔒 L’état privé archivé correspondant n’a pas pu authentifier cet ancien message. Importez une autre sauvegarde contenant son historique lisible. Un nouvel échange ne restaure pas ce message.'
+      : blocked
+        ? '🔒 Cet ancien message est bloqué par la politique de sécurité actuelle des appareils. Un nouvel échange ne restaure pas ce message.'
+        : '🔒 Cet ancien message ciblait un autre appareil ; cette sauvegarde ne contient aucune copie d’historique ni état privé utilisable pour lui. Importez une sauvegarde de l’appareil d’origine. Un nouvel échange protège les prochains messages, mais ne restaure pas celui-ci.';
+    return typeof SdcUiI18n !== 'undefined' ? SdcUiI18n.pick(en, fr) : en;
+  }
+
+  async function tryPrivateRecoveryRatchetMessage(message, envelope, normalizedWire) {
+    try {
+      return await withPrivateRecoveryOperation(() => tryPrivateRecoveryRatchetMessageCore(message, envelope, normalizedWire));
+    } catch (error) {
+      const previous = PrivateRecoveryRatchetMessageDiagnostics.get(message);
+      if (!previous || previous.code === 'ARCHIVE_PENDING')
+        recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_OPEN_FAILED');
+      throw error;
+    }
+  }
+
+  async function restorePrivateRecoveryRatchetState(serialized) {
+    // Live retention timers erase old keys from active stores. Keys already
+    // authenticated inside a read-only backup must remain usable when that
+    // backup is opened later. Rebase only retention metadata in a private clone;
+    // counters, cryptographic bytes, authentication and activation dates stay exact.
+    const clone = JSON.parse(JSON.stringify(serialized));
+    const now = Date.now();
+    for (const entry of [...(clone.skipped || []), ...(clone.skippedHeaderKeys || [])]) entry.addedAt = now;
+    for (const entry of clone.pqRatchet?.previousRoots || []) entry.expiresAt = now + SDC_PQ_RATCHET_PREVIOUS_EPOCH_TTL_MS;
+    return await ratchetStateFromObject(clone);
+  }
+
+  async function tryPrivateRecoveryRatchetMessageCore(message, envelope, normalizedWire) {
+    PrivateRecoveryRatchetDiagnostics.attempts++;
+    const counts = { matched: 0, attempted: 0, rejected: 0, policyBlocked: 0 };
+    recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_PENDING', counts);
+    if (!DataBase?.portablePrivateRecovery || DuressRuntime.active) {
+      recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_NOT_AVAILABLE', counts);
+      return null;
+    }
+    const bundle = await readPrivateRecoveryBundle();
+    const wireId = await ratchetWireCacheId(normalizedWire);
+    const seen = bundle.seenWires[wireId];
+    if (seen && (seen.messageId !== String(message.id) || seen.channelId !== String(message.channel_id))) {
+      recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_REPLAY_REJECTED', counts);
+      throw new Error('Archived ratchet replay rejected');
+    }
+    for (const prior of Object.values(bundle.historyRecords)) {
+      if (prior.wireId !== wireId) continue;
+      if (prior?.direction === 'received' && (String(prior.messageId) !== String(message.id) || String(prior.channelId) !== String(message.channel_id))) {
+        recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_REPLAY_REJECTED', counts);
+        throw new Error('Archived history replay rejected');
+      }
+    }
+    for (const snapshot of bundle.snapshots.slice().reverse()) {
+      let info = envelope.info;
+      if (envelope.fanout) {
+        const selected = envelope.mode === 'encrypted-header-fanout'
+          ? selectCompactSdc4EncryptedHeaderFanoutEntry(envelope.fanout, snapshot.device.deviceId)
+          : selectCompactSdc4FanoutEntry(envelope.fanout, snapshot.device.deviceId);
+        if (!selected) continue;
+        info = selected.info;
+      }
+      const serialized = snapshot.states.find((state) => state.sessionId === info?.sessionId &&
+        state.channelId === String(message.channel_id) && state.remoteAccountId === String(message.author?.id));
+      if (!serialized) continue;
+      counts.matched++;
+      if (isDeviceRevoked(serialized.remoteAccountId, serialized.remoteDeviceId)) { counts.policyBlocked++; continue; }
+      let state = null, clear = null;
+      try {
+        state = await restorePrivateRecoveryRatchetState(serialized);
+        const encryptedHeader = envelope.mode.startsWith('encrypted-header');
+        if (!encryptedHeader && ratchetHeaderEncryptionInboundRequired(message.channel_id, state.remoteAccountId, state.remoteDeviceId) &&
+            !ratchetLegacyPacketAllowedOnlyAsSkippedDrain(state, info.header)) { counts.policyBlocked++; continue; }
+        const context = ratchetContextForState(state, false, 'SDC4_TEXT');
+        context.allowClassicalFallback = pqRatchetClassicalHistoryAllowed(state, message);
+        if (info.attachmentScopedKeyId != null) context.attachmentScopedKeyId = String(info.attachmentScopedKeyId);
+        counts.attempted++;
+        clear = encryptedHeader ? (await ratchetDecryptEncryptedHeaderMutable(state, info, context)).clear
+          : await ratchetDecryptMutable(state, { header: info.header, ciphertext: info.ciphertext }, context);
+        const plaintext = await decodeSdc4ApplicationPlaintextBytes(clear);
+        assertSdc4NativeUnfurlBinding(plaintext, splitSdc4WireAndNativeUnfurls(message.content).nativeUnfurlUrls);
+        // No clone ever enters RatchetSessions or any outbound selection. Preserve
+        // authenticated progress only in the archive; exporting again carries it.
+        bundle.seenWires[wireId] = { messageId: String(message.id), channelId: String(message.channel_id) };
+        const progress = { device: snapshot.device, states: [await ratchetStateToObject(state)] };
+        progress.id = Utils.BytesToBase64url(await Utils.Sha256(Utils.StringToUtf8Bytes(JSON.stringify(progress.states))));
+        if (!bundle.snapshots.some((entry) => entry.id === progress.id)) bundle.snapshots.push(progress);
+        DataBase.portablePrivateRecovery = await sealPrivateRecoveryBundle(bundle);
+        Utils.dbChanged = true;
+        await Utils.SaveDb();
+        await persistSdc4ReceivedPlaintextHistory(wireId, plaintext, message.id, message.channel_id);
+        recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_RECOVERED', counts);
+        return plaintext;
+      } catch (error) {
+        // Authentication failure may try another exact snapshot, never a different
+        // device/session or a weaker transport. Persistence failure must propagate.
+        counts.rejected++;
+        if (clear) {
+          recordPrivateRecoveryRatchetDiagnostic(message, 'ARCHIVE_COMMIT_FAILED', counts);
+          throw error;
+        }
+      } finally { if (state) ratchetEraseMutableSecrets(state); clear?.fill?.(0); }
+    }
+    recordPrivateRecoveryRatchetDiagnostic(message, counts.rejected ? 'ARCHIVE_STATE_REJECTED'
+      : counts.policyBlocked ? 'ARCHIVE_POLICY_BLOCKED' : 'ARCHIVE_NO_MATCHING_STATE', counts);
+    return null;
+  }
+
   async function buildPortableHistoryExportBundle() {
     if (!DataBase?.isEncrypted || !Cache?.dbKey) return null;
     const ctx = await loadSdc4HistoryStore();
@@ -39140,6 +41759,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     let historyKey = null;
     let imported = 0;
     let skipped = 0;
+    const deferred = [];
     try {
       historyKey = new Uint8Array(await Utils.AesDecrypt(
         Cache.dbKey,
@@ -39147,9 +41767,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         'db-portable-sdc4-history-key-v1'
       ));
       if (historyKey.byteLength !== 32) throw new Error('Portable history key length mismatch');
-      const ordered = bundle.records
-        .slice(-SDC_PORTABLE_HISTORY_EXPORT_LIMIT)
-        .sort((a, b) => Number(a?.createdAt || 0) - Number(b?.createdAt || 0));
+      const ordered = bundle.records.slice().sort((a, b) => Number(a?.createdAt || 0) - Number(b?.createdAt || 0));
       for (const record of ordered) {
         let binding = null;
         try {
@@ -39161,26 +41779,24 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             continue;
           }
           if (record.direction === 'sent') {
-            if (!record.historyBinding) { skipped++; continue; }
+            if (!record.historyBinding) { deferred.push(record); continue; }
             binding = Utils.Base64urlToBytes(record.historyBinding);
           } else if (record.direction !== 'received') {
             skipped++;
             continue;
           }
-          const plaintext = await openSelfHistorySourceRecord(
-            record,
-            historyKey,
-            binding || new Uint8Array(0)
-          );
-          await persistSdc4ReceivedPlaintextHistory(
-            record.wireId,
-            plaintext,
-            String(record.messageId || ''),
-            String(record.channelId || '')
-          );
+          if (record.direction === 'sent') {
+            await importOpaqueSentHistoryRecord(record, historyKey, binding);
+          } else {
+            const plaintext = await openSelfHistorySourceRecord(record, historyKey, new Uint8Array(0));
+            await importAuthenticatedHistoryRecord(record, plaintext, null);
+          }
           imported++;
         } catch (error) {
           skipped++;
+          // Keep authenticated source ciphertext available for a later retry;
+          // transient frame/storage errors cannot erase the only recovery copy.
+          if (record) deferred.push(record);
           console.debug('[SDC][VAULT][v68.4.5] one portable history record skipped', {
             wireId: String(record?.wireId || '').slice(0, 12),
             reason: error?.message || String(error),
@@ -39189,7 +41805,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           try { binding?.fill?.(0); } catch (_) {}
         }
       }
-      delete DataBase.portableSdc4History;
+      if (deferred.length) bundle.records = deferred;
+      else delete DataBase.portableSdc4History;
       DataBase.portableSdc4HistoryImportedAt = Date.now();
       DataBase.portableSdc4HistoryImportedRecords = imported;
       DataBase.portableSdc4HistorySkippedRecords = skipped;
@@ -39201,7 +41818,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         sourceDeviceId: bundle.sourceDeviceId,
         ratchetSecretsImported: false,
       });
-      return { imported, skipped, present: true };
+      return { imported, skipped, deferred: deferred.length, present: true };
     } finally {
       try { historyKey?.fill?.(0); } catch (_) {}
     }
@@ -39599,6 +42216,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function ratchetHeaderEncryptionInboundRequired(channelId, peerId, remoteDeviceId) {
+    if (getDeviceRecord(peerId, remoteDeviceId)?.headerEncryptionImportRequiredChannels?.includes(String(channelId))) return true;
     const epoch = ratchetHeaderEncryptionMigrationEpoch(channelId, peerId);
     return epoch.enabled && epoch.inboundRequiredDeviceIds.includes(String(remoteDeviceId || ''));
   }
@@ -39689,6 +42307,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     config.ratchetV4Required = true;
     const normalizedPeerId = String(peerId || '');
     if (/^[0-9]{1,32}$/.test(normalizedPeerId)) {
+      // An explicit authenticated KEX is the only boundary allowed to clear an
+      // imported anti-downgrade marker; it never clears device revocations/PQ.
+      for (const record of Object.values(getDeviceAccountRegistry(normalizedPeerId, false)?.devices || {})) {
+        if (Array.isArray(record.headerEncryptionImportRequiredChannels))
+          record.headerEncryptionImportRequiredChannels = record.headerEncryptionImportRequiredChannels.filter(id => String(id) !== channelId);
+      }
       // v68.0.3: a new account-level KEX is also a new recipient-membership epoch.
       // Do not inherit stale peer devices from older key generations. Devices are
       // admitted again only by a signed announcement observed after this boundary.
@@ -40127,9 +42751,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return findInProgressRatchetSessions(channelId, peerId).length > 0;
   }
 
-  async function startRatchetV4PilotForRemoteDevice(channelId, remoteDeviceId) {
+  async function startRatchetV4PilotForRemoteDevice(channelId, remoteDeviceId, userIntent = null) {
     channelId = String(channelId || '');
     remoteDeviceId = String(remoteDeviceId || '');
+    assertSdcControlSendAllowed(channelId, userIntent);
     if (!channelId) throw new Error('Select a DM first');
     if (!isValidRatchetDeviceId(remoteDeviceId)) throw new Error('Invalid target SDC4 remote device');
     await ensureRatchetStoreLoaded();
@@ -40199,7 +42824,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         localDeviceId: local.deviceId,
         targetRemoteDeviceId: remoteDeviceId,
       });
-      await sendSignedDeviceControl(channelId, 'RATCHET HELLO', hello);
+      rememberSdcControlExchangeIntent('ratchet', sessionId, channelId, userIntent);
+      await sendSignedDeviceControl(channelId, 'RATCHET HELLO', hello, userIntent);
       console.log('[SDC][RATCHET][v67.1.123] targeted SDC4 HELLO sent', {
         sessionId, channelId, peerId, localDeviceId: local.deviceId, remoteDeviceId,
       });
@@ -40366,7 +42992,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     peerId = String(peerId || '');
     remoteDeviceId = String(remoteDeviceId || '');
     if (!channelId || !peerId || !isValidRatchetDeviceId(remoteDeviceId) || !ratchetV4IsRequired(channelId)) return;
+    try { assertSdcControlSendAllowed(channelId); } catch (_) { return false; }
     setTimeout(() => {
+      try { assertSdcControlSendAllowed(channelId); } catch (_) { return; }
       hotAddRatchetV4ForPeerDevice(channelId, peerId, remoteDeviceId, reason).catch((error) => {
         console.warn('[SDC][RATCHET][v67.1.124] peer device hot-add deferred', {
           channelId, peerId, remoteDeviceId, reason, error: String(error?.message || error),
@@ -40379,7 +43007,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     channelId,
     peerId,
     recipientSet,
-    reason = 'kex-v3-post-kex-registry-probe'
+    reason = 'kex-v3-post-kex-registry-probe',
+    userIntent = null
   ) {
     channelId = String(channelId || '');
     peerId = String(peerId || '');
@@ -40397,7 +43026,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const failed = [];
     for (const remoteDeviceId of plan.discoveryDeviceIds) {
       try {
-        const result = await startRatchetV4PilotForRemoteDevice(channelId, remoteDeviceId);
+        const result = await startRatchetV4PilotForRemoteDevice(channelId, remoteDeviceId, userIntent);
         started.push({ remoteDeviceId, sessionId: String(result?.sessionId || '') });
       } catch (error) {
         // Registry-only devices are deliberately non-authoritative until they
@@ -40419,7 +43048,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return { plan, started, failed };
   }
 
-  async function startMissingRatchetV4HandshakesForActiveDevices(channelId, peerId, reason = 'automatic') {
+  async function startMissingRatchetV4HandshakesForActiveDevices(channelId, peerId, reason = 'automatic', userIntent = null) {
     channelId = String(channelId || '');
     peerId = String(peerId || '');
     const recipientSet = resolveRatchetV4ActiveDeviceRecipientSet(channelId, peerId, false);
@@ -40432,7 +43061,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const failed = [];
     for (const remoteDeviceId of plan.startDeviceIds) {
       try {
-        const result = await startRatchetV4PilotForRemoteDevice(channelId, remoteDeviceId);
+        const result = await startRatchetV4PilotForRemoteDevice(channelId, remoteDeviceId, userIntent);
         started.push({ remoteDeviceId, sessionId: result.sessionId });
       } catch (error) {
         const text = String(error?.message || error);
@@ -40454,7 +43083,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return { recipientSet, plan, started, deferred, failed };
   }
 
-  async function ensureRatchetV4Live(channelId, reason = 'automatic', timeoutMs = SDC4_AUTO_HANDSHAKE_TIMEOUT_MS) {
+  async function ensureRatchetV4Live(channelId, reason = 'automatic', timeoutMs = SDC4_AUTO_HANDSHAKE_TIMEOUT_MS, userIntent = null) {
     if (DuressRuntime.active) {
       const error = new Error('Real-Vault SDC4 recovery is disabled in the alternate runtime');
       error.code = 'SDC_DURESS_REAL_CONTROL_PLANE_BLOCKED';
@@ -40477,7 +43106,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (recipientSet.activeDeviceIds.length > 0) {
         // v67.1.123: recovery is complete only when every active registry device
         // has its own LIVE session. Launch one targeted HELLO for each missing id.
-        await startMissingRatchetV4HandshakesForActiveDevices(channelId, peerId, reason);
+        await startMissingRatchetV4HandshakesForActiveDevices(channelId, peerId, reason, userIntent);
         const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || SDC4_AUTO_HANDSHAKE_TIMEOUT_MS);
         let nextCoverageRepairAt = 0;
         while (Date.now() < deadline) {
@@ -40498,7 +43127,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             nextCoverageRepairAt = Date.now() + 500;
             try {
               await startMissingRatchetV4HandshakesForActiveDevices(
-                channelId, peerId, `${reason}:membership-refresh`
+                channelId, peerId, `${reason}:membership-refresh`, userIntent
               );
             } catch (error) {
               console.warn('[SDC][RATCHET][v67.1.124] active-device membership refresh deferred', {
@@ -40524,7 +43153,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (!pendingRatchetHandshakeForDm(channelId, peerId)) {
         console.log('[SDC][RATCHET][v67.1.123] automatic SDC4 discovery handshake starting', { channelId, peerId, reason });
         try {
-          await startRatchetV4Pilot(channelId);
+          await startRatchetV4Pilot(channelId, userIntent);
         } catch (error) {
           const text = String(error?.message || error);
           if (!/already pending|already LIVE/i.test(text)) throw error;
@@ -40572,7 +43201,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return state;
   }
 
-  async function ensurePortableImportConvergenceForChannel(channelId, reason = 'protected-use') {
+  async function ensurePortableImportConvergenceForChannel(channelId, reason = 'protected-use', userIntent = null) {
     const state = portableImportConvergenceState();
     const channel = String(channelId || '');
     // v70.10.12 defense-in-depth: even a future direct caller may not turn a
@@ -40603,8 +43232,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // Explicit import is an active restoration operation, so a fresh signed
       // announcement is appropriate here even though ordinary channel viewing
       // remains passive in the normal non-import path.
-      await sendDeviceAnnouncement(channel, true);
-      const live = await ensureRatchetV4Live(channel, `portable-db-import:${reason}`, 15000);
+      await sendDeviceAnnouncement(channel, true, { userIntent });
+      const live = await ensureRatchetV4Live(channel, `portable-db-import:${reason}`, 15000, userIntent);
       const record = {
         at: Date.now(),
         localDeviceId: String(local.deviceId || ''),
@@ -40669,7 +43298,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return true;
   }
 
-  function scheduleAutomaticRatchetV4(channelId, reason = 'channel-selected') {
+  function scheduleAutomaticRatchetV4(channelId, reason = 'channel-selected', userIntent = null) {
     // v70.10.12 privacy boundary: SDC4 HELLO is network-visible. Never initiate or
     // retry it from passive navigation/plugin-load. User-send and authenticated
     // protocol events keep their event-driven recovery paths unchanged.
@@ -40685,9 +43314,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (DuressRuntime.active) return;
     channelId = String(channelId || '');
     if (!channelId || !ratchetV4IsRequired(channelId)) return;
+    try { assertSdcControlSendAllowed(channelId, userIntent); } catch (_) { return false; }
     setTimeout(() => {
       if (DuressRuntime.active) return;
-      ensureRatchetV4Live(channelId, reason).then(async () => {
+      try { assertSdcControlSendAllowed(channelId, userIntent); } catch (_) { return; }
+      ensureRatchetV4Live(channelId, reason, SDC4_AUTO_HANDSHAKE_TIMEOUT_MS, userIntent).then(async () => {
         if (pqRatchetPassiveNavigationReason(reason)) {
           console.debug('[SDC][PQ][v70.3.2] SDC4 coverage confirmed without PQ traffic on passive navigation', {
             channelId, reason,
@@ -42772,7 +45403,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
   async function ratchetGetSentHistoryRecord(wire) {
     const id = await ratchetWireCacheId(wire);
-    return await getSdc4HistoryRecord(id, 'sent');
+    return await getSdc4HistoryRecord(id, 'sent', selfHistoryBindingFromWire(wire, { direction: 'sent' }));
   }
 
   async function ratchetRememberReceivedPlaintext(wire, plaintext, messageId, channelId = null) {
@@ -42971,6 +45602,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function startFreshRatchetAfterKexV3(channelId, peerId, exchangeId) {
+    const userIntent = sdcControlExchangeIntent('kex', exchangeId, channelId);
     try {
       await ensureRatchetStoreLoaded();
       let recipientSet = resolveRatchetV4ActiveDeviceRecipientSet(channelId, peerId, false);
@@ -42979,7 +45611,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         bootstrap = await startMissingRatchetV4HandshakesForActiveDevices(
           channelId,
           peerId,
-          'kex-v3-fresh-bootstrap'
+          'kex-v3-fresh-bootstrap',
+          userIntent
         );
       }
 
@@ -42995,7 +45628,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             channelId,
             peerId,
             recipientSet,
-            'kex-v3-fresh-bootstrap'
+            'kex-v3-fresh-bootstrap',
+            userIntent
           )
         : { plan: null, started: [], failed: [] };
 
@@ -43012,12 +45646,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           discoveryStarted: discovery.started,
           discoveryFailed: discovery.failed,
         });
-        scheduleAutomaticRatchetV4(channelId, 'kex-v3-post-kex-convergence');
+        scheduleAutomaticRatchetV4(channelId, 'kex-v3-post-kex-convergence', userIntent);
         return { bootstrap, discovery, recipientSet };
       }
 
       if (recipientSet.recipientEpochEnabled) {
-        scheduleAutomaticRatchetV4(channelId, 'kex-v3-awaiting-post-kex-device-activity');
+        scheduleAutomaticRatchetV4(channelId, 'kex-v3-awaiting-post-kex-device-activity', userIntent);
         console.log('[SDC][RATCHET][v68.6.18] fresh KEX recipient epoch awaiting signed peer device activity', {
           channelId: String(channelId), peerId: String(peerId), exchangeId: String(exchangeId),
           generation: recipientSet.recipientEpochGeneration,
@@ -43031,7 +45665,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         };
       }
 
-      const started = await startRatchetV4Pilot(channelId);
+      const started = await startRatchetV4Pilot(channelId, userIntent);
       console.log('[SDC][RATCHET][v68.6.18] KEX v3 registry-empty discovery HELLO started', {
         channelId: String(channelId), peerId: String(peerId), exchangeId: String(exchangeId),
         sessionId: started?.sessionId || null,
@@ -43046,13 +45680,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
   }
 
-  async function startRatchetV4Pilot(channelId = Cache.channelId) {
+  async function startRatchetV4Pilot(channelId = Cache.channelId, userIntent = null) {
     if (DuressRuntime.active) {
       const error = new Error('Real-Vault SDC4 handshake is disabled in the alternate runtime');
       error.code = 'SDC_DURESS_REAL_CONTROL_PLANE_BLOCKED';
       throw error;
     }
     channelId = String(channelId || '');
+    assertSdcControlSendAllowed(channelId, userIntent);
     if (!channelId) throw new Error('Select a DM first');
     await ensureRatchetStoreLoaded();
     prunePendingRatchetHandshakes();
@@ -43110,7 +45745,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         peerId,
         localDeviceId: local.deviceId,
       });
-      await sendSignedDeviceControl(channelId, 'RATCHET HELLO', hello);
+      rememberSdcControlExchangeIntent('ratchet', sessionId, channelId, userIntent);
+      await sendSignedDeviceControl(channelId, 'RATCHET HELLO', hello, userIntent);
       console.log('[SDC][RATCHET][v67.1.110] SDC4 HELLO sent', { sessionId, channelId, peerId, localDeviceId: local.deviceId });
       return { sessionId, channelId, peerId, localDeviceId: local.deviceId };
     } finally {
@@ -43215,6 +45851,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         });
         return true;
       }
+      const competingIntent = sdcControlExchangeIntent('ratchet', localSessionId, message.channel_id);
+      rememberSdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id, competingIntent);
       PendingRatchetHandshakes.delete(localSessionId);
       console.log('[SDC][RATCHET][v67.1.110] simultaneous HELLO resolved: remote session wins', {
         localSessionId, remoteSessionId: info.sessionId, senderId,
@@ -43222,6 +45860,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
 
     if (findRatchetSession(info.sessionId, message.channel_id, senderId, info.deviceId)) return true;
+    assertSdcControlSendAllowed(message.channel_id,
+      sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id));
     if (isDeviceRevoked(ownId, local.deviceId))
       throw new Error('SDC4 HELLO cannot be accepted by a locally revoked device');
     const conversationKey = await ratchetCurrentConversationKeyBytes(message.channel_id);
@@ -43314,6 +45954,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const pending = PendingRatchetHandshakes.get(String(info.sessionId));
     if (!ratchetAcceptMatchesPendingTarget(pending, info, local.deviceId))
       throw new Error('SDC4 ACCEPT pending/target binding mismatch');
+    assertSdcControlSendAllowed(message.channel_id,
+      sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id));
     const senderDevicePublic = Utils.Base64urlToBytes(info.senderDevicePublicKey);
     if (await deviceIdFromPublicKey(senderDevicePublic) !== info.senderDeviceId)
       throw new Error('SDC4 ACCEPT device identity mismatch');
@@ -43411,6 +46053,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
     const state = findRatchetSession(info.sessionId, message.channel_id, senderId, info.senderDeviceId);
     if (!state || state.handshakeState !== 'RESPONDER_WAIT_READY') throw new Error('Unknown SDC4 READY session');
+    assertSdcControlSendAllowed(message.channel_id,
+      sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id));
     if (info.senderDeviceId !== state.remoteDeviceId || info.recipientDeviceId !== state.localDeviceId)
       throw new Error('SDC4 READY device binding mismatch');
     if (isDeviceRevoked(senderId, state.remoteDeviceId)) throw new Error('SDC4 READY rejected from revoked device');
@@ -43444,7 +46088,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // level KEX can only prove current membership once its targeted SDC4 handshake
     // reaches LIVE. Re-announce its own PQ prekey now so the peer learns HYBRID
     // capability for this exact deviceId. This publishes no ratchet secret.
-    try { await sendPqPrekeyAnnouncement(message.channel_id, true); }
+    try { await sendPqPrekeyAnnouncement(message.channel_id, true, null, null, sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id)); }
     catch (error) {
       console.warn('[SDC][PQ][v69.0.5] post-SDC4-LIVE PQ announcement deferred', {
         channelId: String(message.channel_id), peerId: senderId,
@@ -43490,7 +46134,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     PendingRatchetHandshakes.delete(state.sessionId);
     await persistRatchetSessions();
     await reconcileRatchetSessionsForDm(message.channel_id, senderId, 'initiator-live');
-    try { await sendPqPrekeyAnnouncement(message.channel_id, true); }
+    try { await sendPqPrekeyAnnouncement(message.channel_id, true, null, null, sdcControlExchangeIntent('ratchet', info.sessionId, message.channel_id)); }
     catch (error) {
       console.warn('[SDC][PQ][v69.0.5] post-SDC4-LIVE PQ announcement deferred', {
         channelId: String(message.channel_id), peerId: senderId,
@@ -43743,7 +46387,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     }
 
     const looksLikeFs = fileFsDescriptors.length > 0 || fileFsOfflineDescriptors.length > 0 || attachments.some((item) =>
-      /^sdc4fs_[A-Za-z0-9_-]{22}$/.test(String(item?.filename || ''))
+      !!sdc4FileFsAttachmentLogicalId(item) || isValidSdc4FileFsDescriptor(item?.__sdc4FileFsDescriptor)
     );
 
     if (looksLikeFs) {
@@ -43765,14 +46409,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       for (let index = 0; index < attachments.length; index++) {
         const attachment = attachments[index];
         try {
-          const outerLogicalIdMatch = /^sdc4fs_([A-Za-z0-9_-]{22})$/.exec(String(attachment?.filename || ''));
-          const outerLogicalId = outerLogicalIdMatch ? outerLogicalIdMatch[1] : '';
+          const outerLogicalId = sdc4FileFsAttachmentLogicalId(attachment);
           let descriptor = null;
           if (outerLogicalId) {
             descriptor = fileFsDescriptors.find((row) => row.i === outerLogicalId) ||
               fileFsOfflineDescriptors.find((row) => row.i === outerLogicalId) || null;
           }
-          if (!descriptor) descriptor = fileFsDescriptors[index] || fileFsOfflineDescriptors[index] || null;
+          if (!descriptor && isValidSdc4FileFsDescriptor(attachment?.__sdc4FileFsDescriptor))
+            descriptor = { ...attachment.__sdc4FileFsDescriptor };
+          // Missing historical filename identity is recovered only by the exact
+          // downloaded ciphertext hash in decryptAttachment, never by array index.
           await decryptAttachment(
             null,
             null,
@@ -43927,11 +46573,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   async function decryptRatchetV4TextMessage(message, processingContext = null) {
+    await waitSdcBackupReceiveGate();
     const raw = String(message?.content || '');
     if (!raw.startsWith(SDC4_WIRE_PREFIX)) return false;
     let tx;
     try { tx = await sdc4InboundTransactionKey(message, raw); }
     catch (_) { return await decryptRatchetV4TextMessageCore(message, processingContext); }
+    await waitSdcBackupReceiveGate();
+    while (SdcBackupReceiveGate) await waitSdcBackupReceiveGate();
 
     const existing = Sdc4InboundDecryptTransactions.get(tx.key);
     if (existing) {
@@ -44050,13 +46699,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // though the durable encrypted sent-history record already existed. The
         // durable renderer is still opaque-origin and receives only ciphertext + a
         // freshly derived device-bound history key; plaintext never enters Discord.
-        const durableSentHistory = await getSdc4HistoryRecord(localEchoId, 'sent');
+        const selfHistoryBinding = sdc4HistoryBindingFromDataPlaneEnvelope(dataPlaneEnvelope);
+        const durableSentHistory = await getSdc4HistoryRecord(localEchoId, 'sent', selfHistoryBinding);
         if (durableSentHistory && typeof SecureComposer !== 'undefined') {
-          message.content = '\u2063';
-          message.embeds = Array.isArray(message.embeds)
-            ? message.embeds.filter(isNativeKlipyEmbed)
-            : [];
-          SecureComposer.scheduleDurableLocalEchoForMessage(
+          await hydrateSelfHistoryFileBindings(message, localEchoId, null, durableSentHistory, selfHistoryBinding);
+          const scheduled = SecureComposer.scheduleDurableLocalEchoForMessage(
             message,
             localEchoId,
             durableSentHistory,
@@ -44064,8 +46711,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               ? sdc4FanoutHistoryBindingBytes(dataPlaneEnvelope.fanout.entries)
               : info.ciphertext
           );
-          await decryptRatchetV4BoundAttachments(message, info, processingContext);
-          return true;
+          if (scheduled) {
+            message.content = '\u2063🔒 Protected message';
+            message.embeds = Array.isArray(message.embeds)
+              ? message.embeds.filter(isNativeKlipyEmbed)
+              : [];
+            await decryptRatchetV4BoundAttachments(message, info, processingContext);
+            return true;
+          }
         }
 
         // Emergency compatibility fallback only: if encrypted sent-history could
@@ -44073,12 +46726,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // frame-to-frame for the current Secure Input instance. It remains bounded
         // and is never the normal path for canonical Chat Control messages.
         if (typeof SecureComposer !== 'undefined' &&
-            SecureComposer.canUseEphemeralLocalEcho(localEchoId, message.channel_id)) {
-          message.content = '\u2063';
+            SecureComposer.canUseEphemeralLocalEcho(localEchoId, message.channel_id) &&
+            SecureComposer.scheduleLocalEchoForMessage(message, localEchoId)) {
+          message.content = '\u2063🔒 Protected message';
           message.embeds = Array.isArray(message.embeds)
             ? message.embeds.filter(isNativeKlipyEmbed)
             : [];
-          SecureComposer.scheduleLocalEchoForMessage(message, localEchoId);
           await decryptRatchetV4BoundAttachments(message, info, processingContext);
           return true;
         }
@@ -44100,15 +46753,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           splitTransport.inlineSelfHistoryTokens,
           localEchoId
         );
-        if (inlineSiblingPlaintext != null) {
-          assertSdc4NativeUnfurlBinding(inlineSiblingPlaintext, splitTransport.nativeUnfurlUrls);
-          message.content = '<:ENC:465534298662109185>' + inlineSiblingPlaintext;
-          message.embeds = Array.isArray(message.embeds) ? message.embeds.filter(isNativeKlipyEmbed) : [];
-          postProcessMessage(message, inlineSiblingPlaintext);
-          await decryptRatchetV4BoundAttachments(message, info, processingContext);
-          return true;
-        }
-        PendingSelfSyncedOwnMessages.set(localEchoId, message);
+        if (inlineSiblingPlaintext?.opaque &&
+            await presentOpaqueSelfHistoryCopy(message, inlineSiblingPlaintext, selfHistoryBinding)) return true;
+        rememberSelfHistoryPendingPrimary(message, localEchoId, raw);
         message.content = '<:ENC:465534298662109185>🔒 Encrypted message sent from another authorized installation — no inline sibling copy was available for this device.';
         message.embeds = Array.isArray(message.embeds)
           ? message.embeds.filter(isNativeKlipyEmbed)
@@ -44140,6 +46787,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return true;
       }
 
+      await ensureRatchetStoreLoaded();
+      const currentEntry = fanoutEnvelope ? (dataPlaneEnvelope.mode === 'encrypted-header-fanout'
+        ? selectCompactSdc4EncryptedHeaderFanoutEntry(fanoutEnvelope, local.deviceId)
+        : selectCompactSdc4FanoutEntry(fanoutEnvelope, local.deviceId))?.info : info;
+      const currentSession = currentEntry && findRatchetSession(currentEntry.sessionId, message.channel_id, authorId);
+      const recoveredPlaintext = currentSession?.liveText && currentSession.handshakeState === 'LIVE' ? null
+        : await tryPrivateRecoveryRatchetMessage(message, dataPlaneEnvelope, normalizedWire);
+      if (recoveredPlaintext != null) {
+        message.content = '<:ENC:465534298662109185>' + recoveredPlaintext;
+        postProcessMessage(message, recoveredPlaintext);
+        await decryptRatchetV4BoundAttachments(message, info, processingContext);
+        return true;
+      }
+
       if (fanoutEnvelope) {
         const selected = dataPlaneEnvelope.mode === 'encrypted-header-fanout'
           ? selectCompactSdc4EncryptedHeaderFanoutEntry(fanoutEnvelope, local.deviceId)
@@ -44148,7 +46809,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           // A fan-out message may legitimately omit this installation (for
           // example a newly-added or revoked device). Do not try other entries
           // and do not expose/decrypt attachments that were not addressed here.
-          message.content = '<:ENC:465534298662109185>🔒 SDC4 message was not encrypted for this device.';
+          message.content = '<:ENC:465534298662109185>' + privateRecoveryUnavailableMessage(message);
           message.embeds = Array.isArray(message.embeds)
             ? message.embeds.filter(isNativeKlipyEmbed)
             : [];
@@ -47674,7 +50335,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     ]);
     const isPlausibleSecurityControl = plausibleSecurityControlTypes.has(earlyMessageType);
     const isPassiveDeviceControl = passiveDeviceControlTypes.has(earlyMessageType);
-    const persistentDeviceDataControlTypes = new Set(['SELF HISTORY SYNC']);
+    const persistentDeviceDataControlTypes = new Set(['SELF HISTORY SYNC', 'SELF HISTORY SYNC FRAGMENT']);
     const isPersistentDeviceDataControl = persistentDeviceDataControlTypes.has(earlyMessageType);
     const isV65DeviceControl = new Set([
       ...passiveDeviceControlTypes,
@@ -47954,7 +50615,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return true;
       }
 
-      if (isIncomingKeyExchange && !keyExchangeWhitelist[userId]) {
+      const incomingExchangeIntent = sdcControlExchangeIntent(
+        'kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id
+      );
+      if (isIncomingKeyExchange && (!keyExchangeWhitelist[userId] ||
+          (!['online', 'idle', 'dnd'].includes(sdcLocalControlPresence()) && !incomingExchangeIntent))) {
         const username = safeDiscordPeerPresentationLabel(message.author, userId);
         const discriminator =
           message.author.discriminator && message.author.discriminator !== '0'
@@ -47986,6 +50651,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           return true;
         }
 
+        const acceptedIntent = createSdcControlUserIntent(message.channel_id, 'accepted-kex-request');
+        rememberSdcControlExchangeIntent('kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id, acceptedIntent);
         keyExchangeWhitelist[userId] = true;
         console.log('[SDC] Incoming key exchange accepted', {
           userId,
@@ -48208,7 +50875,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               // per-installation device id during the fresh KEX window. The account-level
               // KEX still has one winning responder transcript; announcements only feed
               // the authenticated active-device registry used by post-KEX SDC4 bootstrap.
-              try { await sendDeviceAnnouncement(message.channel_id, false); } catch (_) {}
+              try { await sendDeviceAnnouncement(message.channel_id, false, { userIntent: sdcControlExchangeIntent('kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id) }); } catch (_) {}
               await Utils.SendSystemMessage(message.channel_id, responseMessage);
               armV3Retransmission(state, responseMessage, 'RESP_SENT');
 
@@ -48612,7 +51279,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               `*signature*: \`${Utils.PayloadEncode(ackSignature)}\``;
             await Utils.SendSystemMessage(message.channel_id, ackMessage);
             try {
-              await sendDeviceAnnouncement(message.channel_id, true);
+              await sendDeviceAnnouncement(message.channel_id, true, { userIntent: sdcControlExchangeIntent('kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id) });
             } catch (announceError) {
               console.warn('[SDC][DEVICE][v68.0.3] post-KEX responder device announcement deferred', {
                 channelId: String(message.channel_id), exchangeId, error: String(announceError?.message || announceError),
@@ -48641,7 +51308,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               userId,
               exchangeId
             );
-            await Utils.SendPersonalKey(message.channel_id);
+            await Utils.SendPersonalKey(message.channel_id, sdcControlExchangeIntent('kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id));
             console.log('[SDC][CRYPTO] kex:v3-responder-complete', {
               userId,
               exchangeId,
@@ -48762,7 +51429,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               'INITIATOR'
             );
             try {
-              await sendDeviceAnnouncement(message.channel_id, true);
+              await sendDeviceAnnouncement(message.channel_id, true, { userIntent: sdcControlExchangeIntent('kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id) });
             } catch (announceError) {
               console.warn('[SDC][DEVICE][v68.0.3] post-KEX initiator device announcement deferred', {
                 channelId: String(message.channel_id), exchangeId, error: String(announceError?.message || announceError),
@@ -48785,7 +51452,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               userId,
               exchangeId
             );
-            await Utils.SendPersonalKey(message.channel_id);
+            await Utils.SendPersonalKey(message.channel_id, sdcControlExchangeIntent('kex', getSystemMessageProperty('exchangeId', sysmsg), message.channel_id));
             console.log('[SDC][CRYPTO] kex:v3-initiator-complete', {
               userId,
               exchangeId,
@@ -49317,24 +51984,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           return true;
         }
       case 'SELF HISTORY SYNC':
+      case 'SELF HISTORY SYNC FRAGMENT':
         {
-          // Legacy v68.4.0 separate control. v68.4.4 no longer emits these for
-          // ordinary messages; keep old rows visible and explicit for auditability.
           try {
-            const applied = await handleSelfHistorySync(message, sysmsg);
-            renderSdcVisualCryptoControl(message, 'Multi-device', applied ? 'SELF HISTORY SYNC appliqué' : 'SELF HISTORY SYNC non ciblé', {
-              bucket: 'device',
-              status: applied ? 'success' : 'historical',
-              direction: sdcVisualControlDirection(message, oldMessage),
-              detail: 'ancien paquet séparé v68.4.0 · aucun nouveau paquet séparé émis en v68.4.4',
-            });
+            const result = messageType === 'SELF HISTORY SYNC FRAGMENT'
+              ? await handleSelfHistoryFragment(message, sysmsg) : await handleSelfHistorySync(message, sysmsg);
+            if (result?.authenticated) hideSdcAuxiliaryTransportMessage(message, 'self-history-authenticated-control');
           } catch (error) {
-            console.error('[SDC][DEVICE][v68.4.5] legacy self-history synchronization rejected', error);
             renderSdcVisualCryptoControl(message, 'Multi-device', 'SELF HISTORY SYNC rejeté', {
               bucket: 'device',
               status: 'rejected',
               direction: sdcVisualControlDirection(message, oldMessage),
-              detail: error?.message || String(error),
+              detail: 'copie auxiliaire non authentifiée ou contexte indisponible',
             });
           }
           return true;
@@ -49934,6 +52595,39 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const EMBED_LINKS_CHECK = 0x4000n;
   const prefixRegex = CONFIG.patterns.prefix;
   const noencprefixRegex = CONFIG.patterns.noencPrefix;
+  function offlineSdc4TextFileRecipientSetReady(channelId) {
+    try {
+      const peerId = ratchetPeerAccountId(channelId);
+      const ids = activeAsyncPrekeyRecipientRecords(channelId, peerId).map((row) => String(row.deviceId));
+      return sdc4OfflineFileRecipientSetIsCurrent(channelId, ids);
+    } catch (_) { return false; }
+  }
+  async function sendOversizedOfflineSdc4TextFile(channelId, message, plaintext, hasAttachmentBinding, nativePresentationContext, allowed = true) {
+    if (!allowed || hasAttachmentBinding || Utils.StringToUtf8Bytes(String(plaintext)).byteLength <= SDC_HYBRID_ASYNC_MAX_PLAINTEXT_BYTES)
+      return false;
+    if (!offlineSdc4TextFileRecipientSetReady(channelId)) return false;
+    // v70.11.2: Q/QF application bytes remain frozen. A pure long user text
+    // instead uses the existing per-file CEK delivery, before any Q grant is made.
+    try {
+      await SecureComposer.sendSecureLongTextAsFile(channelId, String(plaintext),
+        'sdc4q-plaintext-exceeds-frozen-offline-budget', nativePresentationContext, SelfHistoryMessageContexts.get(message));
+    } catch (failure) {
+      // SDK rejections may be frozen objects. Never mutate that external value:
+      // recovery needs a reliable local marker even when upload already started.
+      const error = new Error('Offline encrypted file send failed; the draft is preserved', { cause: failure });
+      const status = Number(failure?.status ?? failure?.statusCode ?? failure?.response?.status);
+      const code = Number(failure?.body?.code ?? failure?.response?.body?.code ?? failure?.code);
+      if (Number.isInteger(status) && status >= 100 && status <= 599) error.status = status;
+      if (Number.isSafeInteger(code) && code > 0) error.body = { code };
+      // A queued/enqueued attachment is an acceptance boundary. Recovery in the
+      // surrounding native send must not transparently create a second file.
+      error.sdcOfflineTextFileAttempted = true;
+      throw error;
+    }
+    message._sdc_skip_original_send = true;
+    message.content = '';
+    return true;
+  }
   async function handleSend(
     channelId,
     message,
@@ -49942,9 +52636,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     attachmentScopedKeyIdOverride = null,
     attachmentFileFsDescriptorsOverride = null,
     attachmentGroupFileFsDescriptorsOverride = null,
-    nativePresentationContext = null
+    nativePresentationContext = null,
+    allowOfflineTextFileFallback = true
   ) {
     let content = String(message?.content ?? '');
+    const outboundContext = SelfHistoryMessageContexts.get(message) || captureSelfHistorySendContext(channelId);
+    SelfHistoryMessageContexts.set(message, outboundContext);
 
     // Device/KEX controls are already protected by their dedicated authenticated path.
     if (content.includes('-----SYSTEM MESSAGE-----')) return null;
@@ -50064,15 +52761,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // v70.10.1 zero-touch migration. Genuine encrypted user intent publishes this
     // installation's signed Quiet capability BEFORE any SDC4/PQ construction.
     // Merely viewing/selecting the DM remains fully passive.
+    const controlUserIntent = applicationEncryptionRequested ? outboundContext.userIntent : null;
     if (applicationEncryptionRequested)
-      await ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, 'normal-composer-before-crypto');
+      await ensureQuietPqCapabilityBeforeProtectedUserBuild(channelId, 'normal-composer-before-crypto', controlUserIntent);
 
     // v70.9.5: normal composer path gets the same portable-import restoration
     // gate as Chat Control. This is not a protocol downgrade or a new handshake;
     // it simply re-announces the current installation and reconstructs the already
     // required frozen SDC4 sessions before user traffic resumes.
     if (sdc4Required && portableImportConvergenceState()) {
-      await ensurePortableImportConvergenceForChannel(channelId, 'normal-composer-send');
+      await ensurePortableImportConvergenceForChannel(channelId, 'normal-composer-send', controlUserIntent);
     }
 
     // v67 root-rotation boundary: do not let application traffic race a KEX v3
@@ -50250,10 +52948,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           // classical/ML-KEM prekey immediately before enqueue.
           if (!ratchetAttachmentScopedKeyId && content !== '') {
             try {
+              if (await sendOversizedOfflineSdc4TextFile(channelId, message, content,
+                ratchetFileFsDescriptors.length > 0, nativePresentationContext, allowOfflineTextFileFallback))
+                return await Utils.GetKeyByHash(channelConfig.k);
               const asyncBuilt = ratchetFileFsDescriptors.length
                 ? await buildSdc4OfflineFileDelivery(channelId, ratchetFileFsUserText || '', ratchetFileFsDescriptors)
                 : await buildAsyncPrekeyMessageWire(channelId, content);
               if (asyncBuilt?.multiMessageFanout === true) {
+                asyncBuilt.selfHistorySendContext = outboundContext;
                 await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'sticky-pq-fast-offline', nativePresentationContext);
                 if (ratchetFileFsDescriptors.length) {
                   message.content = encodeSdc4FileFsDetachedCarrier(asyncBuilt.batchId);
@@ -50263,7 +52965,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 }
               } else {
                 const inlineAsync = await appendInlineSelfHistoryCapsules(
-                  channelId, asyncBuilt.wire + ' `🔒`', asyncBuilt.wire, asyncBuilt.wireId
+                  channelId, asyncBuilt.wire + ' `🔒`', asyncBuilt.wire, asyncBuilt.wireId,
+                  SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS, outboundContext
                 );
                 message.content = inlineAsync.transport;
               }
@@ -50287,6 +52990,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 message._sdc_offline_file_recipient_ids = asyncBuilt.recipientDeviceIds.slice();
               return await Utils.GetKeyByHash(channelConfig.k);
             } catch (offlineFastError) {
+              if (offlineFastError?.sdcOfflineTextFileAttempted) throw offlineFastError;
               if (Number(offlineFastError?.sentParts || 0) > 0)
                 failClosed(`SDC4QF fan-out partially delivered (${Number(offlineFastError.sentParts)} fragment(s)); automatic retry is suppressed to avoid duplicate delivery: ${String(offlineFastError?.message || offlineFastError)}`);
               console.debug('[SDC][PQ][v70.3.9] immediate authenticated SDC4Q unavailable; trying bounded LIVE-PQ recovery', {
@@ -50314,10 +53018,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           // convergence when it later processes the queued Discord message.
           if (!ratchetAttachmentScopedKeyId && content !== '') {
             try {
+              if (await sendOversizedOfflineSdc4TextFile(channelId, message, content,
+                ratchetFileFsDescriptors.length > 0, nativePresentationContext, allowOfflineTextFileFallback))
+                return await Utils.GetKeyByHash(channelConfig.k);
               const asyncBuilt = ratchetFileFsDescriptors.length
                 ? await buildSdc4OfflineFileDelivery(channelId, ratchetFileFsUserText || '', ratchetFileFsDescriptors)
                 : await buildAsyncPrekeyMessageWire(channelId, content);
               if (asyncBuilt?.multiMessageFanout === true) {
+                asyncBuilt.selfHistorySendContext = outboundContext;
                 await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'automatic-fast-path', nativePresentationContext);
                 if (ratchetFileFsDescriptors.length) {
                   message.content = encodeSdc4FileFsDetachedCarrier(asyncBuilt.batchId);
@@ -50330,7 +53038,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                   channelId,
                   asyncBuilt.wire + ' `🔒`',
                   asyncBuilt.wire,
-                  asyncBuilt.wireId
+                  asyncBuilt.wireId, SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS, outboundContext
                 );
                 message.content = inlineAsync.transport;
               }
@@ -50356,6 +53064,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 message._sdc_offline_file_recipient_ids = asyncBuilt.recipientDeviceIds.slice();
               return await Utils.GetKeyByHash(channelConfig.k);
             } catch (asyncImmediateError) {
+              if (asyncImmediateError?.sdcOfflineTextFileAttempted) throw asyncImmediateError;
               if (Number(asyncImmediateError?.sentParts || 0) > 0)
                 failClosed(`SDC4QF fan-out partially delivered (${Number(asyncImmediateError.sentParts)} fragment(s)); automatic retry is suppressed to avoid duplicate delivery: ${String(asyncImmediateError?.message || asyncImmediateError)}`);
               console.debug('[SDC][ASYNC][v68.4.5] immediate offline bootstrap unavailable; trying normal SDC4 recovery', {
@@ -50366,7 +53075,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           }
 
           try {
-            await ensureRatchetV4Live(channelId, 'outgoing-text');
+            await ensureRatchetV4Live(channelId, 'outgoing-text', SDC4_AUTO_HANDSHAKE_TIMEOUT_MS, controlUserIntent);
             ratchetWire = await encryptRatchetV4Text(channelId, content, { attachmentScopedKeyId: ratchetAttachmentScopedKeyId });
           } catch (error) {
             // If signed prekeys were not cached at the first attempt, history/device
@@ -50376,10 +53085,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             // SDC3 attachment fallback remains forbidden.
             if (!ratchetAttachmentScopedKeyId && content !== '') {
               try {
+                if (await sendOversizedOfflineSdc4TextFile(channelId, message, content,
+                  ratchetFileFsDescriptors.length > 0, nativePresentationContext, allowOfflineTextFileFallback))
+                  return await Utils.GetKeyByHash(channelConfig.k);
                 const asyncBuilt = ratchetFileFsDescriptors.length
                   ? await buildSdc4OfflineFileDelivery(channelId, ratchetFileFsUserText || '', ratchetFileFsDescriptors)
                   : await buildAsyncPrekeyMessageWire(channelId, content);
                 if (asyncBuilt?.multiMessageFanout === true) {
+                  asyncBuilt.selfHistorySendContext = outboundContext;
                   await enqueueHybridAsyncMultiDeviceFanout(channelId, asyncBuilt, 'automatic-recovery-fallback', nativePresentationContext);
                   if (ratchetFileFsDescriptors.length) {
                     message.content = encodeSdc4FileFsDetachedCarrier(asyncBuilt.batchId);
@@ -50392,7 +53105,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                     channelId,
                     asyncBuilt.wire + ' `🔒`',
                     asyncBuilt.wire,
-                    asyncBuilt.wireId
+                    asyncBuilt.wireId, SDC_SELF_HISTORY_SYNC_SAFE_WIRE_CHARS, outboundContext
                   );
                   message.content = inlineAsync.transport;
                 }
@@ -50416,6 +53129,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                   message._sdc_offline_file_recipient_ids = asyncBuilt.recipientDeviceIds.slice();
                 return await Utils.GetKeyByHash(channelConfig.k);
               } catch (asyncError) {
+                if (asyncError?.sdcOfflineTextFileAttempted) throw asyncError;
                 if (Number(asyncError?.sentParts || 0) > 0)
                   failClosed(`SDC4QF fan-out partially delivered (${Number(asyncError.sentParts)} fragment(s)); automatic retry is suppressed to avoid duplicate delivery: ${String(asyncError?.message || asyncError)}`);
                 failClosed(
@@ -50447,7 +53161,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             ratchetTransport,
             ratchetWire,
             null,
-            SecureComposer?.getDiscordMessageContentLimit?.() || 2000
+            SecureComposer?.getDiscordMessageContentLimit?.() || 2000, outboundContext
           );
           ratchetTransport = inlineSiblingCopy.transport;
 
@@ -50460,7 +53174,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             await SecureComposer.sendSecureLongTextAsFile(
               channelId,
               content,
-              'sdc4-final-transport-exceeds-discord-content-limit'
+              'sdc4-final-transport-exceeds-discord-content-limit', nativePresentationContext, outboundContext
             );
             message._sdc_skip_original_send = true;
             message.content = '';
@@ -50654,6 +53368,349 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   const SECURE_COMPOSER_PASTE_CHARACTER_THRESHOLD = 10000;
   const SECURE_COMPOSER_PASTE_LINE_THRESHOLD = 1000;
 
+  // v70.10.15: one alias/shortcut implementation is shared by the parent and
+  // both opaque frames. Discord's live catalog overrides this small offline
+  // fallback; code, escaped tokens, URLs and custom emoji are never rewritten.
+  function secureEmojiFallbackAliases() {
+    return {
+      heart_eyes:'😍', joy:'😂', smile:'😄', blush:'😊', wink:'😉', sob:'😭', cry:'😢',
+      angry:'😠', rage:'😡', thinking:'🤔', thinking_face:'🤔', eyes:'👀', heart:'❤️',
+      orange_heart:'🧡', yellow_heart:'💛', green_heart:'💚', blue_heart:'💙',
+      purple_heart:'💜', black_heart:'🖤', white_heart:'🤍', broken_heart:'💔',
+      fire:'🔥', tada:'🎉', rocket:'🚀', wave:'👋', clap:'👏', pray:'🙏',
+      thumbsup:'👍', '+1':'👍', thumbsdown:'👎', '-1':'👎', ok_hand:'👌', muscle:'💪',
+      point_right:'👉', point_left:'👈', '100':'💯', warning:'⚠️', check:'✅',
+      white_check_mark:'✅', x:'❌', skull:'💀', skull_crossbones:'☠️', clown:'🤡',
+      clown_face:'🤡', poop:'💩', shit:'💩', hankey:'💩', sunglasses:'😎',
+      nerd:'🤓', nerd_face:'🤓', innocent:'😇', neutral_face:'😐', expressionless:'😑',
+      unamused:'😒', sweat_smile:'😅', rofl:'🤣', rolling_on_the_floor_laughing:'🤣',
+      laughing:'😆', satisfied:'😆', grinning:'😀', grin:'😁', smiley:'😃',
+      stuck_out_tongue:'😛', stuck_out_tongue_winking_eye:'😜',
+      stuck_out_tongue_closed_eyes:'😝', open_mouth:'😮', face_holding_back_tears:'🥹',
+      pleading_face:'🥺', slightly_smiling_face:'🙂', slight_smile:'🙂',
+      frowning_face:'☹️', frowning2:'☹️', slightly_frowning_face:'🙁', slight_frown:'🙁',
+      disappointed:'😞', weary:'😩', tired_face:'😫', scream:'😱', fearful:'😨',
+      cold_sweat:'😰', sweat:'😓', confounded:'😖', flushed:'😳', kissing_heart:'😘',
+      heart_eyes_cat:'😻', crying_cat_face:'😿', smile_cat:'😸',
+      smiling_face_with_3_hearts:'🥰', smiling_face_with_three_hearts:'🥰',
+      hugging:'🤗', hugging_face:'🤗', face_with_raised_eyebrow:'🤨', raised_eyebrow:'🤨',
+      face_with_hand_over_mouth:'🤭', shushing_face:'🤫', zipper_mouth:'🤐',
+      zipper_mouth_face:'🤐', upside_down:'🙃', upside_down_face:'🙃',
+      sweat_drops:'💦', sparkles:'✨', star:'⭐', star2:'🌟', rainbow:'🌈',
+      party_popper:'🎉', confetti_ball:'🎊', balloon:'🎈', gift:'🎁',
+    };
+  }
+
+  function secureMarkdownCodeRange(text, start) {
+    const tick = String.fromCharCode(96);
+    if (text[start] !== tick) return null;
+    let length = 1;
+    while (text[start + length] === tick) length++;
+    let cursor = start + length;
+    while (cursor < text.length) {
+      const found = text.indexOf(tick, cursor);
+      if (found < 0) break;
+      let count = 1;
+      while (text[found + count] === tick) count++;
+      if ((length >= 3 && count >= length) || (length < 3 && count === length)) {
+        return { start, bodyStart:start + length, bodyEnd:found, end:found + count, length, closed:true };
+      }
+      cursor = found + count;
+    }
+    // Unfinished fences stay raw until the user closes them. A single unmatched
+    // inline tick does not swallow the rest of an otherwise ordinary message.
+    return length >= 3
+      ? { start, bodyStart:start + length, bodyEnd:text.length, end:text.length, length, closed:false }
+      : null;
+  }
+
+  function transformSecureEmojiText(value, transform) {
+    const text = String(value == null ? '' : value);
+    let output = '', pending = '', cursor = 0;
+    const flush = () => { output += transform(pending); pending = ''; };
+    while (cursor < text.length) {
+      const rest = text.slice(cursor);
+      const protectedToken = /^(?:https?:\/\/[^\s<>"']+|<a?(?:\\)?:[^<>\r\n]+:[0-9]{15,32}>)/i.exec(rest);
+      if (protectedToken) {
+        flush();
+        output += protectedToken[0].startsWith('<')
+          ? canonicalizeDiscordCustomEmojiMarkup(protectedToken[0]) : protectedToken[0];
+        cursor += protectedToken[0].length; continue;
+      }
+      if (text[cursor] === '\\' && cursor + 1 < text.length) {
+        flush();
+        const escapedAlias = /^\\:[A-Za-z0-9_+~.\-]+:/.exec(rest);
+        const raw = escapedAlias ? escapedAlias[0] : text.slice(cursor, cursor + 2);
+        output += raw; cursor += raw.length; continue;
+      }
+      const code = secureMarkdownCodeRange(text, cursor);
+      if (code) {
+        flush(); output += text.slice(cursor, code.end); cursor = code.end; continue;
+      }
+      pending += text[cursor++];
+    }
+    flush();
+    return output;
+  }
+
+  function secureEmojiAliasMap(entries) {
+    const aliases = Object.assign(Object.create(null), secureEmojiFallbackAliases());
+    if (!Array.isArray(entries)) return aliases;
+    for (const entry of entries.slice(0, 12000)) {
+      if (!Array.isArray(entry) || entry.length !== 2) continue;
+      const name = String(entry[0] || '').toLowerCase().replace(/^:+|:+$/g, '');
+      const emoji = String(entry[1] || '');
+      if (!/^[a-z0-9_+~.\-]{1,100}$/.test(name) || !emoji || emoji.length > 160) continue;
+      const custom = /^<a?:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>$/.test(emoji);
+      const unicode = emoji.length <= 64 && !/[\s<>]/u.test(emoji) &&
+        /(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Regional_Indicator}|\u20E3)/u.test(emoji);
+      if (custom || unicode) aliases[name] = emoji;
+    }
+    return aliases;
+  }
+
+  function normalizeSecureEmojiAliasText(value, aliases, shortcuts = true) {
+    return transformSecureEmojiText(value, (segment) => {
+      let text = segment.replace(/:([A-Za-z0-9_+~.\-]+):/g,
+        (full, name) => aliases[String(name).toLowerCase()] || full);
+      if (!shortcuts) return text;
+      const rules = [
+        [/(^|\s)<3(?=\s|$)/g,'$1❤️'], [/(^|\s)[:=]-?\)(?=\s|$)/g,'$1🙂'],
+        [/(^|\s)[:=]-?\((?=\s|$)/g,'$1🙁'], [/(^|\s):['’]-?\((?=\s|$)/g,'$1😢'],
+        [/(^|\s)[Tt][_.-][Tt](?=\s|$)/g,'$1😭'], [/(^|\s):['’]-?\)(?=\s|$)/g,'$1🥲'],
+        [/(^|\s)(?::[-]?[dD]|=[dD])(?=\s|$)/g,'$1😄'], [/(^|\s)[xX][dD](?=\s|$)/g,'$1😆'],
+        [/(^|\s);-?\)(?=\s|$)/g,'$1😉'], [/(^|\s):[-]?[pP](?=\s|$)/g,'$1😛'],
+        [/(^|\s):[-]?[oO](?=\s|$)/g,'$1😮'], [/(^|\s):[-]?\/(?=\s|$)/g,'$1😕'],
+        [/(^|\s):\|(?=\s|$)/g,'$1😐'], [/(^|\s):[-]?\*(?=\s|$)/g,'$1😘'],
+        [/(^|\s):3(?=\s|$)/g,'$1😺'], [/(^|\s)[oO]:-?\)(?=\s|$)/g,'$1😇'],
+        [/(^|\s)>:-?\((?=\s|$)/g,'$1😠'], [/(^|\s)>:-?[dD](?=\s|$)/g,'$1😈'],
+        [/(^|\s)[dD]:(?=\s|$)/g,'$1😨'], [/(^|\s)-_-(?=\s|$)/g,'$1😑'],
+        [/(^|\s)\^_\^(?=\s|$)/g,'$1😊'], [/(^|\s)[oO]_[oO](?=\s|$)/g,'$1🤨'],
+        [/(^|\s):[sS](?=\s|$)/g,'$1😖'], [/(^|\s):\$(?=\s|$)/g,'$1😳'],
+      ];
+      for (const [pattern, replacement] of rules) text = text.replace(pattern, replacement);
+      return text;
+    });
+  }
+
+  function collectDiscordEmojiAliasEntries(catalogs) {
+    const entries = new Map(), ambiguous = new Set(), seen = new Set();
+    let visited = 0;
+    const put = (rawName, emoji) => {
+      const name = String(rawName || '').toLowerCase().replace(/^:+|:+$/g, '');
+      if (!/^[a-z0-9_+~.\-]{1,100}$/.test(name) || ambiguous.has(name)) return;
+      if (entries.has(name) && entries.get(name) !== emoji) {
+        entries.delete(name); ambiguous.add(name); return;
+      }
+      if (entries.size < 12000) entries.set(name, emoji);
+    };
+    const visit = (record, depth = 0) => {
+      if (!record || typeof record !== 'object' || depth > 7 || seen.has(record) || visited++ >= 40000) return;
+      seen.add(record);
+      try {
+      let emoji = '';
+      const id = String(record.id || record.emojiId || record.emoji_id || '');
+      const custom = /^[0-9]{15,32}$/.test(id);
+      if (custom) {
+        const name = String(record.originalName || record.name || record.uniqueName || '');
+        if (name) emoji = '<' + (record.animated || record.isAnimated ? 'a' : '') + ':' +
+          canonicalDiscordCustomEmojiWireName(name) + ':' + id + '>';
+      } else {
+        for (const key of ['surrogates','unicode','optionallyDiverseSequence','diversitySequence','emoji']) {
+          const candidate = record[key];
+          if (typeof candidate === 'string' && candidate.length <= 64 && !/[\s<>]/u.test(candidate) &&
+              /(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Regional_Indicator}|\u20E3)/u.test(candidate)) {
+            emoji = candidate; break;
+          }
+        }
+        if (!emoji && typeof record.unified === 'string' && /^[0-9A-Fa-f]{4,6}(?:-[0-9A-Fa-f]{4,6}){0,15}$/.test(record.unified)) {
+          const points = record.unified.split('-').map((point) => parseInt(point, 16));
+          if (points.every((point) => point <= 0x10ffff && (point < 0xd800 || point > 0xdfff))) {
+            const candidate = String.fromCodePoint(...points);
+            if (/(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Regional_Indicator}|\u20E3)/u.test(candidate)) emoji = candidate;
+          }
+        }
+      }
+      if (emoji) {
+        for (const key of ['name','uniqueName','shortName','short_name','originalName','names','shortNames','short_names','aliases','shortcodes']) {
+          const names = record[key];
+          if (typeof names === 'string') put(names, emoji);
+          else if (Array.isArray(names)) for (const name of names.slice(0, 32)) if (typeof name === 'string') put(name, emoji);
+        }
+      }
+      let children = [];
+      try { children = record instanceof Map ? Array.from(record.values()) : Object.values(record); } catch (_) {}
+      for (const child of children) if (child && typeof child === 'object') visit(child, depth + 1);
+      } catch (_) { /* Discord exports may contain throwing getters/proxies. */ }
+    };
+    for (const catalog of catalogs) visit(catalog);
+    return Array.from(entries.entries());
+  }
+
+  function safeDiscordChannelLinkPath(value) {
+    try {
+      const parsed = new URL(String(value || ''));
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port) return '';
+      if (!/^(?:(?:www|canary|ptb)\.)?discord(?:app)?\.com$/i.test(parsed.hostname)) return '';
+      return /^\/channels\/(?:@me|[0-9]{15,32})\/[0-9]{15,32}(?:\/[0-9]{15,32})?\/?$/.test(parsed.pathname)
+        ? parsed.pathname : '';
+    } catch (_) { return ''; }
+  }
+
+  function discordMessageLinkPaths(value) {
+    const text = String(value || ''), paths = new Set();
+    for (let cursor = 0; cursor < text.length && paths.size < 12;) {
+      const code = secureMarkdownCodeRange(text, cursor);
+      if (code) { cursor = code.end; continue; }
+      if (text[cursor] === '\\') { cursor += 2; continue; }
+      const match = /^https?:\/\/[^\s<>"']+/i.exec(text.slice(cursor));
+      if (!match) { cursor++; continue; }
+      const path = safeDiscordChannelLinkPath(match[0].replace(/[),.;!?}\]]+$/, '')).replace(/\/$/, '');
+      if (path) paths.add(path);
+      cursor += match[0].length;
+    }
+    return Array.from(paths);
+  }
+
+  function secureMarkdownStartsWithBlock(value) {
+    return /^ {0,3}(?:[-*][ \t]+|[0-9]{1,9}\.[ \t]+|#{1,3}[ \t]+|>|\x60{3,}|~{3,})/.test(String(value || ''));
+  }
+
+  function secureEchoMarkdownCssValue(property, value) {
+    const text = String(value == null ? '' : value).trim();
+    if (/^(?:marginTop|marginBottom|paddingLeft|paddingRight|paddingTop|paddingBottom|fontSize|lineHeight)$/.test(property)) {
+      if (property === 'lineHeight' && text === 'normal') return text;
+      return /^(?:0|[0-9]+(?:\.[0-9]+)?px)$/.test(text) && parseFloat(text) <= 200 ? text : '';
+    }
+    if (property === 'listStyleType') return /^(?:disc|circle|square|decimal|lower-alpha|upper-alpha|lower-roman|upper-roman|none)$/.test(text) ? text : '';
+    if (property === 'listStylePosition') return /^(?:inside|outside)$/.test(text) ? text : '';
+    if (property === 'fontWeight') return /^(?:normal|bold|[1-9]00)$/.test(text) ? text : '';
+    if (property === 'whiteSpace') return /^(?:normal|pre|pre-wrap|pre-line|break-spaces)$/.test(text) ? text : '';
+    if (property === 'fontFamily') return text.length <= 256 && !/[;{}<>\\]|url\s*\(/i.test(text) ? text : '';
+    return '';
+  }
+
+  function normalizeSecureDiscordFontFace(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    const family = String(entry.family || '').trim().replace(/^(['"])(.*)\1$/, '$2');
+    if (!/^[A-Za-z0-9 _-]{1,80}$/.test(family)) return null;
+    let url;
+    try {
+      url = new URL(String(entry.url || ''), entry.base || undefined);
+      if (url.protocol !== 'https:' || url.username || url.password || url.port || url.search || url.hash) return null;
+      if (!/^(?:(?:www|canary|ptb)\.)?discord\.com$|^cdn\.discordapp\.com$/i.test(url.hostname)) return null;
+      if (!/^\/(?:assets|fonts)\/[A-Za-z0-9_./-]+\.(?:woff2?|ttf|otf)$/i.test(url.pathname)) return null;
+    } catch (_) { return null; }
+    const result = { family, url:url.href };
+    const descriptors = {
+      weight:/^(?:normal|bold|[1-9]00(?: [1-9]00)?)$/,
+      style:/^(?:normal|italic|oblique)$/,
+      stretch:/^(?:normal|(?:ultra-|extra-|semi-)?(?:condensed|expanded)|[0-9]{1,3}%(?: [0-9]{1,3}%)?)$/,
+      unicodeRange:/^U\+[0-9A-F?]{1,6}(?:-[0-9A-F]{1,6})?(?:,\s*U\+[0-9A-F?]{1,6}(?:-[0-9A-F]{1,6})?)*$/i,
+    };
+    for (const [key, pattern] of Object.entries(descriptors)) {
+      const value = String(entry[key] || '').trim();
+      if (value && value.length <= 512 && pattern.test(value)) result[key] = value;
+    }
+    return result;
+  }
+
+  function collectSecureDiscordFontFaces(theme, markdownPresentation = {}) {
+    const families = new Set();
+    for (const value of [theme?.fontFamily, ...Object.values(markdownPresentation).map((style) => style?.fontFamily)]) {
+      for (const name of String(value || '').split(',')) families.add(name.trim().replace(/^(['"])(.*)\1$/, '$2').toLowerCase());
+    }
+    const faces = [], seen = new Set(); let remaining = 2048;
+    const visit = (rules, base, depth = 0) => {
+      if (depth > 6 || !rules || faces.length >= 32) return;
+      for (let index = 0, limit = Math.min(Number(rules.length) || 0, remaining); index < limit; index++) {
+        const rule = rules[index];
+        if (--remaining < 0 || faces.length >= 32) break;
+        try {
+          if (rule.type === 5 && rule.style) {
+            const family = rule.style.getPropertyValue('font-family');
+            if (!families.has(String(family).trim().replace(/^(['"])(.*)\1$/, '$2').toLowerCase())) continue;
+            const src = rule.style.getPropertyValue('src');
+            const candidates = String(src || '').matchAll(/url\(\s*(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s)'"\r\n]+))\s*\)/gi);
+            for (const match of candidates) {
+              const face = normalizeSecureDiscordFontFace({family,url:match[1] || match[2] || match[3],base,
+                weight:rule.style.getPropertyValue('font-weight'), style:rule.style.getPropertyValue('font-style'),
+                stretch:rule.style.getPropertyValue('font-stretch'), unicodeRange:rule.style.getPropertyValue('unicode-range')});
+              if (!face) continue;
+              const identity = JSON.stringify(face);
+              if (!seen.has(identity)) { seen.add(identity); faces.push(face); }
+              break;
+            }
+          } else if (rule.cssRules) visit(rule.cssRules, rule.href || base, depth + 1);
+        } catch (_) { /* Cross-origin or inaccessible CSS remains optional. */ }
+      }
+    };
+    try {
+      for (const sheet of Array.from(document.styleSheets || []).slice(0, 64)) {
+        if (remaining <= 0 || faces.length >= 32) break;
+        try { visit(sheet.cssRules, sheet.href || document.baseURI); } catch (_) {}
+      }
+    } catch (_) {}
+    return faces;
+  }
+
+  function secureLocalEchoPresentationForNode(node, fallbackTheme = {}) {
+    const theme = { ...fallbackTheme }, markdownPresentation = {};
+    if (!node || typeof getComputedStyle !== 'function') return { theme, markdownPresentation };
+    let probeRoot = null;
+    try {
+      const native = getComputedStyle(node);
+      for (const property of ['color','fontFamily','fontSize','lineHeight','fontWeight','letterSpacing','fontStyle']) {
+        const value = String(native[property] || '');
+        if (value && value !== 'normal') theme[property] = value;
+      }
+      // Composer's textarea uses a 1px compensation. A message div must instead
+      // use the actual message row font, including the user's Discord zoom/theme.
+      if (native.lineHeight === 'normal') theme.lineHeight = '22px';
+      probeRoot = document.createElement('div');
+      probeRoot.className = String(node.parentElement?.className || '');
+      probeRoot.style.cssText = 'position:fixed;left:-10000px;top:0;width:600px;visibility:hidden;pointer-events:none;contain:layout style;';
+      const probe = document.createElement('div');
+      probe.className = String(node.className || '');
+      for (const property of ['fontFamily','fontSize','lineHeight','fontWeight']) if (theme[property]) probe.style[property] = theme[property];
+      probeRoot.appendChild(probe);
+      const samples = {};
+      for (const tag of ['ul','ol']) {
+        const list = document.createElement(tag), item = document.createElement('li');
+        item.textContent = 'x'; list.appendChild(item); probe.appendChild(list);
+        samples[tag] = list;
+        if (tag === 'ul') {
+          samples.li = item;
+          const nested = document.createElement('ul'), child = document.createElement('li');
+          child.textContent = 'x'; nested.appendChild(child); item.appendChild(nested); samples.nestedUl = nested;
+        }
+      }
+      for (const tag of ['h1','h2','h3','pre']) {
+        const element = document.createElement(tag); element.textContent = 'x'; probe.appendChild(element); samples[tag] = element;
+        if (tag === 'pre') { const code = document.createElement('code'); code.textContent = 'x'; element.replaceChildren(code); samples.code = code; }
+      }
+      const inlineCode = document.createElement('code'); inlineCode.textContent = 'x'; probe.appendChild(inlineCode); samples.inlineCode = inlineCode;
+      document.body.appendChild(probeRoot);
+      const properties = ['marginTop','marginBottom','paddingLeft','paddingRight','paddingTop','paddingBottom','fontSize','lineHeight','fontWeight','fontFamily','listStyleType','listStylePosition','whiteSpace'];
+      for (const [name, sample] of Object.entries(samples)) {
+        const style = getComputedStyle(sample), values = {};
+        for (const property of properties) {
+          if (/^listStyle/.test(property) && !['ul','ol','nestedUl'].includes(name)) continue;
+          const value = secureEchoMarkdownCssValue(property, style[property]);
+          if (value) values[property] = value;
+        }
+        markdownPresentation[name] = values;
+      }
+    } catch (_) { /* Native CSS probing is optional; the safe fallback still renders. */ }
+    finally { try { probeRoot?.remove?.(); } catch (_) {} }
+    return { theme, markdownPresentation, discordFontFaces:collectSecureDiscordFontFaces(theme, markdownPresentation) };
+  }
+
+  const SDC_SECURE_EMOJI_HELPERS = [secureEmojiFallbackAliases, secureMarkdownCodeRange,
+    transformSecureEmojiText, secureEmojiAliasMap, normalizeSecureEmojiAliasText, safeDiscordChannelLinkPath,
+    secureEchoMarkdownCssValue, normalizeSecureDiscordFontFace]
+    .map((helper) => helper.toString()).join('\n');
+
   const SECURE_COMPOSER_FRAME_HTML = String.raw`<!doctype html>
 <html>
 <head>
@@ -50831,99 +53888,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     );
   }
 
+  ${SDC_SECURE_EMOJI_HELPERS}
+  let discordEmojiAliases = secureEmojiAliasMap([]);
+
   function normalizeSecureEmojiShortcuts(value) {
-    let text = canonicalizeDiscordCustomEmojiMarkup(String(value || ''));
-
-    const aliases = {
-      heart_eyes: '😍',
-      joy: '😂',
-      smile: '😄',
-      blush: '😊',
-      wink: '😉',
-      sob: '😭',
-      cry: '😢',
-      angry: '😠',
-      thinking: '🤔',
-      eyes: '👀',
-      heart: '❤️',
-      fire: '🔥',
-      tada: '🎉',
-      rocket: '🚀',
-      wave: '👋',
-      clap: '👏',
-      pray: '🙏',
-      thumbsup: '👍',
-      thumbsdown: '👎',
-      ok_hand: '👌',
-      100: '💯',
-      skull: '💀',
-      sunglasses: '😎',
-      laughing: '😆',
-      stuck_out_tongue: '😛',
-      open_mouth: '😮',
-      face_holding_back_tears: '🥹',
-      pleading_face: '🥺',
-      slightly_smiling_face: '🙂',
-      frowning_face: '☹️',
-      disappointed: '😞',
-      weary: '😩',
-      tired_face: '😫',
-      scream: '😱',
-      fearful: '😨',
-      cold_sweat: '😰',
-      sweat: '😓',
-      confounded: '😖',
-      flushed: '😳',
-      kissing_heart: '😘',
-      heart_eyes_cat: '😻',
-      crying_cat_face: '😿',
-      smile_cat: '😸',
-    };
-
-    text = text.replace(
-      /:([a-zA-Z0-9_+~.\-]+):/g,
-      (full, rawName) =>
-        aliases[
-          String(rawName || '')
-            .toLowerCase()
-        ] || full
+    return normalizeSecureEmojiAliasText(
+      String(value || ''),
+      discordEmojiAliases
     );
-
-    const rules = [
-      [/(^|\s)(?:<3)(?=\s|$)/g, '$1❤️'],
-      [/(^|\s)(?:[:=]-?\))(?=\s|$)/g, '$1🙂'],
-      [/(^|\s)(?:[:=]-?\()(?=\s|$)/g, '$1🙁'],
-      [/(^|\s)(?::['’]-?\()(?=\s|$)/g, '$1😢'],
-      [/(^|\s)(?:[Tt][_.-][Tt])(?=\s|$)/g, '$1😭'],
-      [/(^|\s)(?::['’]-?\))(?=\s|$)/g, '$1🥲'],
-      [/(^|\s)(?::[-]?[dD]|=[dD])(?=\s|$)/g, '$1😄'],
-      [/(^|\s)(?:[xX][dD])(?=\s|$)/g, '$1😆'],
-      [/(^|\s)(?:;-?\))(?=\s|$)/g, '$1😉'],
-      [/(^|\s)(?::[-]?[pP])(?=\s|$)/g, '$1😛'],
-      [/(^|\s)(?::[-]?[oO])(?=\s|$)/g, '$1😮'],
-      [/(^|\s)(?::[-]?\/)(?=\s|$)/g, '$1😕'],
-      [/(^|\s)(?::\|)(?=\s|$)/g, '$1😐'],
-      [/(^|\s)(?::[-]?\*)(?=\s|$)/g, '$1😘'],
-      [/(^|\s)(?::3)(?=\s|$)/g, '$1😺'],
-      [/(^|\s)(?:[oO]:-?\))(?=\s|$)/g, '$1😇'],
-      [/(^|\s)(?:>:-?\()(?=\s|$)/g, '$1😠'],
-      [/(^|\s)(?:>:-?[dD])(?=\s|$)/g, '$1😈'],
-      [/(^|\s)(?:[dD]:)(?=\s|$)/g, '$1😨'],
-      [/(^|\s)(?:-_-)(?=\s|$)/g, '$1😑'],
-      [/(^|\s)(?:\^_\^)(?=\s|$)/g, '$1😊'],
-      [/(^|\s)(?:[oO]_[oO])(?=\s|$)/g, '$1🤨'],
-      [/(^|\s)(?::[sS])(?=\s|$)/g, '$1😖'],
-      [/(^|\s)(?::\$)(?=\s|$)/g, '$1😳'],
-    ];
-
-    for (const [pattern, replacement] of rules) {
-      text = text.replace(
-        pattern,
-        replacement
-      );
-    }
-
-    return text;
   }
 
   function truncateToLimit(value) {
@@ -51704,6 +54676,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // transferred/burned the one-shot SDC4 MK. Concurrent drain preserves the
       // exact DEFLATE bytes while guaranteeing forward progress.
       const compressedBufferPromise = new Response(stream.readable).arrayBuffer();
+      // v70.11.2: observe the drain even if write/close fails before the work
+      // promise reaches it; abort may otherwise reject an unobserved reader.
+      compressedBufferPromise.catch(() => {});
       let compressionTimeoutId = null;
       let compressedBuffer = null;
       try {
@@ -51724,7 +54699,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // strand busy=true after a ratchet MK has been reserved. Fall back to
         // raw application bytes; the parent will then either send the normal
         // authenticated SDC4 wire or choose encrypted message.txt by final size.
-        try { await writer.abort(); } catch (_) {}
+        // A stalled write can also stall abort(). Timeout recovery must not
+        // await that same broken writable before returning the raw bytes.
+        try { Promise.resolve(writer.abort()).catch(() => {}); } catch (_) {}
         return raw;
       } finally {
         if (compressionTimeoutId != null) clearTimeout(compressionTimeoutId);
@@ -52203,6 +55180,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       data.senderId || ''
     );
     textCryptoProtocol = Number(data.textCryptoProtocol || 3);
+    discordEmojiAliases = secureEmojiAliasMap(data.discordEmojiAliases);
     groupSenderRatchetEnabled = data.groupSenderRatchetEnabled === true && textCryptoProtocol === 3;
     mentionCandidates = Array.isArray(data.mentionCandidates)
       ? data.mentionCandidates.filter((x) => x && /^[0-9]{1,32}$/.test(String(x.id || ''))).slice(0, 1200)
@@ -53237,6 +56215,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             ) {
               sendParent('sdc-secure-local-echo-height', {
                 echoId,
+                ready: message.ready === true,
                 height: Math.max(18, Math.min(5000, Math.ceil(Number(message.height)))),
                 tailLeft: Number(message.tailLeft),
                 tailTop: Number(message.tailTop),
@@ -53330,6 +56309,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         } else {
           encryptLongTextFile(pending.plaintext)
             .then((result) => {
+              if (data.offlineTextFileFallback === true) {
+                result.offlineTextFileFallback = true;
+                result.requestId = pending.requestId;
+              }
               const transfer = [];
               if (result.fileCiphertext) transfer.push(result.fileCiphertext);
               if (result.fileKey) transfer.push(result.fileKey);
@@ -53682,6 +56665,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 <html>
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="font-src https://discord.com https://www.discord.com https://canary.discord.com https://ptb.discord.com https://cdn.discordapp.com">
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -53702,6 +56686,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     font-size: var(--sdc-echo-size, 16px);
     line-height: var(--sdc-echo-line-height, 22px);
     font-weight: var(--sdc-echo-weight, 400);
+    letter-spacing: var(--sdc-echo-letter-spacing, normal);
+    font-style: var(--sdc-echo-font-style, normal);
   }
   #echo a { color:#00a8fc; text-decoration:none; cursor:pointer; }
   #echo a:hover { text-decoration:underline; }
@@ -53714,6 +56700,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     display:block; max-width:100%; max-height:300px; width:auto; height:auto;
     object-fit:contain; border-radius:8px; cursor:pointer; user-select:none;
   }
+  #echo a.sdc-discord-preview {
+    display:block; width:min(420px,100%); margin:8px 0 2px; padding:10px 12px;
+    border:1px solid #3f4147; border-left:3px solid #5865f2; border-radius:4px;
+    background:#2b2d31; color:inherit; font-size:.875em; line-height:1.4;
+    white-space:normal; overflow-wrap:anywhere; text-decoration:none;
+  }
+  #echo .sdc-discord-preview-location { display:block; color:#a5a8ae; font-size:.9em; }
+  #echo .sdc-discord-preview-author { display:block; margin-top:3px; font-weight:600; }
+  #echo .sdc-discord-preview-text { display:block; margin-top:3px; white-space:pre-wrap; }
+  body.sdc-compact #echo .sdc-discord-preview { display:none; }
+  body.sdc-discord-preview-only #enc-marker { display:none; }
+  body.sdc-discord-preview-only #echo { width:100%; }
+  #echo .sdc-discord-preview[aria-busy="true"], #echo .sdc-discord-preview[role="status"] { cursor:default; }
 
   /* v70.9.2: sender-local formatting is rendered inside this opaque frame.
      Only a narrow Markdown subset is materialized as DOM elements; HTML from
@@ -53737,6 +56736,27 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     display:block; margin:2px 0; padding-left:8px;
     border-left:4px solid #4e5058;
   }
+  #echo .sdc-list {
+    margin:0; padding-left:24px; white-space:normal;
+  }
+  #echo .sdc-list-item { white-space:pre-wrap; }
+  #echo .sdc-heading { margin:4px 0; font-weight:700; line-height:1.3; }
+  #echo h1.sdc-heading { font-size:1.5em; }
+  #echo h2.sdc-heading { font-size:1.25em; }
+  #echo h3.sdc-heading { font-size:1.1em; }
+  body.sdc-compact #echo {
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-height:22px;
+    font-size:14px; line-height:22px;
+  }
+  body.sdc-compact #echo .sdc-inline-media { display:none; }
+  body.sdc-compact #echo .sdc-code-block,
+  body.sdc-compact #echo .sdc-list,
+  body.sdc-compact #echo .sdc-list-item,
+  body.sdc-compact #echo .sdc-quote,
+  body.sdc-compact #echo .sdc-heading {
+    display:inline; margin:0; padding:0; border:0; font-size:inherit; white-space:nowrap;
+  }
+  body.sdc-compact #echo br { display:none; }
   #echo .sdc-spoiler {
     border-radius:3px; padding:0 2px; background:#1e1f22; color:transparent;
     cursor:pointer;
@@ -53786,6 +56806,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   let lastLayoutSignature = '';
   let discordUnicodeEmojiAssets = new Map();
   let echoRenderedMediaUrls = new Set();
+  let pendingDiscordLinkPreviews = new Map();
+  let discordLocalLinkPreviews = new Map();
+  let discordLinkPreviewRequests = new Map();
+  let echoRendered = false;
+  let fontLayoutReady = true;
+  let fontLoadGeneration = 0;
+  let markdownStyleNode = null;
+  let pendingLayoutReport = null;
+  let historyRewrapConnected = false;
 
   function concatBuffers(buffers) {
     let length = 0;
@@ -53959,6 +56988,49 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return concatBuffers([prefix, messageCiphertext]);
   }
 
+  function receivedHistoryAad(meta) {
+    // Same sorted canonical object as the existing parent received-history AAD.
+    return encoder.encode(JSON.stringify({ accountId: String(meta.accountId || ''), channelId: String(meta.channelId || ''),
+      deviceId: String(meta.deviceId || ''), direction: 'received', messageId: String(meta.messageId || ''),
+      protocol: 'SDC-V67-SDC4-HISTORY', version: 1, wireId: String(meta.wireId || '') }));
+  }
+
+  function selfHistoryFileKeyMetadata(clear) {
+    const text = decoder.decode(clear);
+    const decode = (value) => {
+      const binary = atob(String(value).replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from(binary, value => value.charCodeAt(0));
+    };
+    const encode = (bytes) => {
+      let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
+      return btoa(binary).split('+').join('-').split('/').join('_').replace(/=+$/g, '');
+    };
+    const prefix = '\u2063SDC4FS1:', compact = '\u2063SDC4FSQ1:', endMarker = ':\u2063';
+    if (text.startsWith(prefix)) {
+      const end = text.indexOf(endMarker, prefix.length);
+      if (end < 0) throw new Error('Invalid authenticated file metadata');
+      const parsed = JSON.parse(decoder.decode(decode(text.slice(prefix.length, end))));
+      const rows = parsed.a;
+      if (parsed.v !== 1 || !Array.isArray(rows) || !rows.length || rows.length > 16) throw new Error('Invalid authenticated file descriptor count');
+      return { fileFsDescriptors: rows.map(row => ({ v: row.v, i: row.i, h: row.h, k: row.k, n: row.n, z: row.z })), offlineFileFsDescriptors: [] };
+    }
+    if (text.startsWith(compact)) {
+      const end = text.indexOf(endMarker, compact.length);
+      if (end < 0) throw new Error('Invalid authenticated compact file metadata');
+      const raw = decode(text.slice(compact.length, end)), count = raw[4];
+      if (raw.length < 5 || raw[0] !== 83 || raw[1] !== 70 || raw[2] !== 81 || raw[3] !== 49 ||
+          count < 1 || count > 16 || raw.length !== 5 + count * 48) throw new Error('Invalid authenticated compact file metadata');
+      const rows = []; let offset = 5;
+      for (let index = 0; index < count; index++) {
+        const i = encode(raw.slice(offset, offset + 16)); offset += 16;
+        const k = encode(raw.slice(offset, offset + 32)); offset += 32; rows.push({ v: 1, i, k });
+      }
+      raw.fill(0);
+      return { fileFsDescriptors: [], offlineFileFsDescriptors: rows };
+    }
+    return { fileFsDescriptors: [], offlineFileFsDescriptors: [] };
+  }
+
   function canonicalDiscordCustomEmojiWireName(rawName) {
     let name = String(rawName || '')
       .replace(/\\([\\*_~|>\[\]{}()#+\-.!:])/g, '$1')
@@ -53981,6 +57053,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         canonicalDiscordCustomEmojiWireName(rawName) + ':' + String(id) + '>'
     );
   }
+
+  ${SDC_SECURE_EMOJI_HELPERS}
+  let discordEmojiAliases = secureEmojiAliasMap([]);
+  let discordChannelNavigation = false;
+  let compactPreview = false;
 
   const CUSTOM_EMOJI_RE = /<(a?):([A-Za-z0-9_]{2,32}):([0-9]{15,32})>/g;
   const EMOJI_GRAPHEME_RE = /(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Regional_Indicator}|\u20E3)/u;
@@ -54178,6 +57255,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function appendSafeEchoMediaPreview(fragment, value) {
+    if (compactPreview) return false;
     const youtube = safeEchoYoutubeDescriptor(value);
     const mediaUrl = youtube?.thumbnail || safeEchoDirectMediaUrl(value);
     const identityUrl = youtube?.href || mediaUrl;
@@ -54209,6 +57287,102 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     return true;
   }
 
+  function configureEchoLinkNavigation(anchor, parsed) {
+    anchor.href = parsed.href;
+    anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.referrerPolicy = 'no-referrer';
+    const channelPath = safeDiscordChannelLinkPath(parsed.href);
+    if (channelPath) {
+      anchor.removeAttribute('target');
+      const navigate = (event) => {
+        event.preventDefault();
+        parent.postMessage({ type:'sdc-local-echo-channel-link', echoId, path:channelPath }, '*');
+      };
+      anchor.addEventListener('click', navigate);
+      anchor.addEventListener('auxclick', navigate);
+    }
+  }
+
+  function installDiscordLocalLinkPreviews(entries) {
+    discordLocalLinkPreviews = new Map();
+    if (!Array.isArray(entries)) return;
+    for (const entry of entries.slice(0, 256)) {
+      if (!entry || typeof entry !== 'object') continue;
+      const rawPath = String(entry.path || '');
+      const path = safeDiscordChannelLinkPath('https://discord.com' + rawPath).replace(/\/$/, '');
+      if (!path || path !== rawPath.replace(/\/$/, '')) continue;
+      const clean = (value, limit) => String(value == null ? '' : value).slice(0, limit).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '');
+      discordLocalLinkPreviews.set(path, {
+        channelName:clean(entry.channelName, 160), guildName:clean(entry.guildName, 160),
+        authorName:clean(entry.authorName, 160), text:clean(entry.text, 1000),
+      });
+    }
+  }
+
+  function appendSafeDiscordLinkPreview(fragment, value) {
+    if (compactPreview) return false;
+    const path = safeDiscordChannelLinkPath(value).replace(/\/$/, '');
+    if (!path) return false;
+    const channelPath = path.split('/').slice(0, 4).join('/');
+    const cached = discordLocalLinkPreviews.get(path) || (path === channelPath ? discordLocalLinkPreviews.get(channelPath) : null);
+    const card = document.createElement('a'); card.className = 'sdc-discord-preview';
+    const location = document.createElement('span'); location.className = 'sdc-discord-preview-location';
+    location.textContent = 'Message Discord';
+    card.appendChild(location);
+    const author = document.createElement('span'); author.className = 'sdc-discord-preview-author'; card.appendChild(author);
+    const text = document.createElement('span'); text.className = 'sdc-discord-preview-text';
+    text.textContent = 'Chargement du message…';
+    card.appendChild(text); fragment.appendChild(card);
+    const target = { path, value:String(value), card, location, author, text };
+    if (cached && cached.text) updateDiscordLinkPreviewCard(target, { ...cached, status:'ready' });
+    else card.setAttribute('aria-busy', 'true');
+    if (discordLinkPreviewRequests.size < 12) {
+      const requestId = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+      discordLinkPreviewRequests.set(requestId, target);
+      parent.postMessage({ type:'sdc-local-echo-discord-preview-request', echoId, requestId, path }, '*');
+    }
+    return true;
+  }
+
+  function updateDiscordLinkPreviewCard(target, result) {
+    const clean = (value, limit) => String(value || '').slice(0, limit).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '');
+    target.location.textContent = [clean(result.guildName,160), result.channelName ? '#' + clean(result.channelName,160) : 'Message Discord'].filter(Boolean).join(' · ');
+    target.author.textContent = clean(result.authorName,160);
+    target.card.removeAttribute('aria-busy');
+    if (result.status === 'ready') {
+      configureEchoLinkNavigation(target.card, new URL(target.value));
+      let text = clean(result.text, 1000);
+      // Per-file CEKs are authenticated metadata, never user-visible preview.
+      if (/^\u2063(?:SDC4FS(?:Q)?1|SDCGFS1):/.test(text)) {
+        const end = text.indexOf(':\u2063');
+        text = end >= 0 ? text.slice(end + 2) : '';
+      }
+      const files = Array.isArray(result.attachmentNames) ? result.attachmentNames.slice(0,4).map((name) => clean(name,100)).filter(Boolean) : [];
+      target.text.textContent = text || (files.length ? '📎 ' + files.join(', ') : 'Message sans texte');
+      target.card.removeAttribute('role');
+    } else {
+      target.card.removeAttribute('href'); target.card.removeAttribute('target'); target.card.setAttribute('role','status');
+      target.author.textContent = '';
+      target.text.textContent = result.status === 'inaccessible' ? 'Message inaccessible ou supprimé' :
+        result.status === 'encrypted-unavailable' ? 'Historique chiffré indisponible sur cet appareil' : 'Aperçu du message indisponible';
+    }
+    reportHeight();
+  }
+
+  function appendSafeEchoLink(fragment, value, label) {
+    try {
+      const parsed = new URL(String(value || ''));
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+      const a = document.createElement('a');
+      a.textContent = String(label || value);
+      configureEchoLinkNavigation(a, parsed);
+      const channelPath = safeDiscordChannelLinkPath(parsed.href);
+      if (channelPath) pendingDiscordLinkPreviews.set(channelPath.replace(/\/$/, ''), parsed.href);
+      fragment.appendChild(a);
+      appendSafeEchoMediaPreview(fragment, parsed.href);
+      return true;
+    } catch (_) { return false; }
+  }
+
   function appendSafeEchoSegment(fragment, segment) {
     if (!segment) return;
     const tokenRe = /<(a?):([A-Za-z0-9_]{2,32}):([0-9]{15,32})>|https?:\/\/[^\s<>"']+/gi;
@@ -54223,24 +57397,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         let raw = rawMatch;
         let trailing = '';
         while (/[),.;!?}\]]$/.test(raw)) {
+          if (raw.endsWith(')') && (raw.match(/\(/g) || []).length >= (raw.match(/\)/g) || []).length) break;
           trailing = raw.slice(-1) + trailing;
           raw = raw.slice(0, -1);
         }
-        let linked = false;
-        try {
-          const parsed = new URL(raw);
-          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-            const a = document.createElement('a');
-            a.href = parsed.href;
-            a.textContent = raw;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            a.referrerPolicy = 'no-referrer';
-            fragment.appendChild(a);
-            appendSafeEchoMediaPreview(fragment, parsed.href);
-            linked = true;
-          }
-        } catch (_) {}
+        const linked = appendSafeEchoLink(fragment, raw, raw);
         if (!linked) fragment.appendChild(document.createTextNode(raw));
         if (trailing) fragment.appendChild(document.createTextNode(trailing));
       }
@@ -54252,157 +57413,262 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   function appendSafeInlineMarkdown(fragment, value, depth = 0) {
     const text = String(value == null ? '' : value);
     if (!text) return;
-    if (depth > 6) {
-      appendSafeEchoSegment(fragment, text);
-      return;
-    }
-
-    // Longest delimiter wins when two formats start at the same offset. Every
-    // rendered node is created explicitly; no plaintext ever reaches innerHTML.
-    const tick = String.fromCharCode(96);
+    if (depth > 6) { appendSafeEchoSegment(fragment, text); return; }
     const specs = [
-      { open: '**', close: '**', tag: 'strong' },
-      { open: '__', close: '__', tag: 'u' },
-      { open: '~~', close: '~~', tag: 's' },
-      { open: '||', close: '||', tag: 'span', className: 'sdc-spoiler' },
-      { open: tick, close: tick, tag: 'code', className: 'sdc-inline-code', raw: true },
-      { open: '*', close: '*', tag: 'em' },
-      { open: '_', close: '_', tag: 'em' },
+      { delimiter:'***', tag:'strong', innerTag:'em' },
+      { delimiter:'**', tag:'strong' }, { delimiter:'__', tag:'u' },
+      { delimiter:'~~', tag:'s' }, { delimiter:'||', tag:'span', className:'sdc-spoiler' },
+      { delimiter:'*', tag:'em' }, { delimiter:'_', tag:'em' },
     ];
-
-    let cursor = 0;
+    let cursor = 0, pending = '';
+    const flush = () => { appendSafeEchoSegment(fragment, pending); pending = ''; };
+    const escaped = (index) => {
+      let backslashes = 0;
+      while (index > 0 && text[--index] === '\\') backslashes++;
+      return backslashes % 2 === 1;
+    };
     while (cursor < text.length) {
-      let best = null;
-      for (const spec of specs) {
-        const start = text.indexOf(spec.open, cursor);
-        if (start < 0) continue;
-        const end = text.indexOf(spec.close, start + spec.open.length);
-        if (end < 0 || end === start + spec.open.length) continue;
-        if (!best || start < best.start ||
-            (start === best.start && spec.open.length > best.spec.open.length)) {
-          best = { spec, start, end };
+      const rest = text.slice(cursor);
+      const atomic = /^(?:<a?:[A-Za-z0-9_]{2,32}:[0-9]{15,32}>|https?:\/\/[^\s<>"']+)/i.exec(rest);
+      if (atomic) {
+        flush(); appendSafeEchoSegment(fragment, atomic[0]); cursor += atomic[0].length; continue;
+      }
+      const maskedLink = /^\[([^\]\n]{1,256})\]\((https?:\/\/(?:[^\s<>"'()]|\([^()\s<>"']*\)){1,2048})\)/i.exec(rest);
+      if (maskedLink) {
+        flush();
+        if (!appendSafeEchoLink(fragment, maskedLink[2], maskedLink[1])) {
+          fragment.appendChild(document.createTextNode(maskedLink[0]));
         }
+        cursor += maskedLink[0].length; continue;
       }
-
-      if (!best) {
-        appendSafeEchoSegment(fragment, text.slice(cursor));
-        break;
+      if (text[cursor] === '\\' && /[\\\x60*_~|>\[\]{}()#+\-.!:]/.test(text[cursor + 1] || '')) {
+        flush(); fragment.appendChild(document.createTextNode(text[cursor + 1])); cursor += 2; continue;
       }
-      if (best.start > cursor) appendSafeEchoSegment(fragment, text.slice(cursor, best.start));
-
-      const inner = text.slice(best.start + best.spec.open.length, best.end);
-      const node = document.createElement(best.spec.tag);
-      if (best.spec.className) node.className = best.spec.className;
-      if (best.spec.raw) {
-        node.textContent = inner;
-      } else {
-        appendSafeInlineMarkdown(node, inner, depth + 1);
+      const codeRange = secureMarkdownCodeRange(text, cursor);
+      if (codeRange) {
+        flush();
+        if (!codeRange.closed) {
+          fragment.appendChild(document.createTextNode(text.slice(cursor, codeRange.end)));
+        } else {
+          const code = document.createElement('code');
+          code.className = 'sdc-inline-code';
+          code.textContent = text.slice(codeRange.bodyStart, codeRange.bodyEnd);
+          fragment.appendChild(code);
+        }
+        cursor = codeRange.end; continue;
       }
-
-      if (best.spec.className === 'sdc-spoiler') {
-        node.setAttribute('role', 'button');
-        node.tabIndex = 0;
+      let match = null;
+      for (const spec of specs) {
+        if (!text.startsWith(spec.delimiter, cursor)) continue;
+        // Discord leaves intraword underscores literal (file_name_value).
+        if (spec.delimiter === '_' && /[\p{L}\p{N}]/u.test(text[cursor - 1] || '')) continue;
+        let end = -1, search = cursor + spec.delimiter.length;
+        while (search < text.length) {
+          if (text[search] === '\\') { search += 2; continue; }
+          const literalCode = secureMarkdownCodeRange(text, search);
+          if (literalCode) { search = literalCode.end; continue; }
+          if (text.startsWith(spec.delimiter, search) && !escaped(search) &&
+              !(spec.delimiter === '_' && /[\p{L}\p{N}]/u.test(text[search + 1] || ''))) {
+            end = search; break;
+          }
+          search++;
+        }
+        if (end > cursor + spec.delimiter.length) { match = { spec, end }; break; }
+      }
+      if (!match) { pending += text[cursor++]; continue; }
+      flush();
+      const node = document.createElement(match.spec.tag);
+      if (match.spec.className) node.className = match.spec.className;
+      const inner = text.slice(cursor + match.spec.delimiter.length, match.end);
+      if (match.spec.innerTag) {
+        const innerNode = document.createElement(match.spec.innerTag);
+        appendSafeInlineMarkdown(innerNode, inner, depth + 1); node.appendChild(innerNode);
+      } else appendSafeInlineMarkdown(node, inner, depth + 1);
+      if (match.spec.className === 'sdc-spoiler') {
+        node.setAttribute('role', 'button'); node.tabIndex = 0;
         const reveal = () => node.classList.toggle('sdc-spoiler-open');
         node.addEventListener('click', reveal);
         node.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            reveal();
-          }
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); reveal(); }
         });
       }
-
-      fragment.appendChild(node);
-      cursor = best.end + best.spec.close.length;
+      fragment.appendChild(node); cursor = match.end + match.spec.delimiter.length;
     }
+    flush();
   }
 
   function appendSafeMarkdownLines(fragment, value) {
-    const lines = String(value == null ? '' : value).split('\n');
+    const lines = String(value == null ? '' : value).replace(/\r\n?/g, '\n').split('\n');
+    const stack = [];
+    let previousPlainLine = false, quote = null;
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
-      const quote = /^>\s?/.test(line);
-      if (quote) {
-        const block = document.createElement('span');
-        block.className = 'sdc-quote';
-        appendSafeInlineMarkdown(block, line.replace(/^>\s?/, ''));
-        fragment.appendChild(block);
-      } else {
-        appendSafeInlineMarkdown(fragment, line);
+      const item = /^([ \t]{0,24})([-*]|[0-9]{1,9}\.)([ \t]+)(.*)$/.exec(line);
+      if (item) {
+        previousPlainLine = false; quote = null;
+        const indent = item[1].replace(/\t/g, '    ').length;
+        const tag = item[2].endsWith('.') ? 'ol' : 'ul';
+        while (stack.length && (indent < stack[stack.length - 1].indent ||
+          (indent === stack[stack.length - 1].indent && tag !== stack[stack.length - 1].tag))) stack.pop();
+        let parent = stack[stack.length - 1];
+        if (!parent || indent > parent.indent) {
+          const list = document.createElement(tag); list.className = 'sdc-list';
+          if (tag === 'ol') list.start = Math.max(1, Number(item[2].slice(0, -1)));
+          (parent?.lastItem || fragment).appendChild(list);
+          parent = { indent, tag, list, lastItem:null, contentIndent:indent + item[2].length + item[3].replace(/\t/g, '    ').length }; stack.push(parent);
+        }
+        const li = document.createElement('li'); li.className = 'sdc-list-item';
+        appendSafeInlineMarkdown(li, item[4]); parent.list.appendChild(li); parent.lastItem = li;
+        continue;
       }
-      if (index < lines.length - 1) fragment.appendChild(document.createElement('br'));
+      const parent = stack[stack.length - 1];
+      const leading = /^[ \t]*/.exec(line)[0];
+      const indent = leading.replace(/\t/g, '    ').length;
+      if (line.trim() && parent?.lastItem && indent >= parent.contentIndent) {
+        parent.lastItem.appendChild(document.createElement('br'));
+        appendSafeInlineMarkdown(parent.lastItem, line.slice(leading.length));
+        continue;
+      }
+      stack.length = 0;
+      if (!line) {
+        quote = null;
+        if (previousPlainLine) fragment.appendChild(document.createElement('br'));
+        if (index < lines.length - 1 || previousPlainLine) fragment.appendChild(document.createElement('br'));
+        previousPlainLine = false;
+        continue;
+      }
+      if (/^>\s?/.test(line)) {
+        previousPlainLine = false;
+        if (!quote) { quote = document.createElement('span'); quote.className = 'sdc-quote'; fragment.appendChild(quote); }
+        else quote.appendChild(document.createElement('br'));
+        appendSafeInlineMarkdown(quote, line.replace(/^>\s?/, ''));
+      } else {
+        quote = null;
+        const heading = /^(#{1,3})[ \t]+(.*)$/.exec(line);
+        if (heading) {
+          const block = document.createElement('h' + heading[1].length); block.className = 'sdc-heading';
+          appendSafeInlineMarkdown(block, heading[2]); fragment.appendChild(block);
+          previousPlainLine = false;
+        } else {
+          if (previousPlainLine) fragment.appendChild(document.createElement('br'));
+          appendSafeInlineMarkdown(fragment, line);
+          previousPlainLine = true;
+        }
+      }
     }
   }
 
   function appendSafeMarkdown(fragment, value) {
-    const text = String(value == null ? '' : value);
-    const fence = String.fromCharCode(96).repeat(3);
-    let cursor = 0;
-
+    const text = String(value == null ? '' : value).replace(/\r\n?/g, '\n');
+    let cursor = 0, plainStart = 0;
     while (cursor < text.length) {
-      const start = text.indexOf(fence, cursor);
-      if (start < 0) {
-        appendSafeMarkdownLines(fragment, text.slice(cursor));
-        break;
+      if (text[cursor] === '\\') { cursor += 2; continue; }
+      const range = secureMarkdownCodeRange(text, cursor);
+      if (!range) { cursor++; continue; }
+      if (range.length < 3) { cursor = range.end; continue; }
+      if (cursor > plainStart) {
+        const before = text.slice(plainStart, cursor);
+        appendSafeMarkdownLines(fragment, before.endsWith('\n') ? before.slice(0, -1) : before);
       }
-      if (start > cursor) appendSafeMarkdownLines(fragment, text.slice(cursor, start));
-
-      const bodyStart = start + fence.length;
-      const end = text.indexOf(fence, bodyStart);
-      if (end < 0) {
-        appendSafeMarkdownLines(fragment, text.slice(start));
-        break;
+      if (!range.closed) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor)));
+        plainStart = text.length; break;
       }
-
-      let codeText = text.slice(bodyStart, end);
-      // Discord-style fenced blocks may begin with a language identifier. It is
-      // presentation-only here; remove the label but never execute/highlight code.
-      if (codeText.startsWith('\n')) {
-        codeText = codeText.slice(1);
-      } else {
+      let codeText = text.slice(range.bodyStart, range.bodyEnd);
+      if (codeText.startsWith('\n')) codeText = codeText.slice(1);
+      else {
         const firstBreak = codeText.indexOf('\n');
-        if (firstBreak >= 0) {
-          const language = codeText.slice(0, firstBreak).trim();
-          if (/^[A-Za-z0-9_+.-]{1,24}$/.test(language)) codeText = codeText.slice(firstBreak + 1);
+        if (firstBreak >= 0 && /^[A-Za-z0-9_+.-]{1,24}$/.test(codeText.slice(0, firstBreak).trim())) {
+          codeText = codeText.slice(firstBreak + 1);
         }
       }
       if (codeText.endsWith('\n')) codeText = codeText.slice(0, -1);
-
-      const pre = document.createElement('pre');
-      pre.className = 'sdc-code-block';
-      const code = document.createElement('code');
-      code.textContent = codeText;
-      pre.appendChild(code);
-      fragment.appendChild(pre);
-      cursor = end + fence.length;
+      const pre = document.createElement('pre'); pre.className = 'sdc-code-block';
+      const code = document.createElement('code'); code.textContent = codeText;
+      pre.appendChild(code); fragment.appendChild(pre);
+      cursor = range.end;
+      if (text[cursor] === '\n') cursor++;
+      plainStart = cursor;
     }
+    if (plainStart < text.length) appendSafeMarkdownLines(fragment, text.slice(plainStart));
   }
 
   function renderEchoPlaintext(value) {
-    const text = canonicalizeDiscordCustomEmojiMarkup(
-      String(value == null ? '' : value)
+    const text = normalizeSecureEmojiAliasText(
+      String(value == null ? '' : value), discordEmojiAliases, false
     );
     const fragment = document.createDocumentFragment();
     echoRenderedMediaUrls = new Set();
+    pendingDiscordLinkPreviews = new Map();
+    discordLinkPreviewRequests = new Map();
 
     // v70.9.2: mimic the subset produced by Secure Input's formatting toolbar
     // while keeping the local echo inside the same opaque-origin security boundary.
     // Links/custom emoji are still allowlisted; arbitrary HTML remains plain text.
     appendSafeMarkdown(fragment, text);
 
-    const jumbo = isJumboEmojiMessage(text);
+    const jumbo = !compactPreview && isJumboEmojiMessage(text);
     echo.classList.toggle('sdc-jumbo', jumbo);
     document.body.classList.toggle('sdc-jumbo', jumbo);
 
     // Keep a zero-width in-frame tail caret after the real plaintext. Its geometry
     // is plaintext-free layout metadata used only to keep Discord's native edited
     // marker at the same visual endpoint Discord would choose for native text.
-    echo.replaceChildren(fragment, tail);
+    echo.replaceChildren(fragment);
+    // A caret after a final block creates an extra anonymous line. Place the
+    // geometry-only caret at the actual last text endpoint instead.
+    let tailHost = echo.lastElementChild;
+    if (!tailHost || echo.lastChild !== tailHost || !/^(?:UL|OL|PRE|H[1-3])$/.test(tailHost.tagName) && !tailHost.classList.contains('sdc-quote')) tailHost = echo;
+    while (/^(?:UL|OL)$/.test(tailHost.tagName) && tailHost.lastElementChild) {
+      tailHost = tailHost.lastElementChild;
+      if (tailHost.lastChild === tailHost.lastElementChild && /^(?:UL|OL)$/.test(tailHost.lastElementChild?.tagName || '')) tailHost = tailHost.lastElementChild;
+    }
+    if (tailHost.tagName === 'PRE' && tailHost.lastElementChild?.tagName === 'CODE') tailHost = tailHost.lastElementChild;
+    tailHost.appendChild(tail);
+    // Build cards after the complete message so link previews never split an
+    // inline sentence. Outgoing text/URLs stay in this opaque realm; catalogue
+    // entries were already present in Discord's local cache, without a fetch.
+    for (const url of Array.from(pendingDiscordLinkPreviews.values()).slice(0, 12)) appendSafeDiscordLinkPreview(echo, url);
+    echoRendered = true;
+  }
+
+  function installSecureMarkdownPresentation(values) {
+    const selectors = {
+      ul:'#echo ul.sdc-list', ol:'#echo ol.sdc-list', nestedUl:'#echo li.sdc-list-item ul.sdc-list',
+      li:'#echo li.sdc-list-item', pre:'#echo pre.sdc-code-block', code:'#echo pre.sdc-code-block > code',
+      inlineCode:'#echo code.sdc-inline-code', h1:'#echo h1.sdc-heading', h2:'#echo h2.sdc-heading', h3:'#echo h3.sdc-heading',
+    };
+    const rules = [];
+    for (const [name, selector] of Object.entries(selectors)) {
+      const styles = values && typeof values[name] === 'object' ? values[name] : {};
+      const declarations = [];
+      for (const [property, raw] of Object.entries(styles).slice(0, 16)) {
+        const value = secureEchoMarkdownCssValue(property, raw);
+        if (!value) continue;
+        const cssProperty = property.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase());
+        declarations.push(cssProperty + ':' + value);
+      }
+      if (declarations.length) rules.push(selector + '{' + declarations.join(';') + '}');
+    }
+    if (!markdownStyleNode) {
+      markdownStyleNode = document.createElement('style');
+      (document.head || document.documentElement).appendChild(markdownStyleNode);
+    }
+    markdownStyleNode.textContent = rules.join('\n');
   }
 
   function reportHeight() {
-    if (!port || !echoId) return;
-    requestAnimationFrame(() => {
+    if (!port || !echoId || pendingLayoutReport) return;
+    const scheduled = { frameId: null, timerId: null };
+    pendingLayoutReport = scheduled;
+    const emitLayout = () => {
+      if (pendingLayoutReport !== scheduled) return;
+      pendingLayoutReport = null;
+      if (scheduled.timerId != null) clearTimeout(scheduled.timerId);
+      if (scheduled.frameId != null && typeof cancelAnimationFrame === 'function') {
+        try { cancelAnimationFrame(scheduled.frameId); } catch (_) {}
+      }
+      if (!port || !echoId) return;
       const height = Math.max(18, Math.ceil(document.documentElement.scrollHeight || echo.scrollHeight || 22));
       let tailLeft = 22, tailTop = 0, tailBottom = 22, lineHeight = 22;
       try {
@@ -54414,18 +57680,54 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         const parsed = parseFloat(String(computed.lineHeight || '22'));
         if (Number.isFinite(parsed) && parsed > 0) lineHeight = parsed;
       } catch (_) {}
-      const signature = [height, tailLeft, tailTop, tailBottom, lineHeight]
+      const ready = echoRendered && fontLayoutReady;
+      const signature = [Number(ready), height, tailLeft, tailTop, tailBottom, lineHeight]
         .map((value) => Math.round(Number(value || 0) * 10) / 10)
         .join('|');
       if (signature === lastLayoutSignature) return;
       lastLayoutSignature = signature;
       try {
         port.postMessage({
-          type: 'sdc-local-echo-height', echoId, height,
+          type: 'sdc-local-echo-height', echoId, height, ready,
           tailLeft, tailTop, tailBottom, lineHeight
         });
       } catch (_) {}
-    });
+    };
+    // A new opaque echo stays hidden until the parent receives ready=true.
+    // Browsers may suspend rAF for that hidden/clipped iframe; a bounded timer
+    // must break the initial readiness cycle. Both paths share one coalesced
+    // measurement and cancel each other, including ResizeObserver bursts.
+    scheduled.timerId = setTimeout(emitLayout, 125);
+    try { scheduled.frameId = requestAnimationFrame(emitLayout); } catch (_) {}
+  }
+
+  async function decodeSdc3LinkPreviewBytes(clear) {
+    const bytes = clear instanceof Uint8Array ? clear : new Uint8Array(clear);
+    if (bytes.byteLength > 1024 * 1024) throw new Error('SDC3 preview plaintext exceeds its local bound');
+    if (bytes.byteLength < 2 || new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint16(0,false) !== 0x05dc)
+      return decoder.decode(bytes);
+    if (bytes.byteLength < 33) throw new Error('Truncated SDC3 PNG compression');
+    const png = bytes.slice(), view = new DataView(png.buffer);
+    const length = view.getUint32(2,true), width = view.getUint32(16,false), height = view.getUint32(20,false);
+    if (length > 1024 * 1024 || !length || !width || !height || width > 32767 ||
+        width * height < Math.ceil(length/3) || width * height > Math.ceil(length/3) + 32767 ||
+        view.getUint32(8,false) !== 13 || String.fromCharCode(...png.slice(12,16)) !== 'IHDR')
+      throw new Error('SDC3 compressed preview dimensions/length exceed their local bound');
+    view.setUint16(0,0x8950,false); view.setUint32(2,0x4e470d0a,false);
+    let bitmap = null, pixels = null, out = null, canvas = null;
+    try {
+      bitmap = await createImageBitmap(new Blob([png],{type:'image/png'}));
+      if (bitmap.width !== width || bitmap.height !== height) throw new Error('SDC3 PNG dimensions mismatch');
+      canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+      const context = canvas.getContext('2d'); if (!context) throw new Error('SDC3 PNG decoder unavailable');
+      context.drawImage(bitmap,0,0); pixels = context.getImageData(0,0,width,height).data;
+      out = new Uint8Array(length);
+      // Historical compression encodes exactly three RGB bytes per pixel.
+      for (let offset=0;offset<length;offset++) out[offset] = pixels[Math.floor(offset/3)*4+offset%3];
+      return decoder.decode(out);
+    } finally {
+      try { png.fill(0); pixels?.fill?.(0); out?.fill?.(0); bitmap?.close?.(); if (canvas) { canvas.width=0; canvas.height=0; } } catch (_) {}
+    }
   }
 
   window.addEventListener('wheel', (event) => {
@@ -54445,14 +57747,154 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     } catch (_) {}
   }, { passive: false });
 
+  function installDiscordFontFaces(entries) {
+    const generation = ++fontLoadGeneration;
+    fontLayoutReady = true;
+    if (typeof FontFace !== 'function' || !document.fonts?.add || !Array.isArray(entries)) return;
+    const pending = [];
+    for (const raw of entries.slice(0, 32)) {
+      const entry = normalizeSecureDiscordFontFace(raw);
+      if (!entry) continue;
+      try {
+        const {family,url,...descriptors} = entry;
+        const face = new FontFace(family, 'url("' + url + '")', descriptors);
+        document.fonts.add(face);
+        // Load the public static faces independently of message contents.
+        pending.push(face.load());
+      } catch (_) {}
+    }
+    if (!pending.length) return;
+    fontLayoutReady = false;
+    let timeout;
+    const deadline = new Promise((resolve) => { timeout = setTimeout(resolve, 600); });
+    Promise.race([Promise.allSettled(pending).then(() => document.fonts.ready).catch(() => {}), deadline]).then(() => {
+      clearTimeout(timeout);
+      if (generation !== fontLoadGeneration) return;
+      fontLayoutReady = true;
+      reportHeight();
+    });
+  }
+
   window.addEventListener('message', async (event) => {
     const data = event.data || {};
     const nextPort = event.ports && event.ports[0];
+    if (data.type === 'sdc-discord-link-preview-result') {
+      if (event.source !== parent) return;
+      const wipeUnusedPreviewGrants = () => {
+        for (const value of [data.history?.key,...(Array.isArray(data.history?.candidates) ? data.history.candidates.map(row=>row?.key) : [])])
+          try { if (value instanceof ArrayBuffer) new Uint8Array(value).fill(0); } catch (_) {}
+      };
+      if (data.echoId !== echoId) { wipeUnusedPreviewGrants(); return; }
+      const target = discordLinkPreviewRequests.get(String(data.requestId || ''));
+      if (!target || target.path !== String(data.path || '')) { wipeUnusedPreviewGrants(); return; }
+      discordLinkPreviewRequests.delete(String(data.requestId));
+      if (!target.card.isConnected) { wipeUnusedPreviewGrants(); return; }
+      let key = null, clear = null;
+      const grantKeys = [];
+      try {
+        let result = data;
+        if (data.status === 'opaque') {
+          const supplied = data.history?.key ? [{key:data.history.key,group:null}] :
+            (Array.isArray(data.history?.candidates) ? data.history.candidates.slice(0,8192) : []);
+          for (const grant of supplied) grantKeys.push(new Uint8Array(grant?.key || new ArrayBuffer(0)));
+          await probeSandboxNativeAesGcm();
+          if (data.highAssuranceNativeOnly === true && sandboxAeadBackend !== 'native-webcrypto-aes256-gcm')
+            throw new Error('High-Assurance policy requires native AES-GCM for protected link previews');
+          const envelope = new Uint8Array(data.history?.envelope || new ArrayBuffer(0));
+          const aad = new Uint8Array(data.history?.aad || new ArrayBuffer(0));
+          if (!supplied.length || grantKeys.some(value=>value.byteLength!==32) || envelope.byteLength < 28 || envelope.byteLength > 2*1024*1024 ||
+              aad.byteLength < 1 || aad.byteLength > 8192) throw new Error('Invalid opaque link history');
+          let opened = false;
+          for (let index=0;index<supplied.length && index * envelope.byteLength < 64*1024*1024;index++) {
+            try {
+              key = grantKeys[index];
+              clear = await sandboxAes256GcmDecrypt(key,envelope.slice(0,12),envelope.slice(12),aad);
+              let text = data.history.sdc3 === true ? await decodeSdc3LinkPreviewBytes(clear) : decoder.decode(clear);
+              const group = supplied[index].group;
+              if (group) {
+                const marker = /^\u2063SDCGSR1:([a-z0-9]{1,12})\.([a-z0-9]{1,12})\.([a-z0-9]{1,12})\.([A-Za-z0-9_-]{16,64}):\u2063/.exec(text);
+                if (!marker || parseInt(marker[1],36)!==group.generation || parseInt(marker[2],36)!==group.epoch ||
+                    parseInt(marker[3],36)!==group.n || marker[4]!==group.deviceId)
+                  throw new Error('GROUP preview retained-key metadata mismatch');
+                text = text.slice(marker[0].length);
+              } else if (data.history.sdc3 === true && text.startsWith('\u2063SDCGSR1:')) throw new Error('Unexpected GROUP marker');
+              result = { ...data, status:'ready', text }; opened = true; break;
+            } catch (_) { /* Try the next already-retained key, never a future chain key. */ }
+            finally { try { clear?.fill?.(0); } catch (_) {} clear=null; }
+            if (index % 8 === 7) await new Promise(resolve=>setTimeout(resolve,0));
+          }
+          if (!opened) throw new Error('No retained preview key authenticated this message');
+        }
+        updateDiscordLinkPreviewCard(target,result);
+      } catch (_) { updateDiscordLinkPreviewCard(target,{status:'encrypted-unavailable'}); }
+      finally { try { clear?.fill?.(0); } catch (_) {} for (const value of grantKeys) { try { value.fill(0); } catch (_) {} } }
+      return;
+    }
+    // v70.11.0: imported sender history is opened and re-encrypted only here.
+    // The parent receives an envelope, never the original outgoing plaintext.
+    // Establish the private port before the parent transfers either history key.
+    if (data.type === 'sdc-sent-history-rewrap-connect') {
+      const requestId = String(data.requestId || '');
+      if (event.source !== parent || !nextPort || historyRewrapConnected ||
+          !/^[A-Za-z0-9_-]{22}$/.test(requestId)) return;
+      historyRewrapConnected = true;
+      let used = false;
+      nextPort.onmessage = async (portEvent) => {
+        const job = portEvent.data || {};
+        if (used || job.type !== 'sdc-sent-history-rewrap-run' || job.requestId !== requestId) return;
+        used = true;
+        let sourceKey = null, destinationKey = null, envelope = null, binding = null;
+        let clear = null, nonce = null, sealed = null, sourceAad = null, destinationAad = null;
+        try {
+          sourceKey = new Uint8Array(job.sourceKeyBuffer || new ArrayBuffer(0));
+          destinationKey = new Uint8Array(job.destinationKeyBuffer || new ArrayBuffer(0));
+          envelope = new Uint8Array(job.envelopeBuffer || new ArrayBuffer(0));
+          binding = new Uint8Array(job.bindingBuffer || new ArrayBuffer(0));
+          const source = job.sourceMeta || {}, destination = job.destinationMeta || {};
+          const validMeta = (meta) => /^[0-9]{1,32}$/.test(String(meta.accountId || '')) &&
+            /^[A-Za-z0-9_-]{22}$/.test(String(meta.deviceId || '')) &&
+            /^[0-9]{1,32}$/.test(String(meta.channelId || '')) &&
+            /^[A-Za-z0-9_-]{1,128}$/.test(String(meta.requestId || ''));
+          if (sourceKey.byteLength !== 32 || destinationKey.byteLength !== 32 ||
+              envelope.byteLength < 28 || envelope.byteLength > 64 * 1024 * 1024 ||
+              binding.byteLength < 28 || binding.byteLength > 64 * 1024 * 1024 ||
+              !validMeta(source) || !validMeta(destination) ||
+              source.accountId !== destination.accountId || source.channelId !== destination.channelId ||
+              source.requestId !== destination.requestId) throw new Error('Invalid sent-history rewrap context');
+          await probeSandboxNativeAesGcm();
+          if (job.highAssuranceNativeOnly === true && sandboxAeadBackend !== 'native-webcrypto-aes256-gcm')
+            throw new Error('Native cryptography is unavailable in the history sandbox');
+          if (source.direction !== undefined && source.direction !== 'sent' && source.direction !== 'received')
+            throw new Error('Invalid opaque history direction');
+          sourceAad = source.direction === 'received' ? receivedHistoryAad(source) : sentHistoryAad(source, binding);
+          destinationAad = sentHistoryAad(destination, binding);
+          clear = await sandboxAes256GcmDecrypt(sourceKey, envelope.slice(0, 12), envelope.slice(12), sourceAad);
+          nonce = new Uint8Array(12); crypto.getRandomValues(nonce);
+          sealed = await sandboxAes256GcmEncrypt(destinationKey, nonce, clear, destinationAad);
+          const output = concatBuffers([nonce, sealed]);
+          const fileMetadata = job.includeFileKeys === true ? selfHistoryFileKeyMetadata(clear) : {};
+          nextPort.postMessage({ type:'sdc-sent-history-rewrap-complete', requestId, envelope:output.buffer, ...fileMetadata }, [output.buffer]);
+        } catch (_) {
+          // Failure details must never serialize input, key material or cleartext.
+          try { nextPort.postMessage({ type:'sdc-sent-history-rewrap-error', requestId }); } catch (_) {}
+        } finally {
+          for (const bytes of [sourceKey, destinationKey, envelope, binding, clear, nonce, sealed, sourceAad, destinationAad]) {
+            try { bytes?.fill?.(0); } catch (_) {}
+          }
+          try { nextPort.close(); } catch (_) {}
+        }
+      };
+      try { nextPort.start?.(); } catch (_) {}
+      nextPort.postMessage({ type:'sdc-sent-history-rewrap-ready', requestId });
+      return;
+    }
     const nextEchoId = String(data.echoId || '');
     if (!nextPort || !/^[A-Za-z0-9_-]{16,64}$/.test(nextEchoId)) return;
 
     echoId = nextEchoId;
     port = nextPort;
+    echoRendered = false;
+    lastLayoutSignature = '';
     const theme = data.theme || {};
     const root = document.documentElement.style;
     if (theme.color) root.setProperty('--sdc-echo-color', String(theme.color));
@@ -54460,7 +57902,27 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     if (theme.fontSize) root.setProperty('--sdc-echo-size', String(theme.fontSize));
     if (theme.lineHeight) root.setProperty('--sdc-echo-line-height', String(theme.lineHeight));
     if (theme.fontWeight) root.setProperty('--sdc-echo-weight', String(theme.fontWeight));
+    if (theme.letterSpacing) root.setProperty('--sdc-echo-letter-spacing', String(theme.letterSpacing));
+    if (theme.fontStyle) root.setProperty('--sdc-echo-font-style', String(theme.fontStyle));
+    installSecureMarkdownPresentation(data.markdownPresentation);
+    installDiscordFontFaces(data.discordFontFaces);
     installDiscordEmojiAssets(data.discordEmojiAssets);
+    discordEmojiAliases = secureEmojiAliasMap(data.discordEmojiAliases);
+    discordChannelNavigation = data.discordChannelNavigation === true;
+    installDiscordLocalLinkPreviews(data.discordLocalLinkPreviews);
+    compactPreview = data.compactPreview === true;
+    document.body.classList.toggle('sdc-compact', compactPreview);
+
+    if (data.type === 'sdc-discord-link-preview-init') {
+      document.body.classList.add('sdc-discord-preview-only');
+      echo.replaceChildren();
+      discordLinkPreviewRequests = new Map();
+      for (const path of Array.isArray(data.paths) ? data.paths.slice(0,12) : [])
+        appendSafeDiscordLinkPreview(echo,'https://discord.com'+String(path));
+      echoRendered = true; reportHeight();
+      try { port.start?.(); } catch (_) {}
+      return;
+    }
 
     if (data.type === 'sdc-local-history-init') {
       let key = null;
@@ -54485,6 +57947,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         reportHeight();
       } catch (_) {
         echo.textContent = '🔒 Encrypted local history could not be opened on this device.';
+        echoRendered = true;
         reportHeight();
       } finally {
         try { key?.fill?.(0); } catch (_) {}
@@ -54511,10 +57974,128 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   try {
     new ResizeObserver(reportHeight).observe(echo);
   } catch (_) {}
+  try { document.fonts?.addEventListener?.('loadingdone', reportHeight); } catch (_) {}
 })();
 </script>
 </body>
 </html>`;
+
+  async function rewrapSdcSentHistoryOpaque(record, sourceKey, binding, destinationLocal, options = null) {
+    const lifecycle = captureSelfHistorySendContext(record?.channelId, {});
+    assertSelfHistorySendContext(lifecycle);
+    const ownId = String(Discord.getCurrentUser?.()?.id || '');
+    const sourceMeta = {
+      accountId:String(record?.accountId || ''), deviceId:String(record?.deviceId || ''),
+      channelId:String(record?.channelId || ''), requestId:String(record?.requestId || (record?.direction === 'received' ? record?.wireId : '') || ''),
+      direction: String(record?.direction || ''), wireId: String(record?.wireId || ''), messageId: String(record?.messageId || ''),
+    };
+    const destinationMeta = {
+      ...sourceMeta, accountId:String(destinationLocal?.accountId || ''),
+      deviceId:String(destinationLocal?.deviceId || ''),
+    };
+    const validMeta = (meta) => /^[0-9]{1,32}$/.test(meta.accountId) &&
+      isValidRatchetDeviceId(meta.deviceId) && /^[0-9]{1,32}$/.test(meta.channelId) &&
+      /^[A-Za-z0-9_-]{1,128}$/.test(meta.requestId);
+    if (!record || record.version !== 1 || (record.direction !== 'sent' && !(options?.selfHistorySync === true && record.direction === 'received')) ||
+        !(sourceKey instanceof Uint8Array) || sourceKey.byteLength !== 32 ||
+        !(binding instanceof Uint8Array) || binding.byteLength < 28 || binding.byteLength > 64 * 1024 * 1024 ||
+        !validMeta(sourceMeta) || !validMeta(destinationMeta) ||
+        sourceMeta.accountId !== ownId || destinationMeta.accountId !== ownId)
+      throw new Error('Invalid opaque sent-history rewrap context');
+    const envelope = Utils.Base64urlToBytes(String(record.envelope || ''));
+    if (envelope.byteLength < 28 || envelope.byteLength > 64 * 1024 * 1024 ||
+        Utils.BytesToBase64url(envelope) !== String(record.envelope || ''))
+      throw new Error('Invalid opaque sent-history envelope');
+    let sourceCopy = null, destinationKey = null, bindingCopy = null;
+    try {
+      sourceCopy = sourceKey.slice();
+      bindingCopy = binding.slice();
+      destinationKey = options?.selfHistorySync === true && options?.destinationKey instanceof Uint8Array
+        ? options.destinationKey.slice() : await deriveSdc4HistoryKeyBytes(destinationLocal);
+      if (!(destinationKey instanceof Uint8Array) || destinationKey.byteLength !== 32)
+        throw new Error('Invalid destination history key');
+      assertSelfHistorySendContext(lifecycle);
+      const requestId = Utils.BytesToBase64url(Utils.GetRandomBytes(16));
+      const expectedBytes = envelope.byteLength;
+      return await new Promise((resolve, reject) => {
+        const iframe = document.createElement('iframe');
+        const channel = new MessageChannel();
+        let settled = false, dispatched = false;
+        const cleanup = () => {
+          SelfHistoryOpaqueJobs.delete(cancel);
+          clearTimeout(timeout);
+          iframe.onload = null; iframe.onerror = null;
+          try { channel.port1.close(); } catch (_) {}
+          try { channel.port2.close(); } catch (_) {}
+          try { iframe.remove(); } catch (_) {}
+        };
+        const finish = (error, result = null) => {
+          if (settled) return;
+          settled = true; cleanup();
+          if (error) reject(error); else resolve(result);
+        };
+        const cancel = () => finish(new Error('Opaque sent-history lifecycle changed'));
+        SelfHistoryOpaqueJobs.add(cancel);
+        const timeout = setTimeout(() => finish(new Error('Opaque sent-history rewrap timed out')), 20000);
+        channel.port1.onmessage = (event) => {
+          const data = event.data || {};
+          if (settled || data.requestId !== requestId) return;
+          try { assertSelfHistorySendContext(lifecycle); } catch (_) { cancel(); return; }
+          if (data.type === 'sdc-sent-history-rewrap-ready' && !dispatched) {
+            dispatched = true;
+            try {
+              channel.port1.postMessage({
+                type:'sdc-sent-history-rewrap-run', requestId, sourceMeta, destinationMeta,
+                highAssuranceNativeOnly:sdcHighAssuranceNativeCryptoEnabled(),
+                includeFileKeys: options?.includeFileKeys === true,
+                sourceKeyBuffer:sourceCopy.buffer, destinationKeyBuffer:destinationKey.buffer,
+                envelopeBuffer:envelope.buffer, bindingBuffer:bindingCopy.buffer,
+              }, [sourceCopy.buffer, destinationKey.buffer, envelope.buffer, bindingCopy.buffer]);
+            } catch (_) { finish(new Error('Opaque sent-history key transfer failed')); }
+          } else if (data.type === 'sdc-sent-history-rewrap-complete' && dispatched) {
+            if (!(data.envelope instanceof ArrayBuffer) || data.envelope.byteLength !== expectedBytes) {
+              finish(new Error('Invalid opaque sent-history result')); return;
+            }
+            if (options?.includeFileKeys === true) {
+              try {
+                const fileFsDescriptors = normalizeSdc4FileFsDescriptors(data.fileFsDescriptors || []);
+                const offlineFileFsDescriptors = Array.isArray(data.offlineFileFsDescriptors) && data.offlineFileFsDescriptors.length
+                  ? normalizeSdc4FileFsOfflineDescriptors(data.offlineFileFsDescriptors) : [];
+                finish(null, { envelope: new Uint8Array(data.envelope), fileFsDescriptors, offlineFileFsDescriptors });
+              } catch (_) { finish(new Error('Invalid opaque file-key metadata')); }
+            } else finish(null, new Uint8Array(data.envelope));
+          } else if (data.type === 'sdc-sent-history-rewrap-error') {
+            finish(new Error('Opaque sent-history authentication or encryption failed'));
+          }
+        };
+        try { channel.port1.start?.(); } catch (_) {}
+        iframe.setAttribute('sandbox', 'allow-scripts');
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.cssText = 'display:none;width:0;height:0;border:0;pointer-events:none';
+        // The HTML is constant. CSP also blocks all image/media/network paths in
+        // this disposable rewrap use of the existing opaque renderer.
+        iframe.srcdoc = SECURE_LOCAL_ECHO_FRAME_HTML.replace('<head>',
+          '<head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; connect-src \'none\'; img-src \'none\'; base-uri \'none\'; form-action \'none\';">');
+        iframe.onload = () => {
+          if (settled) return;
+          try {
+            assertSelfHistorySendContext(lifecycle);
+            iframe.contentWindow.postMessage({ type:'sdc-sent-history-rewrap-connect', requestId }, '*', [channel.port2]);
+          } catch (_) { finish(new Error('Opaque sent-history sandbox initialization failed')); }
+        };
+        iframe.onerror = () => finish(new Error('Opaque sent-history sandbox failed to load'));
+        try {
+          const root = document.body || document.documentElement;
+          if (!root) throw new Error('No document available');
+          root.appendChild(iframe);
+        } catch (_) { finish(new Error('Opaque sent-history sandbox could not be mounted')); }
+      });
+    } finally {
+      for (const bytes of [sourceCopy, destinationKey, envelope, bindingCopy]) {
+        try { bytes?.fill?.(0); } catch (_) {}
+      }
+    }
+  }
 
   const SecureComposer = {
     active: null,
@@ -54575,6 +58156,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     // remains inside the sandboxed iframe.
     localEchoPortal: null,
     localEchoViewportHandler: null,
+    localEchoViewportFrame: null,
+    localEchoGeometryObserver: null,
+    localEchoGeometryNodes: new Set(),
+    localEchoVisibleContentIndex: null,
+    discordLinkPreviewPending: new Map(),
+    discordLinkPreviewFrames: new Map(),
+    discordLinkPreviewRepairTimer: null,
+    authenticatedDiscordPreviewMessages: new WeakMap(),
 
     // Only already-encrypted long-paste attachments generated by Secure Input.
     // channelId -> [{ file, encryptedFilename, plaintextCharacters, source }]
@@ -54625,6 +58214,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     lastFailureToastAt: 0,
     failureToastCooldownMs: 30000,
     currentIsolationMode: null,
+    mountGeneration: 0,
+    pendingSecureMount: null,
     testBurnNextSdc4Reservation: false,
     lastNativeInputBlockedAt: 0,
     deferredNativeDraft: null,
@@ -54935,7 +58526,30 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         this.syncProtectionIndicator(this.active);
         this.RefreshSoon(0);
       }
+      this.hydrateCachedSentLocalEchoes?.(id)?.catch?.(() => {});
       return true;
+    },
+
+    async hydrateCachedSentLocalEchoes(channelId) {
+      if (!this.started || DuressRuntime.active) return 0;
+      const id = String(channelId || '');
+      if (!/^[0-9]{10,32}$/.test(id)) return 0;
+      if (!this.cachedSentPresentationHydrations) this.cachedSentPresentationHydrations = new Map();
+      const previous = this.cachedSentPresentationHydrations.get(id);
+      if (previous) return await previous;
+      const job = (async () => {
+        let restored = 0;
+        for (const message of cachedDiscordMessagesForChannel(id)) {
+          if (!this.started || DuressRuntime.active) break;
+          if (!message?.__sdcSentPresentation || this.findDurableLocalEchoForMessage(id, message.id)) continue;
+          if (await hydrateSdcSentMessagePresentation(message)) restored++;
+        }
+        if (restored) this.scheduleVisibleLocalEchoRepair(0);
+        return restored;
+      })();
+      this.cachedSentPresentationHydrations.set(id, job);
+      try { return await job; }
+      finally { if (this.cachedSentPresentationHydrations.get(id) === job) this.cachedSentPresentationHydrations.delete(id); }
     },
 
     isChannelReady(channelId) {
@@ -54989,7 +58603,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
     },
 
-    async waitForChannelReady(channelId, instanceId) {
+    async waitForChannelReady(channelId, instanceId, nativeSubmissionContext = null) {
       const id = String(channelId || '');
       if (!id) throw new Error('Secure Input channel readiness check has no channel id');
       if (this.isChannelReady(id)) return true;
@@ -55003,9 +58617,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       });
 
       while (Date.now() - startedAt < this.channelReadinessMaxWaitMs) {
-        const current = this.active;
-        if (!current || current.channelId !== id || current.instanceId !== instanceId) {
-          throw new Error('secure composer changed channel while waiting for Discord readiness');
+        if (nativeSubmissionContext) {
+          this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
+        } else {
+          const current = this.active;
+          if (!current || current.channelId !== id || current.instanceId !== instanceId) {
+            throw new Error('secure composer changed channel while waiting for Discord readiness');
+          }
         }
         if (this.isChannelReady(id)) {
           this.log('send-resumed-channel-ready', {
@@ -55088,8 +58706,65 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     },
 
+    captureNativeEncryptedFileSubmitContext(channelId) {
+      const id = canonicalDiscordSnowflake(channelId, 'native encrypted file channel id');
+      const config = Utils.GetChannelConfig(id);
+      const editor = this.findNativeEditor();
+      const context = {
+        nativeOnly: true, channelId: id,
+        accountId: String(Discord.getCurrentUser()?.id || ''),
+        editor, composerRoot: this.getComposerRoot(editor),
+        nativeDraftText: this.nativeEditorText(editor),
+        keyHash: config?.k, cryptoProtocol: Number(config?.cryptoProtocol || 3),
+        textCryptoProtocol: this.getSecureTextCryptoProtocol(id),
+        encryptionEnabled: config?.e === true || config?.e === 1,
+        database: DataBase, databaseKey: Cache.dbKey,
+        keyRecord: DataBase?.keys?.[config?.k],
+      };
+      this.assertNativeEncryptedFileSubmitContext(context);
+      return context;
+    },
+
+    isNativeEncryptedFileSubmitContextCurrent(context, allowEditorReplacement = false) {
+      if (!context || context.nativeOnly !== true || !this.started || this.active ||
+          !context.encryptionEnabled || !context.keyHash || !context.accountId ||
+          context.database !== DataBase || context.databaseKey !== Cache.dbKey ||
+          context.keyRecord !== DataBase?.keys?.[context.keyHash] ||
+          String(Cache.channelId || '') !== context.channelId ||
+          String(Discord.getChannelId?.() || Cache.channelId || '') !== context.channelId ||
+          String(Discord.getCurrentUser()?.id || '') !== context.accountId) return false;
+      const config = Utils.GetChannelConfig(context.channelId);
+      if (!config?.e || config.k !== context.keyHash ||
+          Number(config.cryptoProtocol || 3) !== context.cryptoProtocol ||
+          this.getSecureTextCryptoProtocol(context.channelId) !== context.textCryptoProtocol) return false;
+      const editor = this.findNativeEditor();
+      const root = this.getComposerRoot(editor);
+      if (!editor?.isConnected || !root?.isConnected) return false;
+      // A fresh sentence typed during encryption/readiness belongs to the user.
+      // Never replace it with the earlier transaction's encrypted capability.
+      if (this.nativeEditorText(editor) !== context.nativeDraftText) return false;
+      return allowEditorReplacement || (editor === context.editor && root === context.composerRoot);
+    },
+
+    assertNativeEncryptedFileSubmitContext(context) {
+      if (!this.isNativeEncryptedFileSubmitContextCurrent(context))
+        throw new Error('Native encrypted file send context changed; the draft and encrypted attachments are preserved');
+      return context;
+    },
+
+    refreshNativeEncryptedFileSubmitContext(context) {
+      // addFiles may replace the native editor. Only that explicit queue stage
+      // may retarget it, after validating the original account/channel/policy.
+      if (!this.isNativeEncryptedFileSubmitContextCurrent(context, true))
+        throw new Error('Native encrypted file send context changed while adding the encrypted file');
+      context.editor = this.findNativeEditor();
+      context.composerRoot = this.getComposerRoot(context.editor);
+      return this.assertNativeEncryptedFileSubmitContext(context);
+    },
+
     findNativePlaceholder(editor) {
       if (!editor) return null;
+      const editorRect = editor.getBoundingClientRect?.();
 
       const roots = [
         editor.parentElement,
@@ -55116,7 +58791,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               rect.width <= 0 ||
               rect.height <= 0 ||
               rect.bottom <= 0 ||
-              rect.top >= window.innerHeight
+              rect.top >= window.innerHeight ||
+              (editorRect && (
+                rect.top < editorRect.top - 8 || rect.top > editorRect.bottom + 8 ||
+                rect.left < editorRect.left - 16 || rect.left > editorRect.right + 16
+              ))
             ) {
               continue;
             }
@@ -55200,8 +58879,477 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return captured;
     },
 
+    discordLocalLinkPreviewEntries() {
+      // Resolve only the exact links requested by a source-bound opaque frame.
+      // A global cache catalogue can omit old messages and expose unrelated text.
+      return [];
+    },
+
     discordNativeEmojiAssetEntries() {
       return Array.from(this.discordNativeEmojiAssets.entries()).slice(-512);
+    },
+
+    discordEmojiAliasEntries() {
+      const channelId = String(this.active?.channelId || Discord.getChannelId?.() || '');
+      const cached = this.discordEmojiAliasCache;
+      if (cached?.channelId === channelId && Date.now() - cached.at < 30000) {
+        return cached.entries;
+      }
+      const catalogs = [], providers = [];
+      const add = (provider) => { if (provider && !providers.includes(provider)) providers.push(provider); };
+      try {
+        const webpack = typeof BdApi !== 'undefined' ? BdApi?.Webpack : null;
+        add(webpack?.getStore?.('EmojiStore'));
+        add(webpack?.getByKeys?.('getByName', 'getBySurrogate'));
+        add(webpack?.getByKeys?.('getByName', 'getSurrogatePairForUnicode'));
+        add(webpack?.getByKeys?.('getByName'));
+        add(Utils.Webpack()?.findModule?.((m) => m && (
+          typeof m.getUnicodeEmojis === 'function' || typeof m.getAllUnicodeEmojis === 'function' ||
+          (typeof m.getByName === 'function' && (typeof m.getBySurrogate === 'function' || m.emojis))
+        )));
+      } catch (_) {}
+      let guildId = '';
+      try { guildId = String(Discord.getChannel?.(channelId)?.guild_id || ''); } catch (_) {}
+      for (const provider of providers) {
+        try {
+          catalogs.push(provider);
+          for (const key of ['getUnicodeEmojis','getAllUnicodeEmojis','getAllEmojis','getAll','getGuilds']) {
+            if (typeof provider[key] === 'function') catalogs.push(provider[key]());
+          }
+          if (guildId && typeof provider.getGuildEmoji === 'function') catalogs.push(provider.getGuildEmoji(guildId));
+          const context = provider.getDisambiguatedEmojiContext?.(guildId || null);
+          if (context) {
+            catalogs.push(context);
+            if (typeof context.getAll === 'function') catalogs.push(context.getAll());
+          }
+          // Refresh known fallback names from Discord as well, so current
+          // Unicode sequence choices win over historical alias spellings.
+          if (typeof provider.getByName === 'function') {
+            for (const name of Object.keys(secureEmojiFallbackAliases())) catalogs.push(provider.getByName(name));
+          }
+        } catch (_) {}
+      }
+      const entries = collectDiscordEmojiAliasEntries(catalogs);
+      this.discordEmojiAliasCache = { channelId, at:Date.now(), entries };
+      return entries;
+    },
+
+    discordLinkPreviewAccess(rawPath) {
+      const path = safeDiscordChannelLinkPath('https://discord.com' + String(rawPath || '')).replace(/\/$/, '');
+      if (!path || path !== String(rawPath || '').replace(/\/$/, '') || DuressRuntime.active) return null;
+      const [, , guildId, channelId, messageId] = path.split('/');
+      const accountId = String(Discord.getCurrentUser?.()?.id || '');
+      if (!/^[0-9]{15,32}$/.test(accountId)) return null;
+      let channel;
+      try { channel = Discord.getChannel?.(channelId); } catch (_) { return null; }
+      if (!channel || String(channel.id || '') !== channelId) return null;
+      if (guildId === '@me') {
+        if (![1, 3].includes(channel.type) || channel.guild_id || !Array.isArray(channel.recipients) || !channel.recipients.length) return null;
+      } else {
+        if (String(channel.guild_id || '') !== guildId) return null;
+        let permissions = Discord.modules?.PermissionStore;
+        try { if (!permissions?.can && typeof BdApi !== 'undefined') permissions = BdApi.Webpack?.getStore?.('PermissionStore'); } catch (_) {}
+        // Unknown permission APIs are a denied preview, never evidence of access.
+        try {
+          if (typeof permissions?.can !== 'function' || permissions.can(1024n, channel) !== true ||
+              (messageId && permissions.can(65536n, channel) !== true) ||
+              ([2, 13].includes(channel.type) && permissions.can(1048576n, channel) !== true)) return null;
+        } catch (_) { return null; }
+      }
+      let guild = null;
+      try { guild = guildId !== '@me' ? Discord.getGuild?.(guildId) : null; } catch (_) {}
+      let channelName = String(channel.name || '');
+      if (!channelName && guildId === '@me') {
+        channelName = channel.recipients.slice(0, 4).map((id) => {
+          try { const user = typeof id === 'object' ? id : Discord.getUser?.(id); return String(user?.globalName || user?.global_name || user?.username || ''); } catch (_) { return ''; }
+        }).filter(Boolean).join(', ');
+      }
+      return { path, guildId, channelId, messageId: messageId || '', accountId, channel,
+        channelName: channelName.slice(0, 160), guildName: String(guild?.name || '').slice(0, 160) };
+    },
+
+    async rememberAuthenticatedDiscordPreviewMessage(message, payloadBuffer, context) {
+      if (DuressRuntime.active || !message || typeof message !== 'object') return false;
+      const accountId = String(Discord.getCurrentUser?.()?.id || '');
+      const channelId = String(message.channel_id || ''), messageId = String(message.id || '');
+      if (!accountId || !/^[0-9]{15,32}$/.test(channelId) || !/^[0-9]{15,32}$/.test(messageId)) return false;
+      const authorId = String(message.author?.id || '');
+      const wireHash = await getSdc3ReplayWireId(payloadBuffer,channelId,authorId);
+      const contentHash = Utils.BytesToBase64url(new Uint8Array(await Utils.Sha256(Utils.StringToUtf8Bytes(String(message.content || '')))));
+      if (!context || context.database !== DataBase || context.databaseKey !== Cache.dbKey || context.accountId !== accountId) return false;
+      // Authentication/replay admission already succeeded in decryptMessage.
+      // Retain hashes and context only, never another plaintext cache.
+      this.authenticatedDiscordPreviewMessages.set(message, { accountId, channelId, messageId,authorId,
+        wireHash,contentHash,database:DataBase,databaseKey:Cache.dbKey });
+      return true;
+    },
+
+    async sealAuthenticatedDiscordPreview(message, access, isCurrent, rawMessage) {
+      const proof = this.authenticatedDiscordPreviewMessages.get(message);
+      if (!proof || proof.accountId !== access.accountId || proof.channelId !== access.channelId || proof.messageId !== access.messageId ||
+          proof.authorId !== String(message.author?.id || '') || proof.database !== DataBase || proof.databaseKey !== Cache.dbKey) return null;
+      const database = DataBase, databaseKey = Cache.dbKey;
+      return await withSdcUiHistoryRecovery(async () => {
+        let key = null, clear = null;
+        const current = () => isCurrent() && !DuressRuntime.active && database === DataBase && databaseKey === Cache.dbKey;
+        try {
+          if (!current()) return null;
+          const payload = this.sdc3DiscordLinkPreviewPayload(rawMessage);
+          if (!payload || String(rawMessage?.author?.id || '') !== proof.authorId) return null;
+          const wireHash = await getSdc3ReplayWireId(Utils.PayloadDecode(payload).buffer,access.channelId,proof.authorId);
+          const content = String(message.content || '');
+          const contentHash = Utils.BytesToBase64url(new Uint8Array(await Utils.Sha256(Utils.StringToUtf8Bytes(content))));
+          if (!current() || wireHash !== proof.wireHash || contentHash !== proof.contentHash) return null;
+          key = new Uint8Array(Utils.GetRandomBytes(32)); clear = Utils.StringToUtf8Bytes(content.replace(/^<:ENC(?:_[^:<>]*)?:[0-9]{15,32}>/, ''));
+          if (clear.byteLength > 1024 * 1024) return null;
+          const aad = canonicalJsonBytes({protocol:'SDC-LOCAL-DISCORD-LINK-PREVIEW',version:1,
+            accountId:access.accountId,channelId:access.channelId,messageId:access.messageId,authorId:proof.authorId});
+          const envelope = await rawAesGcmEncrypt(key,clear,aad);
+          if (!current()) return null;
+          const history = { key:key.buffer, envelope:envelope.buffer, aad:aad.buffer }; key = null;
+          return { status:'opaque',history,highAssuranceNativeOnly:sdcHighAssuranceNativeCryptoEnabled() };
+        } finally { try { key?.fill?.(0); clear?.fill?.(0); } catch (_) {} }
+      });
+    },
+
+    sdc3DiscordLinkPreviewPayload(message) {
+      const previous = messageRegex.lastIndex;
+      try {
+        messageRegex.lastIndex = 0;
+        const match = messageRegex.exec(String(message?.content || ''));
+        if (match?.[1]) return String(match[1]);
+      } finally { messageRegex.lastIndex = previous; }
+      const embed = Array.isArray(message?.embeds) && message.embeds.length === 1 ? message.embeds[0] : null;
+      if (embed && ['SimpleDiscordCrypt','🔒'].includes(String(embed.footer?.text || '')) &&
+          embed.author?.name === '-----ENCRYPTED MESSAGE-----' && /^[⠀-⣿]{16,}$/.test(String(embed.description || '')))
+        return String(embed.description);
+      return '';
+    },
+
+    async prepareSdc3DiscordLinkPreview(message, payload, isCurrent) {
+      const database = DataBase, databaseKey = Cache.dbKey;
+      return await withSdcUiHistoryRecovery(async () => {
+        const candidates = [];
+        const current = () => isCurrent() && !DuressRuntime.active && database === DataBase && databaseKey === Cache.dbKey;
+        try {
+          if (!current()) return null;
+          const bytes = new Uint8Array(Utils.PayloadDecode(payload));
+          if (bytes.byteLength < 71 || bytes.byteLength > 2 * 1024 * 1024) return null;
+          const scopedPrefix = bytes.slice(0,16), envelope = bytes.slice(16), header = envelope.slice(0,27);
+          if (!Utils.IsAesV3Envelope(envelope) || header[8] !== 1 || header[9] !== 1 || header[10] !== 0 ||
+              !constantTimeBytesEqual(scopedPrefix,header.slice(11,27))) return null;
+          const channelId = String(message.channel_id || ''), authorId = String(message.author?.id || '');
+          if (!/^[0-9]{15,32}$/.test(authorId)) return null;
+          const wireId = await getSdc3ReplayWireId(bytes.buffer,channelId,authorId);
+          const admitted = sdc3ReplayAdmissions.get(wireId);
+          if (admitted && ![admitted.messageId,...(admitted.aliasMessageIds || [])].map(String).includes(String(message.id))) return null;
+          const keyRef = [], key = await Utils.GetKeyByScopedId(Utils.BytesToBase64(scopedPrefix),channelId,keyRef);
+          if (!current() || !key || !constantTimeBytesEqual(scopedPrefix,await Utils.GetV3ScopedKeyId(key,channelId))) return null;
+          const meta = keyRef[0]?.t === 1 ? getGroupSenderRatchetMeta(keyRef[1]) : null;
+          const allowStatic = !meta || groupSenderRatchetLegacyAllowedForMessage(meta,message);
+          if (allowStatic) {
+            const domainSalt = await Utils.Sha256(Utils.StringToUtf8Bytes(`SDC3|DOMAIN-SALT|${channelId}`));
+            const raw = new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:domainSalt,
+              info:Utils.StringToUtf8Bytes('SDC3|AES-256-GCM|message')},cryptoService.getV3HkdfMaterial(key),256));
+            candidates.push({key:raw.buffer,group:null});
+          }
+          if (meta) {
+            // Read only exact retained/skipped MKs. Never prune, consume, derive
+            // future CK/MKs, save a ratchet, or request a missing key for a link.
+            for (const epoch of groupSenderRatchetEpochCandidates(meta)) {
+              for (const chain of Object.values(epoch.chains || {}).filter(row=>String(row?.a || '')===authorId)) {
+                for (const entry of [...Object.entries(chain.history || {}),...Object.entries(chain.skipped || {})]) {
+                  if (!current()) return null;
+                  if (candidates.length >= 8192) throw new Error('GROUP preview retained-key budget exceeded');
+                  const n = Number(entry[0]), mk = Utils.Base64urlToBytes(String(entry[1]?.mk || ''));
+                  try {
+                    if (!Number.isSafeInteger(n) || n < 0 || mk.byteLength !== 32 || !isValidRatchetDeviceId(chain.d)) continue;
+                    const domain = await groupSenderRatchetMessageDomainKeyBytes(mk,channelId);
+                    candidates.push({key:domain.buffer,group:{generation:Number(epoch.generation),epoch:Number(epoch.epoch),deviceId:chain.d,n}});
+                  } finally { try { mk.fill(0); } catch (_) {} }
+                }
+              }
+            }
+          }
+          if (!current() || !candidates.length || (keyRef[1] && DataBase?.keys?.[keyRef[1]] !== keyRef[0])) return null;
+          const aad = Utils.ConcatBuffers([header,sdc3V3AadContextBytes(channelId,authorId)]);
+          const history = { envelope:envelope.slice(27).buffer, aad:aad.buffer, candidates:candidates.splice(0), sdc3:true };
+          return {status:'opaque',history,highAssuranceNativeOnly:sdcHighAssuranceNativeCryptoEnabled()};
+        } catch (_) { return null; }
+        finally { for (const candidate of candidates) { try { new Uint8Array(candidate.key).fill(0); } catch (_) {} } }
+      });
+    },
+
+    async resolveDiscordLocalLinkPreview(rawPath, isCurrent = () => true) {
+      const access = this.discordLinkPreviewAccess(rawPath);
+      if (!access || !isCurrent()) return { path: String(rawPath || ''), status: 'inaccessible' };
+      const current = () => isCurrent() && !DuressRuntime.active &&
+        String(Discord.getCurrentUser?.()?.id || '') === access.accountId && !!this.discordLinkPreviewAccess(access.path);
+      const base = { path: access.path, channelName: access.channelName, guildName: access.guildName };
+      if (!access.messageId) return { ...base, status: 'ready', text: String(access.channel.topic || '').slice(0, 1000) };
+      let message = null;
+      try { message = Discord.getMessage?.(access.channelId, access.messageId) ||
+        Discord.modules?.MessageStore?.getMessage?.(access.channelId, access.messageId); } catch (_) {}
+      const exact = (row) => row && String(row.id || '') === access.messageId && String(row.channel_id || row.channelId || '') === access.channelId;
+      if (!exact(message)) message = null;
+      const cachedAuthenticatedMessage = message;
+      if (message) {
+        const storedText = String(message.content || '');
+        const storedMeta = message.__sdcSentPresentation;
+        const boundOwnHistory = String(message.author?.id || '') === access.accountId && storedMeta?.version === 1 &&
+          storedMeta.accountId === access.accountId && storedMeta.channelId === access.channelId && storedMeta.messageId === access.messageId;
+        // Discord's store may already contain decrypted ENC text. Resolve its
+        // original wire by ID instead of copying protected text from the store.
+        // Old own placeholders without ciphertext metadata follow the same path.
+        if (!boundOwnHistory && (/^<:ENC(?:_[^:<>]*)?:[0-9]{15,32}>/.test(storedText) || storedText.includes('\u2063'))) message = null;
+      }
+      if (!message) {
+        const readCache = this.discordMessageLinkReadCache || (this.discordMessageLinkReadCache = new Map());
+        const cached = readCache.get(access.accountId + ':' + access.path);
+        if (cached && Date.now() - cached.at < 15000 && exact(cached.message)) message = cached.message;
+      }
+      if (!message) {
+        if (!current()) return { ...base, status: 'inaccessible' };
+        const token = discordAuthTokenForSilentDmResolution();
+        if (!token) return { ...base, status: 'unavailable' };
+        try {
+          // IDs were matched to an accessible ChannelStore object. No arbitrary
+          // URL, plaintext, search query, POST or dispatcher event is sent.
+          const response = await pdDiscordApiFetch(`/channels/${access.channelId}/messages/${access.messageId}`, {
+            method: 'GET', headers: { Authorization: token }, timeout: 8000,
+          });
+          if (!current()) return { ...base, status: 'inaccessible' };
+          if (!response.ok) return { ...base, status: [401, 403, 404].includes(response.status) ? 'inaccessible' : 'unavailable' };
+          message = await response.json();
+          if (!current() || !exact(message)) return { ...base, status: 'inaccessible' };
+          this.discordMessageLinkReadCache.set(access.accountId + ':' + access.path, { at:Date.now(), message });
+          while (this.discordMessageLinkReadCache.size > 128) this.discordMessageLinkReadCache.delete(this.discordMessageLinkReadCache.keys().next().value);
+        } catch (_) { return { ...base, status: 'unavailable' }; }
+      }
+      if (!current() || message._sdc_auxiliary_transport) return { ...base, status: 'inaccessible' };
+      const author = message.author || {};
+      const metadata = { ...base, authorName: String(author.globalName || author.global_name || author.username || '').slice(0, 160) };
+      if (cachedAuthenticatedMessage) {
+        const sealed = await this.sealAuthenticatedDiscordPreview(cachedAuthenticatedMessage,access,current,message);
+        if (sealed) return {...metadata,...sealed};
+      }
+      const sdc3Payload = this.sdc3DiscordLinkPreviewPayload(message);
+      if (sdc3Payload) {
+        const grant = await this.prepareSdc3DiscordLinkPreview(message,sdc3Payload,current);
+        return grant ? {...metadata,...grant} : {...metadata,status:'encrypted-unavailable'};
+      }
+      let text = String(message.content || '').replace(/^<:ENC(?:_[^:<>]*)?:[0-9]{15,32}>/, '').trim();
+      const rawPattern = /^(?:SDC[A-Z0-9]*:|SDCFILE|🔒 Protected message|🔒 .*encrypted message)/i;
+      const patternMatches = (pattern) => { const previous = pattern.lastIndex; try { pattern.lastIndex = 0; return pattern.test(text); } finally { pattern.lastIndex = previous; } };
+      const protectedText = /^<:ENC(?:_[^:<>]*)?:[0-9]{15,32}>/.test(String(message.content || '')) ||
+        text.includes('\u2063') || rawPattern.test(text) || patternMatches(messageRegex) || patternMatches(systemMessageRegex);
+      if (!protectedText) {
+        const attachmentNames = Array.isArray(message.attachments) ? message.attachments.slice(0, 4).map((item) => String(item?.filename || '').slice(0, 100)).filter(Boolean) : [];
+        return { ...metadata, status: 'ready', text: text.slice(0, 1000), attachmentNames };
+      }
+      const database = DataBase, databaseKey = Cache.dbKey;
+      return await withSdcUiHistoryRecovery(async () => {
+        const historyCurrent = () => current() && database === DataBase && databaseKey === Cache.dbKey;
+        if (!historyCurrent()) return { ...metadata, status: 'encrypted-unavailable' };
+        let key = null;
+        try {
+          const own = String(author.id || '') === access.accountId;
+          const meta = own ? message.__sdcSentPresentation : null;
+          let binding = null, wireId = '', record = null;
+          if (meta?.version === 1 && meta.accountId === access.accountId && meta.channelId === access.channelId && meta.messageId === access.messageId) {
+            binding = Utils.Base64urlToBytes(String(meta.binding || ''));
+            wireId = String(meta.wireId || '');
+          } else {
+            let wire = text;
+            if (wire.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX)) wire = decodeHybridAsyncFanoutCarrierWire(wire).innerWire;
+            wire = splitSdc4WireAndNativeUnfurls(wire).wireLine.replace(/\s+`🔒`\s*$/u, '');
+            wireId = wire.startsWith(SDC4_WIRE_PREFIX) ? await ratchetWireCacheId(wire) : await asyncPrekeyWireId(wire);
+            if (!historyCurrent()) return { ...metadata, status: 'encrypted-unavailable' };
+            if (own) binding = selfHistoryBindingFromWire(wire, { direction: 'sent', accountId: access.accountId, channelId: access.channelId });
+          }
+          if (!/^[A-Za-z0-9_-]{32,64}$/.test(wireId) || (own && (!binding || binding.byteLength < 28)))
+            return { ...metadata, status: 'encrypted-unavailable' };
+          record = await getSdc4HistoryRecord(wireId, own ? 'sent' : 'received', own ? binding : null);
+          // Pre-SHF1 sibling copies could store own history as received with an
+          // empty messageId. Exact wire/account/channel + its received AAD bind
+          // that authenticated record, without opening text in this parent.
+          if (!record && own && historyCurrent()) record = await getSdc4HistoryRecord(wireId, 'received');
+          if (!historyCurrent() || !record || !['sent', 'received'].includes(record.direction) ||
+              (!own && record.direction !== 'received') ||
+              String(record.wireId || '') !== wireId || record.accountId !== access.accountId || record.channelId !== access.channelId ||
+              (!own && String(record.messageId || '') !== access.messageId) ||
+              (own && record.direction === 'received' && record.messageId && String(record.messageId) !== access.messageId))
+            return { ...metadata, status: 'encrypted-unavailable' };
+          key = await deriveSdc4HistoryKeyBytes();
+          if (!historyCurrent()) return { ...metadata, status: 'encrypted-unavailable' };
+          const envelope = Utils.Base64urlToBytes(String(record.envelope || ''));
+          const aad = record.direction === 'sent' ? sdc4SentHistoryAadBytes(record, binding) : sdc4ReceivedHistoryAadBytes(record);
+          const history = { key: key.buffer, envelope: envelope.buffer, aad: aad.buffer };
+          key = null; // ownership transfers to the source-bound opaque renderer
+          return { ...metadata, status: 'opaque', history, highAssuranceNativeOnly:sdcHighAssuranceNativeCryptoEnabled() };
+        } catch (_) { return { ...metadata, status: 'encrypted-unavailable' }; }
+        finally { try { key?.fill?.(0); } catch (_) {} }
+      });
+    },
+
+    async handleDiscordLocalLinkPreviewRequest(event, data) {
+      const echoId = String(data.echoId || '');
+      const record = this.localEchoFrames.get(echoId) || this.discordLinkPreviewFrames.get(echoId);
+      if (!record?.iframe?.contentWindow || event.source !== record.iframe.contentWindow ||
+          !/^[0-9a-f]{32}$/.test(String(data.requestId || ''))) return;
+      if (record.accountId !== String(Discord.getCurrentUser?.()?.id || '')) return;
+      const path = safeDiscordChannelLinkPath('https://discord.com' + String(data.path || '')).replace(/\/$/, '');
+      if (!path || path !== String(data.path || '').replace(/\/$/, '')) return;
+      if (!record.discordPreviewPaths) record.discordPreviewPaths = new Set();
+      if (!record.discordPreviewRequestIds) record.discordPreviewRequestIds = new Set();
+      if (record.discordPreviewRequestIds.has(data.requestId) || record.discordPreviewRequestIds.size >= 64 ||
+          (!record.discordPreviewPaths.has(path) && record.discordPreviewPaths.size >= 12)) return;
+      record.discordPreviewRequestIds.add(data.requestId);
+      record.discordPreviewPaths.add(path);
+      const database = DataBase, databaseKey = Cache.dbKey, accountId = String(Discord.getCurrentUser?.()?.id || '');
+      const current = () => this.started && !DuressRuntime.active && record.iframe?.isConnected &&
+        (this.localEchoFrames.get(echoId) || this.discordLinkPreviewFrames.get(echoId)) === record &&
+        String(Cache.channelId || Discord.getChannelId?.() || '') === String(record.channelId || '') &&
+        String(Discord.getCurrentUser?.()?.id || '') === accountId && DataBase === database && Cache.dbKey === databaseKey;
+      const result = await this.resolveDiscordLocalLinkPreview(path, current);
+      try {
+        if (current()) {
+          const transfer = result.history ? [result.history.envelope,result.history.aad,
+            ...(result.history.key ? [result.history.key] : []),...(result.history.candidates || []).map(row=>row.key)] : [];
+          record.iframe.contentWindow.postMessage({ type: 'sdc-discord-link-preview-result', echoId,
+            requestId: data.requestId, ...result, highAssuranceNativeOnly:sdcHighAssuranceNativeCryptoEnabled() }, '*', transfer);
+        }
+      } finally {
+        for (const buffer of [result.history?.key,...(result.history?.candidates || []).map(row=>row.key)])
+          try { if (buffer?.byteLength) new Uint8Array(buffer).fill(0); } catch (_) {}
+      }
+    },
+
+    scheduleNativeDiscordLinkPreviews(message, plaintext) {
+      if (!this.started || DuressRuntime.active) return false;
+      const channelId = String(message?.channel_id || ''), messageId = String(message?.id || '');
+      const accountId = String(Discord.getCurrentUser?.()?.id || '');
+      if (!/^[0-9]{15,32}$/.test(channelId) || !/^[0-9]{15,32}$/.test(messageId) || !accountId) return false;
+      const key = channelId + ':' + messageId, paths = discordMessageLinkPaths(plaintext);
+      if (!paths.length) {
+        const previous = this.discordLinkPreviewPending.get(key);
+        if (previous) this.removeNativeDiscordLinkPreviewFrame(previous.echoId);
+        this.discordLinkPreviewPending.delete(key); return false;
+      }
+      const previous = this.discordLinkPreviewPending.get(key);
+      if (previous && JSON.stringify(previous.paths) !== JSON.stringify(paths)) this.removeNativeDiscordLinkPreviewFrame(previous.echoId);
+      const echoId = previous?.echoId || ('discord-preview-' + Utils.BytesToBase64url(Utils.GetRandomBytes(16)));
+      this.discordLinkPreviewPending.set(key, { key, echoId, channelId, messageId, accountId, paths });
+      while (this.discordLinkPreviewPending.size > 256) {
+        const oldest = this.discordLinkPreviewPending.keys().next().value;
+        this.removeNativeDiscordLinkPreviewFrame(this.discordLinkPreviewPending.get(oldest)?.echoId);
+        this.discordLinkPreviewPending.delete(oldest);
+      }
+      this.scheduleNativeDiscordLinkPreviewRepair(); return true;
+    },
+
+    removeNativeDiscordLinkPreviewFrame(echoId) {
+      const record = this.discordLinkPreviewFrames.get(String(echoId || ''));
+      try {
+        if (record?.nativeLinkHandler) {
+          record.anchorNode?.removeEventListener?.('click',record.nativeLinkHandler,true);
+          record.anchorNode?.removeEventListener?.('auxclick',record.nativeLinkHandler,true);
+        }
+      } catch (_) {}
+      try { record?.port?.close?.(); record?.iframe?.remove?.(); } catch (_) {}
+      this.discordLinkPreviewFrames.delete(String(echoId || ''));
+    },
+
+    scheduleNativeDiscordLinkPreviewRepair() {
+      if (!this.started || !this.discordLinkPreviewPending.size || this.discordLinkPreviewRepairTimer) return;
+      this.discordLinkPreviewRepairTimer = setTimeout(() => {
+        this.discordLinkPreviewRepairTimer = null;
+        this.repairNativeDiscordLinkPreviews();
+      }, 50);
+    },
+
+    repairNativeDiscordLinkPreviews() {
+      if (!this.started) return;
+      const channelId = String(Cache.channelId || Discord.getChannelId?.() || '');
+      const accountId = String(Discord.getCurrentUser?.()?.id || '');
+      for (const [echoId, record] of this.discordLinkPreviewFrames) {
+        const node = this.findMessageContentNode(record.channelId, record.messageId);
+        if (record.channelId !== channelId || record.accountId !== accountId || !record.iframe?.isConnected || node !== record.anchorNode ||
+            node?.hasAttribute?.('data-sdc-local-echo-owner')) this.removeNativeDiscordLinkPreviewFrame(echoId);
+      }
+      if (DuressRuntime.active) return;
+      let remaining = 32;
+      for (const pending of this.discordLinkPreviewPending.values()) {
+        if (remaining <= 0) break;
+        if (pending.channelId !== channelId || pending.accountId !== accountId || this.discordLinkPreviewFrames.has(pending.echoId)) continue;
+        const anchor = this.findMessageContentNode(pending.channelId, pending.messageId);
+        if (!anchor?.isConnected || anchor.hasAttribute?.('data-sdc-local-echo-owner')) continue;
+        const ownEcho = Array.from(this.localEchoPending.values()).some((item) => item.channelId === pending.channelId &&
+          [item.messageId, ...(item.messageIds || [])].map(String).includes(pending.messageId));
+        if (ownEcho) continue;
+        remaining--;
+        const iframe = document.createElement('iframe');
+        iframe.className = 'sdc-native-discord-link-preview-frame';
+        iframe.setAttribute('sandbox','allow-scripts'); iframe.setAttribute('title','Aperçu local du message Discord');
+        iframe.style.cssText = 'display:block;width:100%;height:22px;border:0;background:transparent;margin:0;';
+        const record = { ...pending, iframe, anchorNode:anchor, port:null,
+          viewportElement:this.findLocalEchoViewportElement(anchor) };
+        this.discordLinkPreviewFrames.set(pending.echoId,record);
+        record.nativeLinkHandler = (event) => {
+          const link = event.target?.closest?.('a[href]');
+          if (!link || !anchor.contains(link) || this.findMessageContentNode(record.channelId,record.messageId) !== anchor) return;
+          const path = safeDiscordChannelLinkPath(String(link.href || '')).replace(/\/$/,'');
+          if (!path || !record.paths.includes(path)) return;
+          event.preventDefault(); event.stopPropagation();
+          this.navigateDiscordLocalMessageLink(path,record);
+        };
+        anchor.addEventListener('click',record.nativeLinkHandler,true);
+        anchor.addEventListener('auxclick',record.nativeLinkHandler,true);
+        iframe.addEventListener('load',() => {
+          if (this.discordLinkPreviewFrames.get(pending.echoId) !== record || !iframe.isConnected) return;
+          const channel = new MessageChannel(); record.port = channel.port1;
+          channel.port1.onmessage = (event) => {
+            const data = event.data || {};
+            if (data.type !== 'sdc-local-echo-height' || data.echoId !== pending.echoId ||
+                this.discordLinkPreviewFrames.get(pending.echoId) !== record || !iframe.isConnected) return;
+            const height = Math.max(22,Math.min(5000,Math.ceil(Number(data.height || 22))));
+            if (Number.isFinite(height) && iframe.style.height !== height+'px') iframe.style.height = height+'px';
+          };
+          try { channel.port1.start?.(); } catch (_) {}
+          iframe.contentWindow.postMessage({type:'sdc-discord-link-preview-init',echoId:pending.echoId,paths:pending.paths,
+            ...secureLocalEchoPresentationForNode(anchor,{}),discordLocalLinkPreviews:[],discordChannelNavigation:true,
+            discordEmojiAliases:this.discordEmojiAliasEntries(),discordEmojiAssets:this.discordNativeEmojiAssetEntries()},'*',[channel.port2]);
+        },{once:true});
+        iframe.srcdoc = SECURE_LOCAL_ECHO_FRAME_HTML;
+        anchor.appendChild(iframe);
+      }
+    },
+
+    navigateDiscordLocalMessageLink(rawPath, record) {
+      const path = safeDiscordChannelLinkPath('https://discord.com'+String(rawPath || '')).replace(/\/$/,'');
+      if (!path || path !== String(rawPath || '').replace(/\/$/,'') || !record?.iframe?.isConnected || DuressRuntime.active ||
+          record.accountId !== String(Discord.getCurrentUser?.()?.id || '') ||
+          String(record.channelId || '') !== String(Cache.channelId || Discord.getChannelId?.() || '') || !this.discordLinkPreviewAccess(path)) return false;
+      try {
+        const router = this.discordChannelRouter();
+        if (router) { router.transitionTo(path); return true; }
+      } catch (_) {}
+      this.toast('Navigation Discord interne indisponible dans cette version du client.','error');
+      return false;
+    },
+
+    discordChannelRouter() {
+      if (this.discordChannelRouterCache) return this.discordChannelRouterCache;
+      try {
+        const webpack = typeof BdApi !== 'undefined' ? BdApi?.Webpack : null;
+        const found = webpack?.getByKeys?.('transitionTo', 'replaceWith') ||
+          webpack?.getByKeys?.('transitionTo') ||
+          webpack?.getModule?.((m) => [m, m?.default, m?.Z, m?.ZP, ...Object.values(m || {})].some((entry) => typeof entry?.transitionTo === 'function'), { first: true, searchExports: true }) ||
+          Utils.Webpack()?.findModule?.((m) => [m, m?.default, m?.Z, m?.ZP, ...Object.values(m || {})].some((entry) => typeof entry?.transitionTo === 'function'));
+        const router = [found, found?.default, found?.Z, found?.ZP, ...Object.values(found || {})].find((entry) => typeof entry?.transitionTo === 'function');
+        if (typeof router?.transitionTo === 'function') this.discordChannelRouterCache = router;
+      } catch (_) {}
+      return this.discordChannelRouterCache || null;
     },
 
     nativeEditorText(editor) {
@@ -55663,7 +59811,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return text.trim() !== '';
     },
 
-    hasPendingNativeAttachmentState() {
+    hasPendingNativeAttachmentState(ignoreSubmitPin = false) {
       const active = this.active;
       const channelId = String(active?.channelId || '');
 
@@ -55680,7 +59828,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       } catch (_) {}
 
-      if (active?.nativeSecureFileSubmitInProgress === true) {
+      if (!ignoreSubmitPin && active?.nativeSecureFileSubmitInProgress === true) {
         return true;
       }
 
@@ -55713,144 +59861,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return false;
     },
 
-    normalizeSecureEmojiShortcuts(
-      value
-    ) {
-      let text =
-        canonicalizeDiscordCustomEmojiMarkup(
-          String(value || '')
-        );
-
-      // Common Discord-style named aliases. The picker bridge normally receives
-      // Unicode/custom emoji directly when Discord exposes the emoji object;
-      // these aliases are a safe fallback for current picker builds that emit
-      // :name: text.
-      const aliases = {
-        heart_eyes: '😍',
-        joy: '😂',
-        smile: '😄',
-        smiling_face_with_3_hearts: '🥰',
-        blush: '😊',
-        wink: '😉',
-        sob: '😭',
-        cry: '😢',
-        angry: '😠',
-        rage: '😡',
-        thinking: '🤔',
-        eyes: '👀',
-        heart: '❤️',
-        orange_heart: '🧡',
-        yellow_heart: '💛',
-        green_heart: '💚',
-        blue_heart: '💙',
-        purple_heart: '💜',
-        black_heart: '🖤',
-        white_heart: '🤍',
-        broken_heart: '💔',
-        fire: '🔥',
-        tada: '🎉',
-        rocket: '🚀',
-        wave: '👋',
-        clap: '👏',
-        pray: '🙏',
-        thumbsup: '👍',
-        thumbsdown: '👎',
-        ok_hand: '👌',
-        muscle: '💪',
-        point_right: '👉',
-        point_left: '👈',
-        100: '💯',
-        warning: '⚠️',
-        check: '✅',
-        x: '❌',
-        skull: '💀',
-        clown: '🤡',
-        poop: '💩',
-        sunglasses: '😎',
-        innocent: '😇',
-        neutral_face: '😐',
-        expressionless: '😑',
-        unamused: '😒',
-        sweat_smile: '😅',
-        rofl: '🤣',
-        laughing: '😆',
-        stuck_out_tongue: '😛',
-        open_mouth: '😮',
-        face_holding_back_tears: '🥹',
-        pleading_face: '🥺',
-        slightly_smiling_face: '🙂',
-        frowning_face: '☹️',
-        disappointed: '😞',
-        weary: '😩',
-        tired_face: '😫',
-        scream: '😱',
-        fearful: '😨',
-        cold_sweat: '😰',
-        sweat: '😓',
-        confounded: '😖',
-        flushed: '😳',
-        kissing_heart: '😘',
-        heart_eyes_cat: '😻',
-        crying_cat_face: '😿',
-        smile_cat: '😸',
-      };
-
-      text =
-        text.replace(
-          /:([a-zA-Z0-9_+~.\-]+):/g,
-          (full, rawName) => {
-            const name =
-              String(rawName || '')
-                .toLowerCase();
-
-            return aliases[name] ||
-              full;
-          }
-        );
-
-      // Native-style textual emoticons. Only replace standalone tokens so code,
-      // URLs and arbitrary punctuation are not rewritten.
-      const shortcutRules = [
-        [/(^|\s)(?:<3)(?=\s|$)/g, '$1❤️'],
-        [/(^|\s)(?:[:=]-?\))(?=\s|$)/g, '$1🙂'],
-        [/(^|\s)(?:[:=]-?\()(?=\s|$)/g, '$1🙁'],
-        [/(^|\s)(?::['’]-?\()(?=\s|$)/g, '$1😢'],
-        [/(^|\s)(?:[Tt][_.-][Tt])(?=\s|$)/g, '$1😭'],
-        [/(^|\s)(?::['’]-?\))(?=\s|$)/g, '$1🥲'],
-        [/(^|\s)(?::[-]?[dD]|=[dD])(?=\s|$)/g, '$1😄'],
-        [/(^|\s)(?:[xX][dD])(?=\s|$)/g, '$1😆'],
-        [/(^|\s)(?:;-?\))(?=\s|$)/g, '$1😉'],
-        [/(^|\s)(?::[-]?[pP])(?=\s|$)/g, '$1😛'],
-        [/(^|\s)(?::[-]?[oO])(?=\s|$)/g, '$1😮'],
-        [/(^|\s)(?::[-]?\/)(?=\s|$)/g, '$1😕'],
-        [/(^|\s)(?::\|)(?=\s|$)/g, '$1😐'],
-        [/(^|\s)(?::[-]?\*)(?=\s|$)/g, '$1😘'],
-        [/(^|\s)(?::3)(?=\s|$)/g, '$1😺'],
-        [/(^|\s)(?:[oO]:-?\))(?=\s|$)/g, '$1😇'],
-        [/(^|\s)(?:>:-?\()(?=\s|$)/g, '$1😠'],
-        [/(^|\s)(?:>:-?[dD])(?=\s|$)/g, '$1😈'],
-        [/(^|\s)(?:[dD]:)(?=\s|$)/g, '$1😨'],
-        [/(^|\s)(?:-_-)(?=\s|$)/g, '$1😑'],
-        [/(^|\s)(?:\^_\^)(?=\s|$)/g, '$1😊'],
-        [/(^|\s)(?:[oO]_[oO])(?=\s|$)/g, '$1🤨'],
-        [/(^|\s)(?::[sS])(?=\s|$)/g, '$1😖'],
-        [/(^|\s)(?::\$)(?=\s|$)/g, '$1😳'],
-      ];
-
-      for (
-        const [
-          pattern,
-          replacement
-        ] of shortcutRules
-      ) {
-        text =
-          text.replace(
-            pattern,
-            replacement
-          );
-      }
-
-      return text;
+    normalizeSecureEmojiShortcuts(value) {
+      return normalizeSecureEmojiAliasText(
+        String(value || ''),
+        secureEmojiAliasMap(this.discordEmojiAliasEntries())
+      );
     },
 
     extractEmojiNamesFromObject(
@@ -58683,6 +62698,37 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return false;
     },
 
+    reconcileSecureReplySurface(active = this.active) {
+      if (!active?.iframe?.contentWindow || active.nativeEditModeArmed || this.active !== active) return false;
+      const editor = this.findNativeEditor();
+      if (!editor?.isConnected) return false;
+      const placeholder = this.findNativePlaceholder(editor);
+      const changedEditor = editor !== active.editor;
+      const changedPlaceholder = placeholder !== active.placeholder;
+      if (changedEditor || changedPlaceholder) {
+        if (changedEditor) {
+          try { this.restoreNativeEditorState(active.editor, active.nativeState); } catch (_) {}
+          active.nativeState = this.saveNativeEditorState(editor);
+          active.mainNativeState = active.nativeState;
+          active.editor = active.mainEditor = editor;
+          active.composerRoot = active.mainComposerRoot = this.getComposerRoot(editor);
+        }
+        if (changedPlaceholder || changedEditor) {
+          try { this.restoreNativePlaceholderState(active.placeholder, active.placeholderState); } catch (_) {}
+          active.placeholderState = this.saveNativePlaceholderState(placeholder);
+          active.mainPlaceholderState = active.placeholderState;
+          active.placeholder = active.mainPlaceholder = placeholder;
+        }
+        active.theme = active.mainTheme = this.getTheme(editor, placeholder);
+        active.nativeTextGeometry = active.mainNativeTextGeometry = this.captureNativeTextGeometry(editor, placeholder, active.theme, active.composerRoot);
+        this.installNativeEditorEvacuationObserver(active);
+      }
+      this.protectNativeEditor(editor);
+      this.protectNativePlaceholder(active.placeholder);
+      this.positionFrame();
+      return true;
+    },
+
     forceSecureReplyFocus(reason = 'reply-transition') {
       const active = this.active;
       if (!active?.iframe?.contentWindow) return false;
@@ -58698,6 +62744,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               !this.hasPendingNativeReplyState()) {
             return;
           }
+          this.reconcileSecureReplySurface(current);
           this.frameCommand('focus');
           try { current.iframe.focus({ preventScroll: true }); } catch (_) {}
         }, delay);
@@ -60343,6 +64390,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       record.sent = true;
       record.observedAt = Date.now();
 
+      // Token observation proves only that the native composer reached this
+      // boundary. The SDK queue result is a separate transaction: terminal
+      // crypto checks and original_enqueue() can still reject this ciphertext.
+      if (record.nativeMode !== 'edit' && record.resolveObserved) {
+        record.resolveObserved(true);
+        record.resolveObserved = null;
+      }
+      if (String(record.channelId || '') !== String(channelId || '')) {
+        const error = new Error('Native encrypted submission changed channel before token observation');
+        error.code = 'SDC_NATIVE_SUBMISSION_CHANNEL_CHANGED';
+        throw error;
+      }
+
       if (record.nativeMode === 'attachment') {
         // Lot 3D terminal revalidation for Secure Input attachment submissions.
         // The SDC3 ciphertext may have been produced in the opaque frame before
@@ -60367,10 +64427,6 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             throw new Error(`GROUP file forward secrecy distribution changed before submit (${coverage.missing.length} known holder(s) missing)`);
           }
         }
-        this.clearNativeEncryptedAttachmentBindings(
-          channelId,
-          'messagequeue-token-observed'
-        );
       }
 
       this.log(
@@ -60388,21 +64444,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             ),
         }
       );
-      // For normal send/reply/attachment, observing MessageQueue means Discord
-      // accepted the ciphertext and the secure submit may complete immediately.
-      //
-      // For editMessage this callback fires BEFORE original_editMessage().
-      // Do not resolve the Secure Input send and do not restore the main
-      // composer yet: wait for the real Discord edit promise to succeed.
-      if (
-        record.nativeMode !==
-          'edit'
-      ) {
-        if (record.resolveObserved) {
-          record.resolveObserved(true);
-          record.resolveObserved = null;
-        }
-      }
+      // editMessage retains its own completion callback after the real edit
+      // result. Other native submissions now wait for CompleteNativeQueueSubmission.
 
       return {
         suppress: false,
@@ -60421,6 +64464,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           ? record.offlineFileRecipientDeviceIds.slice()
           : [],
       };
+    },
+
+    CompleteNativeQueueSubmission(token, succeeded, result = undefined, error = null, submittedRecord = null) {
+      // The already submitted transaction retains its resolver across Stop().
+      // Settling this local Promise must never restore a removed token capability.
+      const record = submittedRecord || this.sendTokens.get(token);
+      if (!record || record.token !== token || record.nativeMode === 'edit' || record.queueCompletedAt)
+        return false;
+      record.queueCompletedAt = Date.now();
+      record.queueAccepted = !!succeeded;
+      if (record.resolveQueueResult) {
+        record.resolveQueueResult({ succeeded: !!succeeded, result, error });
+        record.resolveQueueResult = null;
+      }
+      return true;
     },
 
     CompleteNativeEditSubmission(
@@ -60649,25 +64707,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     },
 
     getDiscordMessageContentLimit() {
-      try {
-        const user =
-          Discord.getCurrentUser?.();
-
-        const premiumType =
-          Number(
-            user?.premiumType ??
-            user?.premium_type ??
-            0
-          );
-
-        return (
-          premiumType === 2
-            ? 4000
-            : 2000
-        );
-      } catch (_) {
-        return 2000;
-      }
+      // Encrypted text must fit the standard account budget even on Nitro.
+      // Braille wire bytes occupy three UTF-8 bytes each, and optional own-device
+      // history must never consume an assumed premium HTTP allowance. Larger
+      // drafts use the existing pre-AEAD compression/encrypted-file path. Reserve
+      // 50 characters for the native reply/edit/upload capability marker before
+      // the terminal hook replaces it with ciphertext (standard field: 2000).
+      return 1950;
     },
 
     countSecureTextLines(value) {
@@ -60749,7 +64795,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     clearSecureQueuedAttachments(
       channelId,
-      reason = 'clear'
+      reason = 'clear',
+      expectedRecords = null
     ) {
       const id =
         String(channelId || '');
@@ -60759,18 +64806,21 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           id
         ) || [];
 
-      this.secureQueuedAttachments.delete(
-        id
-      );
+      const removed = Array.isArray(expectedRecords)
+        ? records.filter((entry) => expectedRecords.includes(entry)) : records;
+      const kept = Array.isArray(expectedRecords)
+        ? records.filter((entry) => !expectedRecords.includes(entry)) : [];
+      if (kept.length) this.secureQueuedAttachments.set(id, kept);
+      else this.secureQueuedAttachments.delete(id);
 
-      if (records.length) {
+      if (removed.length) {
         this.log(
           'secure-queued-attachments-cleared',
           {
             channelId:
               id,
             count:
-              records.length,
+              removed.length,
             reason,
           }
         );
@@ -60870,14 +64920,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       };
     },
 
-    clearNativeEncryptedAttachmentBindings(channelId, reason = 'clear') {
+    clearNativeEncryptedAttachmentBindings(channelId, reason = 'clear', expectedRecords = null) {
       const id = String(channelId || '');
       const records = this.nativeEncryptedAttachmentBindings.get(id) || [];
-      this.nativeEncryptedAttachmentBindings.delete(id);
-      if (records.length) {
+      const retired = Array.isArray(expectedRecords)
+        ? records.filter((record) => expectedRecords.includes(record))
+        : records;
+      const kept = Array.isArray(expectedRecords)
+        ? records.filter((record) => !expectedRecords.includes(record))
+        : [];
+      if (kept.length) this.nativeEncryptedAttachmentBindings.set(id, kept);
+      else this.nativeEncryptedAttachmentBindings.delete(id);
+      if (retired.length) {
         this.log('native-encrypted-attachment-bindings-cleared', {
           channelId: id,
-          count: records.length,
+          count: retired.length,
+          remainingCount: kept.length,
           reason,
         });
       }
@@ -60960,7 +65018,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             record &&
             record.channelId ===
               channelId &&
-            !record.sent
+            (!record.sent ||
+              (record.nativeMode !== 'edit' && record.queueAccepted !== true))
           ) {
             activeSubmitFound =
               true;
@@ -61002,6 +65061,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           const clearRequestedAt = Date.now();
           setTimeout(() => {
             try {
+              // CLEAR_ALL may predate token observation. Never let its grace
+              // timer release a binding that a later native SDK transaction
+              // still needs, including a refused submission kept for review.
+              if (Array.from(this.sendTokens.values()).some((record) =>
+                record?.channelId === channelId &&
+                (!record.sent || (record.nativeMode !== 'edit' && record.queueAccepted !== true))))
+                return;
               const current =
                 this.getNativeEncryptedAttachmentBinding(channelId);
               if (!current) return;
@@ -61145,14 +65211,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     async queueSecureLongTextAttachment(
       channelId,
-      plaintext
+      plaintext,
+      nativeSubmissionContext = null
     ) {
+      if (nativeSubmissionContext) this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
       const prepared =
         await this.encryptSecureTextAttachment(
           channelId,
           plaintext,
           'message.txt'
         );
+
+      if (nativeSubmissionContext) this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
 
       if (
         typeof Discord.addFiles !==
@@ -61226,6 +65296,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             'secure-long-paste',
         }
       );
+
+      if (nativeSubmissionContext) this.refreshNativeEncryptedFileSubmitContext(nativeSubmissionContext);
 
       this.log(
         'long-text-file-queued',
@@ -61718,8 +65790,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       channelId,
       commentPlaintext = '',
       reason =
-        'queued-secure-attachment-submit'
+        'queued-secure-attachment-submit',
+      nativePresentationContext = null,
+      nativeSubmissionContext = null,
+      selfHistoryContext = null
     ) {
+      selfHistoryContext = selfHistoryContext || nativeSubmissionContext?.selfHistoryContext || captureSelfHistorySendContext(channelId);
+      if (nativeSubmissionContext) this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
       const records =
         this.getSecureQueuedAttachments(
           channelId
@@ -61732,7 +65809,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
 
       if (
-        !this.hasPendingNativeComposerState()
+        !(nativeSubmissionContext
+          ? this.getNativeEncryptedAttachmentBinding(channelId)?.count
+          : this.hasPendingNativeComposerState())
       ) {
         throw new Error(
           'native encrypted attachment card is no longer pending'
@@ -61745,13 +65824,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             commentPlaintext || ''
           ),
       };
+      SelfHistoryMessageContexts.set(commentMessage, selfHistoryContext);
 
       await handleSend(
         channelId,
         commentMessage,
         true,
-        true
+        true, null, null, null,
+        nativePresentationContext || this.capturePendingNativeReplyContext(channelId)
       );
+      if (nativeSubmissionContext) this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
 
       let transport =
         String(
@@ -61771,39 +65853,48 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           channelId,
           String(
             commentPlaintext || ''
-          )
+          ),
+          nativeSubmissionContext
         );
 
         const emptyMessage = {
           content: '',
         };
+        SelfHistoryMessageContexts.set(emptyMessage, selfHistoryContext);
 
         await handleSend(
           channelId,
           emptyMessage,
           true,
-          true
+          true, null, null, null,
+          nativePresentationContext || this.capturePendingNativeReplyContext(channelId)
         );
+        if (nativeSubmissionContext) this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
 
         transport =
           String(
             emptyMessage.content || ''
           );
+        commentMessage = emptyMessage;
       }
 
+      const submittedRecords = this.getSecureQueuedAttachments(channelId);
       const submit =
         await this.submitTransport(
           channelId,
           transport,
-          true
+          true,
+          commentMessage._sdc_offline_file_recipient_ids || null,
+          nativeSubmissionContext
         );
 
-      // MessageQueue observed the private SDC token. From this point Discord's
+      // Discord's original queue accepted the private SDC token. From this point its
       // native composer owns upload progress/card cleanup. Only drop our local
       // bookkeeping; never clear the native attachment UI ourselves.
       this.clearSecureQueuedAttachments(
         channelId,
-        'native-messagequeue-submit-observed'
+        'native-messagequeue-submit-accepted',
+        submittedRecords
       );
 
       this.log(
@@ -61841,19 +65932,29 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       channelId,
       plaintext,
       reason =
-        'ciphertext-too-large'
+        'ciphertext-too-large',
+      nativePresentationContext = null,
+      selfHistoryContext = null
     ) {
+      selfHistoryContext = selfHistoryContext || captureSelfHistorySendContext(channelId);
+      const nativeSubmissionContext = this.active ? null
+        : this.captureNativeEncryptedFileSubmitContext(channelId);
+      if (nativeSubmissionContext) nativeSubmissionContext.selfHistoryContext = selfHistoryContext;
       const queued =
         await this.queueSecureLongTextAttachment(
           channelId,
-          plaintext
+          plaintext,
+          nativeSubmissionContext
         );
 
       const submit =
         await this.sendSecureQueuedAttachments(
           channelId,
           '',
-          reason
+          reason,
+          nativePresentationContext,
+          nativeSubmissionContext,
+          selfHistoryContext
         );
 
       this.log(
@@ -61880,6 +65981,29 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         submitMode:
           submit.mode,
       };
+    },
+
+    captureSecureFileSubmitContext(active = this.active) {
+      return { active, database: DataBase, databaseKey: Cache.dbKey,
+        keyRecord: DataBase?.keys?.[active?.keyHash],
+        accountId: String(Discord.getCurrentUser()?.id || '') };
+    },
+
+    isSecureFileSubmitContextCurrent(context) {
+      const active = context?.active;
+      if (!active || !this.started || this.active !== active ||
+          DataBase !== context.database || Cache.dbKey !== context.databaseKey ||
+          DataBase?.keys?.[active.keyHash] !== context.keyRecord ||
+          String(Discord.getCurrentUser()?.id || '') !== context.accountId) return false;
+      const config = this.getCurrentConfig();
+      return !!config && String(config.channelId) === String(active.channelId) &&
+        config.keyHash === active.keyHash && config.cryptoProtocol === active.cryptoProtocol &&
+        this.getSecureTextCryptoProtocol(active.channelId) === active.textCryptoProtocol;
+    },
+
+    assertSecureFileSubmitContext(context) {
+      if (!this.isSecureFileSubmitContextCurrent(context))
+        throw new Error('Secure file send context changed; the encrypted draft is preserved');
     },
 
     async uploadSecureCiphertextFile(
@@ -61919,7 +66043,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         );
       }
 
-      const file =
+      const transactionContext = this.captureSecureFileSubmitContext();
+      const transactionActive = transactionContext.active;
+      this.assertSecureFileSubmitContext(transactionContext);
+      if (String(transactionActive.channelId) !== String(channelId))
+        throw new Error('Secure file channel does not match the active composer');
+      const ownsSubmitPin = transactionActive.nativeSecureFileSubmitInProgress !== true;
+      transactionActive.nativeSecureFileSubmitInProgress = true;
+      transactionActive.nativeSecureFileSubmitStartedAt =
+        Number(transactionActive.nativeSecureFileSubmitStartedAt || Date.now());
+      let succeeded = false;
+      let file = null;
+      try {
+      file =
         new File(
           [
             fileCiphertext
@@ -61962,6 +66098,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         draftType: 0,
       });
 
+      this.assertSecureFileSubmitContext(transactionContext);
+      // Upload cards can replace Slate. Refresh retargets the native anchor
+      // while this pin keeps the original opaque iframe and pending draft.
+      await this.Refresh();
+      this.assertSecureFileSubmitContext(transactionContext);
+
       this.rememberSecureQueuedAttachment(
         channelId,
         {
@@ -61988,6 +66130,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           true,
           offlineRecipientDeviceIds
         );
+
+      this.assertSecureFileSubmitContext(transactionContext);
+      succeeded = true;
+      transactionActive.nativeAttachmentDomIgnoreUntil = Date.now() + 2500;
 
       this.clearSecureQueuedAttachments(
         channelId,
@@ -62026,6 +66172,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           ),
         result,
       };
+      } catch (error) {
+        try { if (file) preEncryptedAttachmentFiles.delete(file); } catch (_) {}
+        throw error;
+      } finally {
+        if (ownsSubmitPin) {
+          transactionActive.nativeSecureFileSubmitInProgress = false;
+          transactionActive.nativeSecureFileSubmitStartedAt = 0;
+          if (!succeeded) transactionActive.nativeAttachmentDomIgnoreUntil = 0;
+          this.RefreshSoon(0);
+        }
+      }
     },
 
     async uploadSecurePdDecoyCiphertextFile(
@@ -62202,6 +66359,30 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       );
     },
 
+    requestOversizedOfflineSdc4TextFile(active, requestId, plainUtf8Bytes, hasAttachmentBinding) {
+      if (!Number.isSafeInteger(plainUtf8Bytes) || plainUtf8Bytes < 0)
+        throw new Error('Invalid Secure Input offline text byte length');
+      if (plainUtf8Bytes <= SDC_HYBRID_ASYNC_MAX_PLAINTEXT_BYTES) return false;
+      if (!offlineSdc4TextFileRecipientSetReady(active?.channelId)) return false;
+      if (active?.nativeEditModeArmed)
+        throw new Error('A long offline edit cannot be converted into a new encrypted attachment');
+      if (hasAttachmentBinding || this.hasPendingNativeAttachmentState())
+        throw new Error('Offline caption and attachment metadata exceed the frozen budget; shorten the caption or send files separately');
+      active.offlineTextFileFallbackRequestId = String(requestId);
+      this.log('sdc4q-text-file-fallback', {channelId:active.channelId, plainUtf8Bytes,
+        frozenBudget:SDC_HYBRID_ASYNC_MAX_PLAINTEXT_BYTES, parentPlaintextReceived:false});
+      this.frameCommand('send-pending-as-file', {requestId, offlineTextFileFallback:true});
+      return true;
+    },
+
+    assertOfflineTextFileFallbackContext(active, data) {
+      if (data.offlineTextFileFallback !== true) return;
+      if (this.active !== active || String(data.requestId || '') !== String(active.offlineTextFileFallbackRequestId || '') ||
+          active.nativeEditModeArmed || this.hasPendingNativeAttachmentState(true) ||
+          this.getSecureSdc4FileFsDescriptors(active.channelId).length)
+        throw new Error('Offline text-file context or pending attachments changed; the secure draft is preserved');
+    },
+
     async prepareSandboxSdc4qOfflineGrantBatch(active, request) {
       const channelId = String(active?.channelId || '');
       if (!active || !channelId || active.textCryptoProtocol !== 4)
@@ -62243,7 +66424,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     },
 
-    async reserveSandboxSdc4Grant(active, request) {
+    async reserveSandboxSdc4Grant(active, request, userIntent = null) {
       const channelId = String(active?.channelId || '');
       if (!active || !channelId || active.textCryptoProtocol !== 4) {
         throw new Error('Secure Input SDC4 sandbox mode is not active');
@@ -62260,7 +66441,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // installation's device private key or mutable ratchet state. Complete the
       // explicit post-import device convergence before consuming a one-shot MK.
       if (portableImportConvergenceState()) {
-        await ensurePortableImportConvergenceForChannel(channelId, 'secure-input-reservation');
+        await ensurePortableImportConvergenceForChannel(channelId, 'secure-input-reservation', userIntent);
       }
 
       const attachmentScopedKeyId =
@@ -62276,7 +66457,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         { attachmentScopedKeyId }
       );
       if (!reservation && ratchetV4IsRequired(channelId)) {
-        await ensureRatchetV4Live(channelId, 'secure-input-sandbox');
+        await ensureRatchetV4Live(channelId, 'secure-input-sandbox', SDC4_AUTO_HANDSHAKE_TIMEOUT_MS, userIntent);
         reservation = await reserveRatchetV4TextEncryption(
           channelId,
           { attachmentScopedKeyId }
@@ -62446,13 +66627,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
       }
       for (const [echoId, record] of this.localEchoFrames) {
-        const expired = !record?.durable && now - Number(record?.createdAt || 0) > ttl;
+        const expired = !this.localEchoPending.has(echoId) || (!record?.durable && now - Number(record?.createdAt || 0) > ttl);
         const detached = record?.iframe && !record.iframe.isConnected;
         if (expired) {
+          this.restoreLocalEchoNativePresentation(record, true);
           this.restoreNativeEditedMarker(record);
           try { record?.iframe?.remove?.(); } catch (_) {}
           this.localEchoFrames.delete(echoId);
         } else if (detached) {
+          this.restoreLocalEchoNativePresentation(record, true);
           this.restoreNativeEditedMarker(record);
           this.localEchoFrames.delete(echoId);
         }
@@ -62461,9 +66644,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // durable-history metadata for durable entries. Keep a separate bound
       // aligned with the encrypted history store so navigation across many
       // DMs cannot evict a renderer while its Discord row is still U+2063.
-      while (this.localEchoPending.size > SDC4_LOCAL_ECHO_PENDING_LIMIT) {
-        this.localEchoPending.delete(this.localEchoPending.keys().next().value);
-      }
+      // Compact reply renderers share ciphertext metadata, but cannot evict the
+      // durable renderer for a canonical sent row. Bound the two sets separately.
+      const normalIds = [], replyIds = [];
+      for (const [id, pending] of this.localEchoPending)
+        (pending?.replyPreview ? replyIds : normalIds).push(id);
+      for (const id of normalIds.slice(0, Math.max(0, normalIds.length - SDC4_LOCAL_ECHO_PENDING_LIMIT))) this.localEchoPending.delete(id);
+      for (const id of replyIds.slice(0, Math.max(0, replyIds.length - 256))) this.localEchoPending.delete(id);
     },
 
     retireLocalEcho(echoId, reason = 'retired', deleteHistory = false) {
@@ -62478,12 +66665,17 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       const frame = this.localEchoFrames.get(id);
       if (frame) {
+        this.restoreLocalEchoNativePresentation(frame, true);
         this.restoreNativeEditedMarker(frame);
         try { frame.iframe?.remove?.(); } catch (_) {}
         this.localEchoFrames.delete(id);
       }
 
       const hadPending = this.localEchoPending.delete(id);
+      for (const [replyId, pending] of Array.from(this.localEchoPending)) {
+        if (pending?.replyPreview && String(pending.historyRecord?.wireId || '') === id)
+          this.retireLocalEcho(replyId, reason, false);
+      }
 
       // The plaintext cache itself lives inside the opaque Secure Input iframe.
       // Once an edit has successfully replaced the Discord message, the old
@@ -62542,6 +66734,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const seen = new Set();
       const addCandidate = (node) => {
         if (!(node instanceof Element) || seen.has(node)) return;
+        // A nested reply can reuse the referenced message-content id. Portal
+        // renderers for sent rows must anchor to the row itself, not its preview.
+        if (node.closest('[class*="repliedMessage"], [class*="repliedText"], [class*="replyPreview"]')) return;
+        const row = node.closest('li, [role="listitem"], [data-list-item-id^="chat-messages"], [class*="messageListItem"]');
+        const rowId = row ? this.getNativeMessageIdFromContainer(row) : '';
+        if (rowId && rowId !== mid) return;
         seen.add(node);
         candidates.push(node);
       };
@@ -62550,17 +66748,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         cid ? `#message-content-${cid}-${mid}` : null,
         `[id^="message-content-"][id$="-${mid}"]`,
       ].filter(Boolean);
-      for (const selector of contentSelectors) {
-        try {
-          for (const node of document.querySelectorAll(selector)) addCandidate(node);
-        } catch (_) {}
-      }
+      if (this.localEchoVisibleContentIndex instanceof Map) {
+        for (const node of this.localEchoVisibleContentIndex.get(mid) || []) addCandidate(node);
+      } else for (const selector of contentSelectors) {
+          try {
+            for (const node of document.querySelectorAll(selector)) addCandidate(node);
+          } catch (_) {}
+        }
 
       const rowSelectors = [
         `[data-list-item-id^="chat-messages"][data-list-item-id$="${mid}"]`,
         `[id^="chat-messages-"][id$="-${mid}"]`,
       ];
-      for (const selector of rowSelectors) {
+      for (const selector of this.localEchoVisibleContentIndex instanceof Map ? [] : rowSelectors) {
         try {
           for (const row of document.querySelectorAll(selector)) {
             const exact = cid
@@ -62589,6 +66789,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           );
         } catch (_) {}
         if (!rect) continue;
+        if (Number(rect.width) <= 0 || Number(rect.height) <= 0) continue;
 
         let style = null;
         try { style = getComputedStyle(node); } catch (_) {}
@@ -62618,7 +66819,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           bestScore = score;
         }
       }
-      return best || candidates[0] || null;
+      return best || null;
     },
 
     findLocalEchoPlaceholderRect(anchor) {
@@ -62811,10 +67012,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         } catch (_) {}
         node = node.parentElement;
       }
-      return classFallback || document.documentElement;
+      return classFallback || null;
     },
 
     getLocalEchoViewportRect(viewportElement) {
+      if (!viewportElement) return null;
       if (!viewportElement || viewportElement === document.documentElement || viewportElement === document.body) {
         return {
           left: 0,
@@ -62827,10 +67029,24 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       try {
         const rect = viewportElement.getBoundingClientRect();
-        const left = Math.max(0, Number(rect.left || 0));
-        const top = Math.max(0, Number(rect.top || 0));
-        const right = Math.min(Number(window.innerWidth || rect.right || 0), Number(rect.right || 0));
-        const bottom = Math.min(Number(window.innerHeight || rect.bottom || 0), Number(rect.bottom || 0));
+        let left = Math.max(0, Number(rect.left || 0));
+        let top = Math.max(0, Number(rect.top || 0));
+        let right = Math.min(Number(window.innerWidth || rect.right || 0), Number(rect.right || 0));
+        let bottom = Math.min(Number(window.innerHeight || rect.bottom || 0), Number(rect.bottom || 0));
+        // Nested chat panels/sidebar transitions may clip the scroller without
+        // changing its own rect. Intersect all actual CSS clipping ancestors.
+        let ancestor = viewportElement.parentElement;
+        while (ancestor && ancestor !== document.documentElement) {
+          const style = getComputedStyle(ancestor);
+          const parentRect = ancestor.getBoundingClientRect();
+          if (/(?:hidden|clip|auto|scroll)/i.test(String(style.overflowX || style.overflow || ''))) {
+            left = Math.max(left, Number(parentRect.left)); right = Math.min(right, Number(parentRect.right));
+          }
+          if (/(?:hidden|clip|auto|scroll)/i.test(String(style.overflowY || style.overflow || ''))) {
+            top = Math.max(top, Number(parentRect.top)); bottom = Math.min(bottom, Number(parentRect.bottom));
+          }
+          ancestor = ancestor.parentElement;
+        }
         if (right <= left || bottom <= top) return null;
         return { left, top, right, bottom, width: right - left, height: bottom - top };
       } catch (_) {
@@ -62840,11 +67056,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     ensureLocalEchoPortal() {
       if (this.localEchoPortal?.isConnected) return this.localEchoPortal;
+      // A hot-reloaded plugin has no frame records for old DOM markers.
+      for (const node of document.querySelectorAll('[data-sdc-local-echo-owner]')) node.removeAttribute('data-sdc-local-echo-owner');
       const root = document.body || document.documentElement;
       if (!root) return null;
       const portal = document.createElement('div');
       portal.className = 'sdc-local-echo-portal';
       portal.setAttribute('data-sdc-local-echo-portal', 'v69.0.5');
+      const nativePresentationStyle = document.createElement('style');
+      nativePresentationStyle.textContent = '[data-sdc-local-echo-owner]{color:transparent!important;text-shadow:none!important}[data-sdc-local-echo-owner]>*{visibility:hidden!important}[data-sdc-local-echo-owner] [class*="edited"]{visibility:visible!important;color:var(--text-muted,#949ba4)!important}';
+      portal.appendChild(nativePresentationStyle);
       portal.style.cssText = [
         'position:fixed',
         'left:0',
@@ -62872,28 +67093,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // Nitro/gift button; it clamps only the portal viewport to the current
       // channelTextArea top edge when that edge intersects the message scroller.
       try {
-        const composer = document.querySelector(
-          'form[class*=form] [class*=channelTextArea], div[class*=channelTextArea]'
-        );
-        const composerRect = composer?.getBoundingClientRect?.();
-        const composerTop = Number(composerRect?.top);
-        if (
-          Number.isFinite(composerTop) &&
-          composerTop > Number(rect.top) + 24 &&
-          composerTop < Number(rect.bottom)
-        ) {
-          const bottom = Math.max(Number(rect.top), composerTop - 2);
-          rect = { ...rect, bottom, height: Math.max(0, bottom - Number(rect.top)) };
+        const candidates = [this.active?.composerRoot?.closest?.('form, [class*="channelTextArea"]'),
+          ...document.querySelectorAll('form[class*=form] [class*=channelTextArea], div[class*=channelTextArea]')].filter(Boolean);
+        for (const composer of candidates) {
+          const composerRect = composer.getBoundingClientRect?.();
+          const composerTop = Number(composerRect?.top);
+          if (Number.isFinite(composerTop) && Number(composerRect.width) > 100 &&
+              Number(composerRect.right) > Number(rect.left) && Number(composerRect.left) < Number(rect.right) &&
+              composerTop > Number(rect.top) + 24 && composerTop < Number(rect.bottom)) {
+            const bottom = Math.max(Number(rect.top), composerTop - 2);
+            rect = { ...rect, bottom, height: Math.max(0, bottom - Number(rect.top)) };
+          }
         }
       } catch (_) {}
 
-      portal.style.left = `${Math.round(rect.left)}px`;
-      portal.style.top = `${Math.round(rect.top)}px`;
-      portal.style.width = `${Math.max(0, Math.round(rect.width))}px`;
-      portal.style.height = `${Math.max(0, Math.round(rect.height))}px`;
-      portal.style.right = 'auto';
-      portal.style.bottom = 'auto';
-      portal.style.overflow = 'hidden';
+      const values = { left: `${Math.round(rect.left)}px`, top: `${Math.round(rect.top)}px`, width: `${Math.max(0, Math.round(rect.width))}px`, height: `${Math.max(0, Math.round(rect.height))}px`, right: 'auto', bottom: 'auto', overflow: 'hidden' };
+      for (const [key, value] of Object.entries(values)) if (portal.style[key] !== value) portal.style[key] = value;
       return rect;
     },
 
@@ -62911,6 +67126,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     findLocalEchoContentNode(pending) {
       if (!pending) return null;
+      if (pending.replyPreview) {
+        const parent = this.findMessageContentNode(pending.channelId, pending.messageId);
+        const row = parent?.closest?.('li, [role="listitem"], [data-list-item-id^="chat-messages"], [class*="messageListItem"], [class*="message_"]');
+        const preview = row?.querySelector?.('[class*="repliedMessage"] [class*="repliedTextContent"], [class*="repliedMessage"] [class*="repliedText"], [class*="repliedMessage"] [class*="markup"], [class*="replyPreview"] [class*="markup"]');
+        return preview?.isConnected ? { node: preview, messageId: String(pending.messageId || '') } : null;
+      }
       const ids = [];
       const add = (value) => {
         const mid = String(value || '');
@@ -62927,13 +67148,53 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return null;
     },
 
+    restoreLocalEchoNativePresentation(record, restoreLayout = false) {
+      const anchor = record?.nativePresentationNode;
+      if (anchor?.getAttribute?.('data-sdc-local-echo-owner') === String(record.echoId || ''))
+        anchor.removeAttribute('data-sdc-local-echo-owner');
+      if (record) record.nativePresentationNode = null;
+      if (restoreLayout) this.restoreLocalEchoNativeLayout(record);
+    },
+
+    restoreLocalEchoNativeLayout(record) {
+      const node = record?.nativeLayoutNode;
+      const previous = record?.nativeLayoutPrevious;
+      if (node?.style && previous) {
+        if (previous.value) node.style.setProperty('min-height', previous.value, previous.priority);
+        else node.style.removeProperty('min-height');
+      }
+      if (record) { record.nativeLayoutNode = null; record.nativeLayoutPrevious = null; }
+    },
+
+    reserveLocalEchoNativeLayout(record, node, height) {
+      if (record.nativeLayoutNode !== node) {
+        this.restoreLocalEchoNativeLayout(record);
+        record.nativeLayoutNode = node;
+        record.nativeLayoutPrevious = { value: node.style.getPropertyValue('min-height'), priority: node.style.getPropertyPriority('min-height') };
+      }
+      const value = `${height}px`;
+      if (node.style.getPropertyValue('min-height') !== value || node.style.getPropertyPriority('min-height') !== 'important')
+        node.style.setProperty('min-height', value, 'important');
+    },
+
+    suppressLocalEchoNativePresentation(record, anchor, echoId) {
+      if (record?.nativePresentationNode && record.nativePresentationNode !== anchor) this.restoreLocalEchoNativePresentation(record);
+      if (!record || !anchor?.setAttribute) return;
+      if (anchor.getAttribute('data-sdc-local-echo-owner') !== String(echoId || ''))
+        anchor.setAttribute('data-sdc-local-echo-owner', String(echoId || ''));
+      record.echoId = String(echoId || '');
+      record.nativePresentationNode = anchor;
+    },
+
     positionLocalEchoFrame(echoId, record, contentNode = null, messageId = null) {
       const pending = this.localEchoPending.get(String(echoId || ''));
       const iframe = record?.iframe;
       if (!pending || !iframe?.isConnected) return false;
+      const ready = record.ready === true;
 
       const currentChannelId = String(Cache.channelId || this.active?.channelId || '');
       if (!currentChannelId || String(pending.channelId || '') !== currentChannelId) {
+        this.restoreLocalEchoNativePresentation(record, true);
         iframe.style.visibility = 'hidden';
         iframe.style.pointerEvents = 'none';
         this.perf.localEchoPortalHidden++;
@@ -62948,6 +67209,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         resolvedMessageId = String(resolved?.messageId || resolvedMessageId || '');
       }
       if (!anchor?.isConnected) {
+        this.restoreLocalEchoNativePresentation(record, true);
         iframe.style.visibility = 'hidden';
         iframe.style.pointerEvents = 'none';
         this.perf.localEchoPortalHidden++;
@@ -62963,7 +67225,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // canonical/optimistic message-id aliases and, as a DOM fallback, by the
       // currently edited message row. No plaintext is inspected in the parent.
       const editActive = this.active;
-      if (editActive?.nativeEditModeArmed) {
+      if (!pending.replyPreview && editActive?.nativeEditModeArmed) {
         const editMessageId = String(editActive.nativeEditMessageId || '');
         const pendingIds = [
           String(resolvedMessageId || ''),
@@ -62991,6 +67253,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           String(editActive.nativeEditLocalEchoId || '') !== '' &&
           String(editActive.nativeEditLocalEchoId || '') === String(echoId || '');
         if (explicitEditEcho || (editMessageId && pendingIds.includes(editMessageId)) || sameEditRow) {
+          this.restoreLocalEchoNativePresentation(record);
           this.restoreNativeEditedMarker(record);
           iframe.style.visibility = 'hidden';
           iframe.style.pointerEvents = 'none';
@@ -63001,19 +67264,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       record.hiddenForInlineEdit = false;
 
-      const height = Math.max(18, Math.min(5000, Math.ceil(Number(record.height || 22))));
+      const height = pending.replyPreview ? 22 : Math.max(18, Math.min(5000, Math.ceil(Number(record.height || 22))));
 
       // v69.0.4: reserve only the vertical space that native Discord content would
       // occupy. v69.0.3 also forced height, which could perturb grouped-message
       // layout while React was recycling rows.
       try {
-        anchor.style.setProperty('min-height', `${height}px`, 'important');
-        anchor.style.removeProperty('height');
+        if (ready) this.reserveLocalEchoNativeLayout(record, anchor, height);
       } catch (_) {}
 
       let anchorRect = null;
       try { anchorRect = anchor.getBoundingClientRect(); } catch (_) {}
       if (!anchorRect) {
+        this.restoreLocalEchoNativePresentation(record);
         iframe.style.visibility = 'hidden';
         iframe.style.pointerEvents = 'none';
         return false;
@@ -63031,6 +67294,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const viewportElement = this.findLocalEchoViewportElement(row || anchor);
       const viewportRect = this.syncLocalEchoPortalBounds(viewportElement);
       if (!viewportRect) {
+        this.restoreLocalEchoNativePresentation(record);
         iframe.style.visibility = 'hidden';
         iframe.style.pointerEvents = 'none';
         this.perf.localEchoPortalHidden++;
@@ -63070,13 +67334,6 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         Number(rowRect?.top ?? top) < Number(viewportRect.bottom) &&
         Number(rowRect?.right ?? anchorRect.right) > Number(viewportRect.left) &&
         Number(rowRect?.left ?? anchorRect.left) < Number(viewportRect.right);
-      if (!visible) {
-        iframe.style.visibility = 'hidden';
-        iframe.style.pointerEvents = 'none';
-        this.perf.localEchoPortalHidden++;
-        return false;
-      }
-
       let right = Number(viewportRect.right) - 8;
       if (rowRect && Number(rowRect.right) > left + 40)
         right = Math.min(right, Number(rowRect.right) - 12);
@@ -63086,6 +67343,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let width = Math.floor(right - left);
       width = Math.max(40, Math.min(Number(viewportRect.right) - left - 4, width));
       if (!Number.isFinite(width) || width < 24) {
+        this.restoreLocalEchoNativePresentation(record);
         iframe.style.visibility = 'hidden';
         iframe.style.pointerEvents = 'none';
         this.perf.localEchoPortalHidden++;
@@ -63100,22 +67358,29 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       iframe.style.top = `${Math.round(top - Number(viewportRect.top))}px`;
       iframe.style.width = `${Math.round(width)}px`;
       iframe.style.height = `${height}px`;
-      iframe.style.visibility = 'visible';
+      // Measure the real message width before the opaque frame renders its
+      // plaintext. Rendering first at the old fixed 320px then widening on ready
+      // caused a visible second wrap/height jump each time a DM was reopened.
+      iframe.style.visibility = ready && visible ? 'visible' : 'hidden';
       // Sender local echoes must remain pointer-interactive at every height so
       // decrypted text can always be selected/copied. Wheel/trackpad events are
       // already forwarded from the opaque iframe to Discord's real message
       // scroller, so keeping pointer events enabled does not require exposing
       // plaintext to the parent renderer.
-      iframe.style.pointerEvents = 'auto';
+      iframe.style.pointerEvents = ready && visible ? 'auto' : 'none';
       iframe.style.clipPath = 'none';
+      if (ready && visible) this.suppressLocalEchoNativePresentation(record, anchor, echoId);
+      else this.restoreLocalEchoNativePresentation(record);
       record.anchorNode = anchor;
       record.messageId = String(resolvedMessageId || pending.messageId || record.messageId || '');
       record.channelId = String(pending.channelId || '');
       record.geometrySource = inlineRect?.source || 'native-row-fallback';
       record.viewportElement = viewportElement || null;
-      this.positionNativeEditedMarker(record, anchor, iframe, viewportRect);
+      if (ready && visible) this.positionNativeEditedMarker(record, anchor, iframe, viewportRect);
+      else this.restoreNativeEditedMarker(record);
+      if (!visible) this.perf.localEchoPortalHidden++;
       this.perf.localEchoPortalPositions++;
-      return true;
+      return ready && visible;
     },
 
     getNativeMessageIdFromContainer(container) {
@@ -63142,6 +67407,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       let bestId = null;
       let bestCreatedAt = -1;
       for (const [echoId, record] of this.localEchoPending) {
+        if (record?.replyPreview) continue;
         const ids = [record?.messageId, ...(Array.isArray(record?.messageIds) ? record.messageIds : [])].map(String);
         if (!ids.includes(messageId)) continue;
         const createdAt = Number(record?.createdAt || 0);
@@ -63154,9 +67420,47 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       // Fallback for rows mounted before messageId was copied into pending state.
       for (const [echoId, record] of this.localEchoFrames) {
+        if (this.localEchoPending.get(echoId)?.replyPreview) continue;
         if (String(record?.messageId || '') === messageId) return String(echoId);
       }
       return null;
+    },
+
+    indexVisibleLocalEchoContent() {
+      const index = new Map();
+      const add = (id, node) => {
+        if (!id || !node) return;
+        const list = index.get(id) || [];
+        if (!list.includes(node)) list.push(node);
+        index.set(id, list);
+      };
+      for (const node of document.querySelectorAll('[id^="message-content-"]')) {
+        const match = /-([0-9]{10,32})$/.exec(String(node.id || ''));
+        if (match) add(match[1], node);
+      }
+      // Also index builds where only the parent row exposes the snowflake.
+      for (const row of document.querySelectorAll('[data-list-item-id^="chat-messages"], [id^="chat-messages-"], li[aria-labelledby*="message-content"], [role="listitem"][aria-labelledby*="message-content"]')) {
+        const id = this.getNativeMessageIdFromContainer(row);
+        const node = Array.from(row.querySelectorAll('[id^="message-content-"], [class*="messageContent"], [class*="markup"]')).find((candidate) =>
+          !candidate.closest('[class*="repliedMessage"], [class*="repliedText"], [class*="replyPreview"]')
+        );
+        add(id, node);
+      }
+      return index;
+    },
+
+    syncLocalEchoGeometryObservation() {
+      if (!this.localEchoGeometryObserver) return;
+      const nodes = new Set();
+      const add = (node) => { if (node?.isConnected) nodes.add(node); };
+      add(this.active?.composerRoot?.closest?.('form') || this.active?.composerRoot);
+      for (const record of this.localEchoFrames.values()) {
+        if (String(record.channelId || '') !== String(Cache.channelId || '') || !record.iframe?.isConnected) continue;
+        add(record.anchorNode); add(record.viewportElement);
+      }
+      for (const node of this.localEchoGeometryNodes) if (!nodes.has(node)) this.localEchoGeometryObserver.unobserve(node);
+      for (const node of nodes) if (!this.localEchoGeometryNodes.has(node)) this.localEchoGeometryObserver.observe(node);
+      this.localEchoGeometryNodes = nodes;
     },
 
     scheduleVisibleLocalEchoRepair(delayMs = 80) {
@@ -63188,23 +67492,26 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       for (const record of this.localEchoFrames.values()) {
         if (!record?.iframe?.isConnected) continue;
         if (String(record.channelId || '') !== currentChannelId) {
+          this.restoreLocalEchoNativePresentation(record, true);
           record.iframe.style.visibility = 'hidden';
           record.iframe.style.pointerEvents = 'none';
         }
       }
 
       let repaired = 0;
+      this.localEchoVisibleContentIndex = this.indexVisibleLocalEchoContent();
       // v70.3.3: scan the whole bounded pending set. Discord virtualization
       // normally exposes only a small subset of rows, but counting already-
       // positioned frames toward a hard 96-item stop could starve later
       // durable rows forever after a long history remount.
-      for (const [echoId, pending] of Array.from(this.localEchoPending.entries())) {
+      try { for (const [echoId, pending] of Array.from(this.localEchoPending.entries())) {
         if (!pending || String(pending.channelId || '') !== currentChannelId) continue;
 
         const resolved = this.findLocalEchoContentNode(pending);
         if (!resolved?.node?.isConnected) {
           const existing = this.localEchoFrames.get(String(echoId));
           if (existing?.iframe?.isConnected) {
+            this.restoreLocalEchoNativePresentation(existing, true);
             existing.iframe.style.visibility = 'hidden';
             existing.iframe.style.pointerEvents = 'none';
           }
@@ -63246,7 +67553,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             mode: 'portal-recreate',
           });
         }
-      }
+      } } finally { this.localEchoVisibleContentIndex = null; }
+      this.syncLocalEchoGeometryObservation();
       return repaired;
     },
 
@@ -63254,6 +67562,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const id = String(echoId || '');
       const record = this.localEchoFrames.get(id);
       if (!record?.iframe?.isConnected) return false;
+      if (layout.ready === true) record.ready = true;
       const next = Math.max(18, Math.min(5000, Math.ceil(Number(layout.height || record.height || 22))));
       record.height = next;
       for (const key of ['tailLeft', 'tailTop', 'tailBottom', 'lineHeight']) {
@@ -63273,7 +67582,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       const id = String(echoId || '');
       const messageId = String(message?.id || '');
       const channelId = String(message?.channel_id || '');
-      if (!id || !messageId || !channelId || !historyRecord) return false;
+      if (!this.started || !id || !messageId || !channelId || !historyRecord) return false;
       if (String(historyRecord.direction || '') !== 'sent' ||
           String(historyRecord.wireId || '') !== id ||
           String(historyRecord.channelId || '') !== channelId) return false;
@@ -63282,16 +67591,64 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         : new Uint8Array(messageCiphertext || new ArrayBuffer(0));
       if (ciphertext.byteLength < 28) return false;
 
+      rememberSdcSentMessagePresentation(message, id, ciphertext);
+      const previous = this.localEchoPending.get(id);
+      const messageIds = previous && String(previous.channelId || '') === channelId && Array.isArray(previous.messageIds)
+        ? previous.messageIds.filter((value) => String(value) !== messageId).slice(-5).map(String) : [];
+      messageIds.push(messageId);
+
       this.localEchoPending.set(id, {
         channelId,
         messageId,
-        messageIds: [messageId],
+        messageIds,
         durable: true,
         historyRecord: JSON.parse(JSON.stringify(historyRecord)),
         messageCiphertext: Utils.BytesToBase64url(ciphertext),
         createdAt: Date.now(),
       });
       return this.scheduleLocalEchoForMessage(message, id);
+    },
+
+    findDurableLocalEchoForMessage(channelId, messageId) {
+      let found = null;
+      for (const pending of this.localEchoPending.values()) {
+        if (!pending?.durable || pending.replyPreview || String(pending.channelId || '') !== String(channelId || '')) continue;
+        const ids = [pending.messageId, ...(Array.isArray(pending.messageIds) ? pending.messageIds : [])].map(String);
+        if (ids.includes(String(messageId || '')) && (!found || Number(pending.createdAt || 0) >= Number(found.createdAt || 0))) found = pending;
+      }
+      return found;
+    },
+
+    scheduleDurableReplyPreview(replyingMessage, referencedMessage, source) {
+      const channelId = String(replyingMessage?.channel_id || replyingMessage?.channelId || '');
+      const parentId = String(replyingMessage?.id || '');
+      const referencedId = String(referencedMessage?.id || referencedMessage?.message_id || '');
+      const history = source?.historyRecord;
+      if (!this.started || !/^[0-9]{10,32}$/.test(parentId) || !referencedId ||
+          !source?.durable || !history || String(history.direction || '') !== 'sent' ||
+          String(source.channelId || '') !== channelId || String(history.channelId || '') !== channelId ||
+          !source.messageCiphertext) return false;
+      // The opaque renderer accepts a 16..64 character base64url-style display
+      // id. Discord's parent id identifies this preview; the original wire id
+      // remains authenticated separately inside historyRecord.
+      const id = 'reply_' + parentId;
+      // This pending entry contains ciphertext only; its display id is separate
+      // from the wire-id authenticated by the original history envelope.
+      this.localEchoPending.set(id, {
+        channelId, messageId: parentId, messageIds: [parentId], referencedId,
+        durable: true, replyPreview: true,
+        historyRecord: JSON.parse(JSON.stringify(history)),
+        messageCiphertext: String(source.messageCiphertext),
+        createdAt: Date.now(),
+      });
+      if (!this.scheduleLocalEchoForMessage(replyingMessage, id)) {
+        this.localEchoPending.delete(id);
+        return false;
+      }
+      // The compact frame will replace this non-secret native fallback locally.
+      // No decrypted plaintext is copied into Discord's reply object.
+      try { referencedMessage.content = '🔒 Protected message'; } catch (_) {}
+      return true;
     },
 
     loadDurableLocalEchoEdit(active, echoId) {
@@ -63327,6 +67684,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
     scheduleLocalEchoForMessage(message, echoId) {
       const id = String(echoId || '');
+      if (!this.started) return false;
       if (!this.hasLocalEcho(id)) return false;
       const messageId = String(message?.id || '');
       const channelId = String(message?.channel_id || '');
@@ -63336,6 +67694,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // ArrowUp edit can ask the Secure Input iframe to restore its own cached
       // plaintext without ever copying that plaintext into the parent renderer.
       const pending = this.localEchoPending.get(id);
+      if (String(pending?.channelId || '') !== channelId) return false;
       if (pending) this.rememberLocalEchoMessageId(pending, messageId);
 
       if (this.localEchoMountTimers.has(id)) return true;
@@ -63439,8 +67798,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       this.rememberLocalEchoMessageId(pending, messageId);
       const frameRecord = {
         iframe,
+        ready: false,
         messageId: String(messageId || ''),
         channelId: pending.channelId,
+        accountId: String(Discord.getCurrentUser?.()?.id || ''),
         durable: !!pending.durable,
         createdAt: Date.now(),
         height: 22,
@@ -63481,7 +67842,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               {
                 type: 'sdc-local-history-init',
                 echoId,
-                theme: this.active?.theme || {},
+                compactPreview: !!pending.replyPreview,
+                ...secureLocalEchoPresentationForNode(contentNode, this.active?.theme || {}),
+                discordEmojiAliases: this.discordEmojiAliasEntries(),
+                discordChannelNavigation: !!this.discordChannelRouter(),
+                discordLocalLinkPreviews: this.discordLocalLinkPreviewEntries(),
                 discordEmojiAssets: this.discordNativeEmojiAssetEntries(),
                 highAssuranceNativeOnly: sdcHighAssuranceNativeCryptoEnabled(),
                 historyKey: keyBuffer,
@@ -63532,7 +67897,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             {
               type: 'sdc-local-echo-init',
               echoId,
-              theme: current.theme || {},
+              ...secureLocalEchoPresentationForNode(contentNode, current.theme || {}),
+              discordEmojiAliases: this.discordEmojiAliasEntries(),
+              discordChannelNavigation: !!this.discordChannelRouter(),
+              discordLocalLinkPreviews: this.discordLocalLinkPreviewEntries(),
               discordEmojiAssets: this.discordNativeEmojiAssetEntries(),
             },
             '*',
@@ -63567,8 +67935,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       return true;
     },
 
-    async submitTransport(channelId, transport, forceNative = false, offlineFileRecipientDeviceIds = null) {
-      const active = this.active;
+    async submitTransport(channelId, transport, forceNative = false, offlineFileRecipientDeviceIds = null, nativeSubmissionContext = null) {
+      const initialSendContext = captureSelfHistorySendContext(channelId);
+      const selfHistoryContext = await selfHistorySendContextForTransport(channelId, transport, initialSendContext);
+      const nativeOnlySubmission = nativeSubmissionContext != null;
+      if (nativeOnlySubmission) {
+        if (!forceNative || this.active || nativeSubmissionContext.nativeOnly !== true)
+          throw new Error('Native encrypted file context is only valid for an unmounted forced native submission');
+        this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
+      }
+      // A native-only file transaction keeps its captured context local. It
+      // never impersonates a mounted opaque Secure Input frame via this.active.
+      const active = nativeOnlySubmission ? nativeSubmissionContext : this.active;
 
       if (
         !active ||
@@ -63579,20 +67957,36 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         );
       }
 
+      // Validate complete ciphertext before any native state or Quiet-PQ enqueue
+      // changes. Reply/edit/upload paths share this standard-account boundary.
+      const transportBudget = assertSdcDiscordTransportBudget(
+        transport, this.getDiscordMessageContentLimit()
+      );
+
       // v68.0.20.3: Discord may expose the editor before its MessageQueue marks
       // the newly selected channel ready. Keep the encrypted draft inside the
       // Secure Input iframe and wait for the corresponding load-complete signal
       // instead of submitting ciphertext into a known-not-ready native queue.
-      await this.waitForChannelReady(channelId, active.instanceId);
+      await this.waitForChannelReady(channelId, active.instanceId, nativeSubmissionContext);
+      if (nativeOnlySubmission) {
+        if (this.active) throw new Error('Secure composer mounted during native encrypted file submission');
+        this.assertNativeEncryptedFileSubmitContext(nativeSubmissionContext);
+      } else if (this.active !== active || active.channelId !== channelId) {
+        throw new Error('secure composer changed channel while preparing native encrypted send');
+      }
 
       const nativeReplyPending =
-        this.hasPendingNativeReplyState();
+        nativeOnlySubmission
+          ? !!this.capturePendingNativeReplyContext(channelId)
+          : this.hasPendingNativeReplyState();
 
       const nativeEditPending =
         !!active.nativeEditModeArmed;
 
       const nativeAttachmentPending =
-        this.hasPendingNativeAttachmentState();
+        nativeOnlySubmission
+          ? !!this.getNativeEncryptedAttachmentBinding(channelId)?.count
+          : this.hasPendingNativeAttachmentState();
 
       // v67.1.110: ordinary Secure Input text is already a complete authenticated
       // ciphertext transport. Submit it straight to Discord's original queue.
@@ -63618,6 +68012,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         this.log('direct-final-ciphertext-submit', {
           channelId,
           textCryptoProtocol: active.textCryptoProtocol,
+          transportChars: transportBudget.characters,
+          transportUtf8Bytes: transportBudget.utf8Bytes,
+          transportContentLimit: transportBudget.characterLimit,
           transport: String(transport).startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX) ? 'SDC4QF' : (String(transport).startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ? 'SDC4Q' : (String(transport).startsWith(SDC4_WIRE_PREFIX) ? 'SDC4' : 'SDC3')),
         });
 
@@ -63643,14 +68040,29 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         await preparePqQuietControlsBeforeUserEnqueue(
           channelId,
           messageObject,
-          'secure-input-direct-final-before-original-enqueue'
+          'secure-input-direct-final-before-original-enqueue', selfHistoryContext.userIntent
         );
+        await assertSelfHistoryOutboundAuthorization(channelId, transport, selfHistoryContext);
 
-        const result = await Discord.original_enqueue.apply(
-          Discord.enqueueTarget,
-          [channelId, messageObject, undefined, options]
-        );
+        let result;
+        try {
+          result = await Discord.original_enqueue.apply(
+            Discord.enqueueTarget,
+            [channelId, messageObject, undefined, options]
+          );
+        } catch (error) {
+          await completeSelfHistoryOutboundTransport(channelId, transport, false, selfHistoryContext);
+          this.warn('discord-encrypted-send-rejected', {
+            channelId,
+            ...sdcDiscordSendFailureDetails(error),
+            transportChars: transportBudget.characters,
+            transportUtf8Bytes: transportBudget.utf8Bytes,
+            automaticRetry: false,
+          });
+          throw error;
+        }
 
+        await completeSelfHistoryOutboundTransport(channelId, transport, true, selfHistoryContext);
         return {
           mode: 'direct-final-ciphertext',
           token: null,
@@ -63681,14 +68093,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         new Promise((resolve) => {
           resolveObserved = resolve;
         });
+      // Resolve a value even on failure so a fast SDK rejection cannot become
+      // unhandled while the native token observation is still being awaited.
+      let resolveQueueResult;
+      const queueResultPromise = new Promise((resolve) => {
+        resolveQueueResult = resolve;
+      });
 
       const record = {
         token,
+        selfHistoryContext,
         channelId,
         transport,
         sent: false,
         createdAt: Date.now(),
         resolveObserved,
+        resolveQueueResult,
         offlineFileRecipientDeviceIds: offlineFileRecipients.slice(),
         // v70.10.11: Reply and upload state can coexist in Discord. The file
         // transaction is the stricter terminal path, so attachment must win over
@@ -63760,15 +68180,41 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ]);
 
       if (observed) {
-        setTimeout(
-          () => this.sendTokens.delete(token),
-          30000
-        );
-
-        return {
-          mode: 'native-ciphertext-pending-state',
-          token,
-        };
+        // The 4.2 s limit applies only to observing the native token. An SDK
+        // upload may take longer; keep the draft and consumed token while its
+        // existing Promise is pending, and never start an automatic retry.
+        try {
+          if (record.nativeMode !== 'edit') {
+            const outcome = await queueResultPromise;
+            if (!outcome.succeeded) {
+              this.warn('discord-encrypted-native-send-rejected', {
+                channelId,
+                nativeMode: record.nativeMode,
+                ...sdcDiscordSendFailureDetails(outcome.error),
+                transportChars: transportBudget.characters,
+                transportUtf8Bytes: transportBudget.utf8Bytes,
+                automaticRetry: false,
+              });
+              throw outcome.error || new Error('Discord native encrypted queue submission failed');
+            }
+            return {
+              mode: 'native-ciphertext-pending-state',
+              token,
+              queueAccepted: true,
+              result: outcome.result,
+            };
+          }
+          return {
+            mode: 'native-ciphertext-pending-state',
+            token,
+          };
+        } finally {
+          // Retain failed consumed tokens too: a second native callback cannot
+          // submit the same ciphertext again after an ambiguous SDK response.
+          setTimeout(() => {
+            if (this.sendTokens.get(token) === record) this.sendTokens.delete(token);
+          }, 30000);
+        }
       }
 
       // Do not execCommand-delete the Slate editor on failure. Restore focus to
@@ -65810,6 +70256,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           seedText: active.initialNativeDraft !== ''
             ? active.initialNativeDraft
             : '',
+          discordEmojiAliases: this.discordEmojiAliasEntries(),
           mentionCandidates: Array.isArray(active.mentionCandidates) ? active.mentionCandidates : [],
         },
         '*',
@@ -66972,6 +71419,31 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     async mount(config, editor) {
       this.unmount('replace');
       this.perf.mounts++;
+      const generation = Number(this.mountGeneration || 0);
+      // Deriving the isolated frame keys can outlive a channel switch, an
+      // import or Stop(). Only this exact mount may commit its native surface.
+      config = { ...config };
+      const mountTarget = {
+        generation, editor, ...config,
+        textCryptoProtocol: this.getSecureTextCryptoProtocol(config.channelId),
+        database: DataBase, databaseKey: Cache.dbKey,
+        keyRecord: DataBase?.keys?.[config.keyHash],
+        accountId: String(Discord.getCurrentUser()?.id || ''),
+      };
+      this.pendingSecureMount = mountTarget;
+      const isMountCurrent = () => {
+        if (!this.started || this.pendingSecureMount !== mountTarget ||
+            Number(this.mountGeneration || 0) !== generation || !editor?.isConnected ||
+            DataBase !== mountTarget.database || Cache.dbKey !== mountTarget.databaseKey ||
+            DataBase?.keys?.[config.keyHash] !== mountTarget.keyRecord ||
+            String(Discord.getCurrentUser()?.id || '') !== mountTarget.accountId) return false;
+        const current = this.getCurrentConfig();
+        return !!current && String(current.channelId) === String(config.channelId) &&
+          current.keyHash === config.keyHash && current.cryptoProtocol === config.cryptoProtocol &&
+          this.getSecureTextCryptoProtocol(config.channelId) === mountTarget.textCryptoProtocol;
+      };
+      const mountKeyMaterial = new Set();
+      let mountCommitted = false;
 
       const instanceId = (() => {
         const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -66998,7 +71470,6 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // contenteditable. Keep the normal encrypted-composer liseré visible on
       // the underlying Discord surface without adding any layout space.
       const secureRingHost = composerRoot || editor.closest?.(ChatInputSelector) || null;
-      try { secureRingHost?.classList?.add('SDC_SECURE_RING'); } catch (_) {}
 
       const initialNativeDraft =
         this.nativeEditorText(editor);
@@ -67054,6 +71525,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         crypto.getRandomValues(
           new Uint8Array(32)
         );
+      mountKeyMaterial.add(draftSalt);
 
       let frameUrl = null;
       let iframe = null;
@@ -67063,16 +71535,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           await Utils.GetKeyBytesByHash(
             config.keyHash
           );
-
-        const rawKey =
-          new Uint8Array(
-            rawKeyBuffer
-          ).slice();
+        const exportedKey = rawKeyBuffer instanceof Uint8Array
+          ? rawKeyBuffer : new Uint8Array(rawKeyBuffer);
+        const rawKey = exportedKey.slice();
+        try { exportedKey.fill(0); } catch (_) {}
+        mountKeyMaterial.add(rawKey);
+        if (!isMountCurrent()) return false;
 
         const channelKey =
           await Utils.GetKeyByHash(
             config.keyHash
           );
+        if (!isMountCurrent()) return false;
 
         if (!channelKey) {
           throw new Error(
@@ -67089,18 +71563,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           channelKey,
           config.channelId
         );
+        mountKeyMaterial.add(networkKeyId);
+        if (!isMountCurrent()) return false;
 
-        const textCryptoProtocol =
-          this.getSecureTextCryptoProtocol(
-            config.channelId
-          );
+        const textCryptoProtocol = mountTarget.textCryptoProtocol;
 
         const historyLocalDevice = textCryptoProtocol === 4
           ? await ensureLocalDeviceIdentity()
           : null;
+        if (!isMountCurrent()) return false;
         const sdc4HistoryKey = textCryptoProtocol === 4
           ? await deriveSdc4HistoryKeyBytes(historyLocalDevice)
           : null;
+        if (sdc4HistoryKey) mountKeyMaterial.add(sdc4HistoryKey);
+        if (!isMountCurrent()) return false;
         let pdDecoyFrameKey = null;
         let pdDecoyFrameContext = null;
         if (textCryptoProtocol === 5) {
@@ -67109,12 +71585,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (!peerRecord || normalizePeerSecurityState(peerRecord) !== PEER_SECURITY_STATE.DURESS_SUSPECTED || !peerRecord.duressDecoy)
             throw new Error('Secure Input constrained-peer state disappeared before mount');
           const local = await ensureLocalDeviceIdentity();
+          if (!isMountCurrent()) return false;
           const pairContext = pdDecoyPairContext(ownerId, senderId, config.channelId, local.deviceId);
           pdDecoyFrameKey = await derivePdDecoyPairKey(
             local.privateKey,
             Utils.Base64urlToBytes(String(peerRecord.duressDecoy.publicKey || '')),
             pairContext
           );
+          mountKeyMaterial.add(pdDecoyFrameKey);
+          if (!isMountCurrent()) return false;
           pdDecoyFrameContext = {
             ownerId: String(ownerId),
             peerId: String(senderId),
@@ -67129,6 +71608,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           draftSalt,
           textCryptoProtocol
         );
+        for (const key of Object.values(frameKeys || {})) mountKeyMaterial.add(key);
+        if (!isMountCurrent() || this.nativeEditorText(editor) !== initialNativeDraft) return false;
         // Master channel bytes are not transferred to the opaque sandbox.
         // Only per-purpose v3/draft keys are handed off; SDC4 text gets one-shot MKs later.
         rawKey.fill(0);
@@ -67323,14 +71804,6 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           // require an empty native draft before switching to Secure Input.
           this.active = null;
 
-          try {
-            iframe?.remove?.();
-          } catch (_) {}
-
-          try {
-            if (frameUrl) URL.revokeObjectURL(frameUrl);
-          } catch (_) {}
-
           try { secureRingHost?.classList?.remove('SDC_SECURE_RING'); } catch (_) {}
           this.restoreNativeEditorState(editor, nativeState);
 
@@ -67371,6 +71844,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         // Native composer is genuinely empty, so any previous deferred state
         // is resolved and Secure Input may mount normally.
         this.deferredNativeDraft = null;
+        try { secureRingHost?.classList?.add('SDC_SECURE_RING'); } catch (_) {}
 
         this.protectNativeEditor(
           editor
@@ -67532,18 +72006,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             }
           }
         }, 1800);
+        mountCommitted = true;
+        return true;
       } catch (error) {
-        try {
-          iframe?.remove?.();
-        } catch (_) {}
-
-        if (frameUrl) {
-          try {
-            URL.revokeObjectURL(
-              frameUrl
-            );
-          } catch (_) {}
-        }
+        // A cancelled derivation may reject later. It must never clear a newer
+        // mount's active state, restore its editor or disable the current DM.
+        if (!isMountCurrent()) return false;
 
         try { secureRingHost?.classList?.remove('SDC_SECURE_RING'); } catch (_) {}
 
@@ -67552,7 +72020,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           nativeState
         );
 
-        this.active = null;
+        if (this.active?.iframe === iframe) {
+          this.unmount('mount-preframe-error');
+          iframe = null;
+          frameUrl = null;
+        }
 
         const mountFailureReason =
           error?.message || String(error);
@@ -67578,6 +72050,15 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           error?.message ||
             'Secure Input mount failed'
         );
+      } finally {
+        if (this.pendingSecureMount === mountTarget) this.pendingSecureMount = null;
+        if (!mountCommitted) {
+          for (const bytes of mountKeyMaterial) {
+            try { bytes?.fill?.(0); } catch (_) {}
+          }
+          try { iframe?.remove?.(); } catch (_) {}
+          try { if (frameUrl) URL.revokeObjectURL(frameUrl); } catch (_) {}
+        }
       }
     },
 
@@ -67601,6 +72082,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     },
 
     unmount(reason = 'unknown') {
+      // Invalidate derivations even before they have assigned this.active.
+      this.mountGeneration = Number(this.mountGeneration || 0) + 1;
+      this.pendingSecureMount = null;
       const active = this.active;
       this.active = null;
       this.hideSecureMentionPopup();
@@ -67902,8 +72386,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               reason: error?.message || String(error),
             });
           }
-          this.unmount('chat-control-disabled');
         }
+        this.unmount('chat-control-disabled');
         if (!DuressRuntime.active) {
           this.log('chat-control-disabled-immediate', {
             channelId: Cache.channelId || null,
@@ -67945,22 +72429,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       if (!config) {
         this.deferredNativeDraft = null;
-
-        if (this.active) {
-          const encryptionEnabled =
-            !!Utils.GetCurrentChannelEncrypt();
-
-          const chatControlEnabled =
-            !!Utils.GetCurrentChatControlProtection();
-
-          this.unmount(
-            !encryptionEnabled
-              ? 'encryption-disabled'
-              : !chatControlEnabled
-                ? 'chat-control-disabled'
-                : 'secure-config-unavailable'
-          );
-        }
+        const encryptionEnabled = !!Utils.GetCurrentChannelEncrypt();
+        const chatControlEnabled = !!Utils.GetCurrentChatControlProtection();
+        this.unmount(
+          !encryptionEnabled ? 'encryption-disabled'
+            : !chatControlEnabled ? 'chat-control-disabled' : 'secure-config-unavailable'
+        );
 
         return;
       }
@@ -68059,6 +72533,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       if (!editor) {
         if (this.active?.editor && !this.active.editor.isConnected) {
           this.unmount('composer-replaced');
+        } else if (this.pendingSecureMount) {
+          this.unmount('composer-unavailable-during-mount');
         }
         return;
       }
@@ -68317,6 +72793,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         return;
       }
 
+      const pendingMount = this.pendingSecureMount;
+      if (pendingMount && Number(pendingMount.generation) === Number(this.mountGeneration) &&
+          pendingMount.editor === editor && pendingMount.channelId === config.channelId &&
+          pendingMount.keyHash === config.keyHash && pendingMount.cryptoProtocol === config.cryptoProtocol &&
+          pendingMount.textCryptoProtocol === this.getSecureTextCryptoProtocol(config.channelId) &&
+          pendingMount.database === DataBase && pendingMount.databaseKey === Cache.dbKey &&
+          pendingMount.keyRecord === DataBase?.keys?.[config.keyHash] &&
+          pendingMount.accountId === String(Discord.getCurrentUser()?.id || '')) return;
       await this.mount(config, editor);
     },
 
@@ -68345,9 +72829,23 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       this.messageListener = async (event) => {
         const data = event.data || {};
 
+        if (data.type === 'sdc-local-echo-channel-link') {
+          const record = this.localEchoFrames.get(String(data.echoId || '')) || this.discordLinkPreviewFrames.get(String(data.echoId || ''));
+          if (!record?.iframe?.contentWindow || event.source !== record.iframe.contentWindow) return;
+          const path = safeDiscordChannelLinkPath('https://discord.com' + String(data.path || ''));
+          if (!path || path !== String(data.path || '')) return;
+          this.navigateDiscordLocalMessageLink(path,record);
+          return;
+        }
+
+        if (data.type === 'sdc-local-echo-discord-preview-request') {
+          await this.handleDiscordLocalLinkPreviewRequest(event, data);
+          return;
+        }
+
         if (data.type === 'sdc-local-echo-wheel') {
           const echoId = String(data.echoId || '');
-          const record = this.localEchoFrames.get(echoId);
+          const record = this.localEchoFrames.get(echoId) || this.discordLinkPreviewFrames.get(echoId);
           if (!record?.iframe?.contentWindow || event.source !== record.iframe.contentWindow) return;
           const viewport = record.viewportElement;
           if (!viewport) return;
@@ -68371,6 +72869,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ) {
           return;
         }
+
+        const messageContext = this.captureSecureFileSubmitContext(active);
+        // Async crypto/native submission can complete after navigation or import.
+        // Commands and draft cleanup belong only to the originating mount.
+        const frameCommandForActive = (command, payload) => {
+          if (this.isSecureFileSubmitContextCurrent(messageContext))
+            this.frameCommand(command, payload);
+        };
+        const clearEncryptedDraftForActive = () => {
+          if (this.isSecureFileSubmitContextCurrent(messageContext))
+            this.encryptedDrafts.delete(active.channelId);
+        };
 
         const sourceMatches =
           event.source === active.iframe.contentWindow;
@@ -68413,7 +72923,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           const kind = data.kind === 'channel' ? 'channel' : 'user';
           const id = String(data.id || '');
           const resolved = this.resolveSecureCanonicalMention(kind, id);
-          this.frameCommand('canonical-mention-resolved', {
+          frameCommandForActive('canonical-mention-resolved', {
             kind,
             id,
             bang: data.bang === true,
@@ -68443,6 +72953,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             String(data.echoId || ''),
             {
               height: Number(data.height || 22),
+              ready: data.ready === true,
               tailLeft: Number(data.tailLeft),
               tailTop: Number(data.tailTop),
               tailBottom: Number(data.tailBottom),
@@ -68572,7 +73083,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             active
           );
 
-          this.frameCommand(
+          frameCommandForActive(
             'focus'
           );
 
@@ -68626,7 +73137,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               }
             );
 
-            this.frameCommand(
+            frameCommandForActive(
               'focus'
             );
           }
@@ -68657,7 +73168,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               );
             }
 
-            this.frameCommand(
+            frameCommandForActive(
               'focus'
             );
           } catch (error) {
@@ -68679,7 +73190,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               'error'
             );
 
-            this.frameCommand(
+            frameCommandForActive(
               'focus'
             );
           }
@@ -68792,9 +73303,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             'sdc-secure-draft-ciphertext'
         ) {
           if (data.empty) {
-            this.encryptedDrafts.delete(
-              active.channelId
-            );
+            clearEncryptedDraftForActive();
           } else if (
             data.ciphertext
           ) {
@@ -68848,6 +73357,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         ) {
           const requestId = String(data.requestId || '');
           let grant = null;
+          const outboundContext = captureSelfHistorySendContext(active.channelId);
+          SelfHistorySandboxContexts.set(String(active.instanceId) + '|' + requestId, outboundContext);
+          while (SelfHistorySandboxContexts.size > 128) SelfHistorySandboxContexts.delete(SelfHistorySandboxContexts.keys().next().value);
           try {
             if (
               Object.prototype.hasOwnProperty.call(data, 'plaintext') ||
@@ -68894,9 +73406,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             // v70.10.1 zero-touch convergence must run before ANY SDC4 reservation
             // or offline-grant decision. It sees no plaintext and is triggered only
             // by this authenticated sandbox user-send request.
+            const controlUserIntent = outboundContext.userIntent;
             await ensureQuietPqCapabilityBeforeProtectedUserBuild(
               active.channelId,
-              'secure-input-before-sdc4-reservation'
+              'secure-input-before-sdc4-reservation',
+              controlUserIntent
             );
             // v70.3.8: Secure Input must not emit a forced readiness bundle per
             // keypress/send attempt. Existing device/PQ announcements are driven by
@@ -68917,6 +73431,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             if (!liveCoverageBeforeReservation.complete &&
                 liveCoverageBeforeReservation.missingLiveDeviceIds.length > 0) {
               try {
+                if (this.requestOversizedOfflineSdc4TextFile(active, requestId, effectivePlainUtf8Bytes,
+                  !!attachmentScopedKeyIdForRequest || fileFsDescriptorsForRequest.length > 0)) return;
                 const offline = await this.prepareSandboxSdc4qOfflineGrantBatch(active, {
                   requestId,
                   plainUtf8Bytes: effectivePlainUtf8Bytes,
@@ -68971,6 +73487,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               // timeout. Prepare the opaque offline grant immediately and let one
               // heavily rate-limited lost-ACK recovery run in the background.
               try {
+                if (this.requestOversizedOfflineSdc4TextFile(active, requestId, effectivePlainUtf8Bytes,
+                  !!attachmentScopedKeyIdForRequest || fileFsDescriptorsForRequest.length > 0)) return;
                 const offline = await this.prepareSandboxSdc4qOfflineGrantBatch(active, {
                   requestId,
                   plainUtf8Bytes: effectivePlainUtf8Bytes,
@@ -69010,6 +73528,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             } catch (pqError) {
               if (pqError?.code !== 'SDC4_PQ_RATCHET_REQUIRED_UNAVAILABLE' &&
                   pqError?.code !== 'SDC4_PQ_RATCHET_PEER_CONFIRMATION_PENDING') throw pqError;
+              if (this.requestOversizedOfflineSdc4TextFile(active, requestId, effectivePlainUtf8Bytes,
+                !!attachmentScopedKeyIdForRequest || fileFsDescriptorsForRequest.length > 0)) return;
               const offline = await this.prepareSandboxSdc4qOfflineGrantBatch(active, {
                 requestId, plainUtf8Bytes: effectivePlainUtf8Bytes, offlineFileDescriptorIds,
               });
@@ -69087,8 +73607,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                   previewOnly: false,
                   transactionCommitted: true,
                 });
-                this.frameCommand('failed');
-                this.frameCommand('focus');
+                frameCommandForActive('failed');
+                frameCommandForActive('focus');
                 return;
               }
 
@@ -69138,7 +73658,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               requestId,
               plainLength: Number(data.plainLength || 0),
               klipyUrls: Array.isArray(data.klipyUrls) ? data.klipyUrls : [],
-            });
+            }, controlUserIntent);
 
             const mk = grant.messageKey;
             const aad = grant.aad;
@@ -69156,8 +73676,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 headerN: Number(grant.record.header?.n),
                 persistedBeforeBurn: true,
               });
-              this.frameCommand('failed');
-              this.frameCommand('focus');
+              frameCommandForActive('failed');
+              frameCommandForActive('focus');
               return;
             }
 
@@ -69211,8 +73731,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               requestId,
               reason: error?.message || String(error),
             });
-            this.frameCommand('failed');
-            this.frameCommand('focus');
+            frameCommandForActive('failed');
+            frameCommandForActive('focus');
             this.toast(
               'SDC Secure Input : réservation SDC4 impossible. Le texte reste dans la zone sécurisée.',
               'error'
@@ -69298,7 +73818,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 requestId,
                 createdAt: Date.now(),
               });
-              this.frameCommand('retain-local-echo', { echoId: firstEchoId, requestId });
+              frameCommandForActive('retain-local-echo', { echoId: firstEchoId, requestId });
             }
 
             if (finalized.length === 1) {
@@ -69308,7 +73828,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 transport,
                 finalized[0].wire,
                 finalized[0].wireId,
-                this.getDiscordMessageContentLimit()
+                this.getDiscordMessageContentLimit(), selfHistorySandboxContext(active, requestId)
               );
               transport = inlineSiblingCopy.transport;
               if (offlineFileSend) {
@@ -69337,6 +73857,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               await enqueueHybridAsyncMultiDeviceFanout(active.channelId, {
                 multiMessageFanout: true,
                 hybridOffline: true,
+                selfHistorySendContext: selfHistorySandboxContext(active, requestId),
                 fanoutVersion: SDC_HYBRID_ASYNC_FANOUT_VERSION,
                 batchId,
                 peerId,
@@ -69360,8 +73881,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               }
             }
 
-            this.encryptedDrafts.delete(active.channelId);
-            this.frameCommand('sent');
+            clearEncryptedDraftForActive();
+            frameCommandForActive('sent');
             this.log('sdc4q-offline-send-complete', {
               channelId: active.channelId,
               requestId,
@@ -69386,14 +73907,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               // Never transparently retry the batch: that could duplicate authenticated
               // recipient wrappers. Keep any native encrypted file card queued so the
               // user can make a fresh file send with fresh metadata.
-              this.encryptedDrafts.delete(active.channelId);
-              this.frameCommand('sent');
+              clearEncryptedDraftForActive();
+              frameCommandForActive('sent');
               this.warn('sdc4qf-offline-file-carrier-submit-failed-after-metadata', {
                 channelId: active.channelId,
                 requestId,
                 batchId,
                 metadataPartsSent: offlineFanoutPartsSent,
-                reason: error?.message || String(error),
+                ...sdcDiscordSendFailureDetails(error),
                 automaticRetrySuppressed: true,
               });
               this.toast('SDC Secure Input : métadonnées SDC4QF envoyées mais le fichier n’a pas été soumis. Réenvoie la pièce jointe ; aucun fallback SDC3 n’a été utilisé.', 'error');
@@ -69401,17 +73922,22 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             }
             if (firstEchoId) {
               this.localEchoPending.delete(firstEchoId);
-              this.frameCommand('discard-local-echo', { echoId: firstEchoId });
+              frameCommandForActive('discard-local-echo', { echoId: firstEchoId });
             }
             this.warn('sdc4q-offline-send-failed', {
               channelId: active.channelId,
               requestId,
               batchId,
-              reason: error?.message || String(error),
+              ...sdcDiscordSendFailureDetails(error),
             });
-            this.frameCommand('failed');
-            this.frameCommand('focus');
-            this.toast('SDC Secure Input : SDC4Q hors-ligne indisponible. Le texte reste dans la zone sécurisée.', 'error');
+            frameCommandForActive('failed');
+            frameCommandForActive('focus');
+            this.toast(
+              sdcDiscordSendFailureDetails(error).httpStatus === 413
+                ? 'SDC Secure Input : Discord a refusé la taille du paquet chiffré. Le brouillon reste dans la zone sécurisée.'
+                : 'SDC Secure Input : envoi SDC4Q impossible. Le texte reste dans la zone sécurisée.',
+              'error'
+            );
           }
           return;
         }
@@ -69616,7 +74142,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 discordTransportLimit,
                 burnedRecipientCount: fanoutEntries.length,
               });
-              this.frameCommand('send-pending-as-file', { requestId });
+              frameCommandForActive('send-pending-as-file', { requestId });
               return;
             }
 
@@ -69639,7 +74165,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               transport,
               normalizedLocalEchoWire,
               localEchoId,
-              discordTransportLimit
+              discordTransportLimit, selfHistorySandboxContext(active, requestId)
             );
             transport = inlineSiblingCopy.transport;
 
@@ -69650,7 +74176,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               requestId,
               createdAt: Date.now(),
             });
-            this.frameCommand('retain-local-echo', {
+            frameCommandForActive('retain-local-echo', {
               echoId: localEchoId,
               requestId,
             });
@@ -69693,14 +74219,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               result = await this.submitTransport(active.channelId, transport);
             } catch (submitError) {
               this.localEchoPending.delete(localEchoId);
-              this.frameCommand('discard-local-echo', { echoId: localEchoId });
+              frameCommandForActive('discard-local-echo', { echoId: localEchoId });
               try { await deleteSdc4HistoryRecord(localEchoId); } catch (_) {}
               persistedHistoryId = null;
               throw submitError;
             }
 
-            this.encryptedDrafts.delete(active.channelId);
-            this.frameCommand('sent');
+            clearEncryptedDraftForActive();
+            frameCommandForActive('sent');
             this.log('send-complete', {
               channelId: active.channelId,
               mode: result.mode,
@@ -69725,20 +74251,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             }
             if (localEchoId) {
               this.localEchoPending.delete(localEchoId);
-              this.frameCommand('discard-local-echo', { echoId: localEchoId });
+              frameCommandForActive('discard-local-echo', { echoId: localEchoId });
             }
             if (persistedHistoryId) {
               try { await deleteSdc4HistoryRecord(persistedHistoryId); } catch (_) {}
             }
-            this.frameCommand('failed');
-            this.frameCommand('focus');
+            frameCommandForActive('failed');
+            frameCommandForActive('focus');
             this.warn('sdc4-operational-fanout-failed', {
               channelId: active.channelId,
               batchId,
               consumedRecipientCount: consumedRecords.length,
               ratchetPositionsBurned: true,
               parentPlaintextReceived: false,
-              reason: error?.message || String(error),
+              ...sdcDiscordSendFailureDetails(error),
             });
             this.toast(
               'SDC multi-device : envoi fan-out impossible. Les positions ratchet réservées sont brûlées; le texte reste dans la zone sécurisée.',
@@ -69848,7 +74374,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 discordTransportLimit,
                 burnedReservation: true,
               });
-              this.frameCommand('send-pending-as-file', {
+              frameCommandForActive('send-pending-as-file', {
                 requestId: record.requestId,
               });
               return;
@@ -69880,7 +74406,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               localEchoId,
               active.channelId,
               record.requestId,
-              historyEnvelope
+              historyEnvelope,
+              ciphertext
             );
             persistedHistoryId = localEchoId;
             const inlineSiblingCopy = await appendInlineSelfHistoryCapsules(
@@ -69888,7 +74415,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               transport,
               normalizedLocalEchoWire,
               localEchoId,
-              discordTransportLimit
+              discordTransportLimit, selfHistorySandboxContext(active, record.requestId)
             );
             transport = inlineSiblingCopy.transport;
 
@@ -69901,7 +74428,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             });
             // Snapshot the plaintext inside the opaque frame before Discord can
             // dispatch our own ciphertext message back into the render path.
-            this.frameCommand('retain-local-echo', {
+            frameCommandForActive('retain-local-echo', {
               echoId: localEchoId,
               requestId: record.requestId,
             });
@@ -69911,13 +74438,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               result = await this.submitTransport(active.channelId, transport);
             } catch (submitError) {
               this.localEchoPending.delete(localEchoId);
-              this.frameCommand('discard-local-echo', { echoId: localEchoId });
+              frameCommandForActive('discard-local-echo', { echoId: localEchoId });
               try { await deleteSdc4HistoryRecord(localEchoId); } catch (_) {}
               persistedHistoryId = null;
               throw submitError;
             }
-            this.encryptedDrafts.delete(active.channelId);
-            this.frameCommand('sent');
+            clearEncryptedDraftForActive();
+            frameCommandForActive('sent');
 
             this.log('send-complete', {
               channelId: active.channelId,
@@ -69937,13 +74464,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             if (persistedHistoryId) {
               try { await deleteSdc4HistoryRecord(persistedHistoryId); } catch (_) {}
             }
-            this.frameCommand('failed');
-            this.frameCommand('focus');
+            frameCommandForActive('failed');
+            frameCommandForActive('focus');
             this.warn('sdc4-sandbox-send-failed', {
               channelId: active.channelId,
               reservationId,
               burned: true,
-              reason: error?.message || String(error),
+              ...sdcDiscordSendFailureDetails(error),
             });
             this.toast(
               'SDC Secure Input : envoi SDC4 isolé impossible. La clé réservée est brûlée; le texte reste dans la zone sécurisée.',
@@ -69966,7 +74493,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             if (!peerRecord || normalizePeerSecurityState(peerRecord) !== PEER_SECURITY_STATE.DURESS_SUSPECTED || !peerRecord.duressDecoy)
               throw new Error('Authenticated constrained-peer SDCD1 state is no longer active');
             if (Number(data.plainLength || 0) === 0) {
-              this.frameCommand('failed'); this.frameCommand('focus'); return;
+              frameCommandForActive('failed'); frameCommandForActive('focus'); return;
             }
             const transport = await finalizePeerToDuressOwnerDecoyCiphertext(
               active.channelId,
@@ -69980,8 +74507,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               this.getDiscordMessageContentLimit()
             );
             const result = await this.submitTransport(active.channelId, transport);
-            this.encryptedDrafts.delete(active.channelId);
-            this.frameCommand('sent');
+            clearEncryptedDraftForActive();
+            frameCommandForActive('sent');
             this.log('send-complete', {
               channelId: active.channelId,
               mode: result.mode,
@@ -70002,13 +74529,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 parentPlaintextReceived: false,
                 composerMountPinned: true,
               });
-              this.frameCommand('send-pending-decoy-as-file');
+              frameCommandForActive('send-pending-decoy-as-file');
               return;
             }
-            this.frameCommand('failed'); this.frameCommand('focus');
+            frameCommandForActive('failed'); frameCommandForActive('focus');
             this.warn('sdcd1-secure-input-send-failed', {
               channelId: active.channelId,
-              reason,
+              ...sdcDiscordSendFailureDetails(error),
             });
             this.toast('SDC Secure Input : envoi SDCD1 impossible. Le brouillon sécurisé est conservé.', 'error');
           }
@@ -70043,8 +74570,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               transport,
               Number(data.plainLength || 0)
             );
-            this.encryptedDrafts.delete(active.channelId);
-            this.frameCommand('sent');
+            clearEncryptedDraftForActive();
+            frameCommandForActive('sent');
             this.log('send-complete', {
               channelId: active.channelId,
               mode: result.mode,
@@ -70054,10 +74581,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               transport: 'SDCD1+encrypted-message.txt',
             });
           } catch (error) {
-            this.frameCommand('failed'); this.frameCommand('focus');
+            frameCommandForActive('failed'); frameCommandForActive('focus');
             this.warn('sdcd1-secure-input-file-send-failed', {
               channelId: active.channelId,
-              reason: error?.message || String(error),
+              ...sdcDiscordSendFailureDetails(error),
             });
             this.toast('SDC Secure Input : envoi du message.txt SDCD1 chiffré impossible. Le brouillon sécurisé est conservé.', 'error');
           }
@@ -70069,7 +74596,16 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             'sdc-secure-send-file-ciphertext'
         ) {
           let fileKey = null;
+          const fileSendContext = SelfHistorySandboxContexts.get(String(active.instanceId) + '|' + String(data.requestId || '')) || captureSelfHistorySendContext(active.channelId);
+          const transactionContext = this.captureSecureFileSubmitContext(active);
+          let fileSubmitPinned = false;
+          let fileSubmitSucceeded = false;
           try {
+            this.assertSecureFileSubmitContext(transactionContext);
+            this.assertOfflineTextFileFallbackContext(active, data);
+            active.nativeSecureFileSubmitInProgress = true;
+            active.nativeSecureFileSubmitStartedAt = Date.now();
+            fileSubmitPinned = true;
             const fileCiphertext = new Uint8Array(data.fileCiphertext || new ArrayBuffer(0));
             fileKey = new Uint8Array(data.fileKey || new ArrayBuffer(0));
             const logicalId = String(data.logicalId || '');
@@ -70077,6 +74613,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             if (fileKey.byteLength !== 32 || !/^[A-Za-z0-9_-]{22}$/.test(logicalId) || !isSdc4FileFsBody(fileCiphertext))
               throw new Error('invalid Secure Input forward-secret message.txt package');
             const bodyHash = await sdc4FileFsBodyHash(fileCiphertext);
+            this.assertSecureFileSubmitContext(transactionContext);
             const descriptor = normalizeSdc4FileFsDescriptors([{
               v: 1,
               i: logicalId,
@@ -70085,7 +74622,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               n: originalFilename,
               z: fileCiphertext.byteLength,
             }])[0];
-            rememberSdc4FileFsKey(active.channelId, descriptor);
+            await rememberSdc4FileFsKey(active.channelId, descriptor);
 
             const longFileChannel = Discord.getChannel(String(active.channelId || ''));
             let transport = null;
@@ -70101,19 +74638,27 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 transport = await encryptRatchetV4Text(active.channelId, carrierPlaintext, { attachmentScopedKeyId: null });
               } catch (error) {
                 if (error?.code !== 'SDC4_PQ_RATCHET_REQUIRED_UNAVAILABLE' &&
-                    error?.code !== 'SDC4_PQ_RATCHET_PEER_CONFIRMATION_PENDING') throw error;
+                    error?.code !== 'SDC4_PQ_RATCHET_PEER_CONFIRMATION_PENDING' &&
+                    error?.code !== 'SDC4_ACTIVE_DEVICE_SET_INCOMPLETE') throw error;
               }
               if (!transport) {
+                this.assertSecureFileSubmitContext(transactionContext);
                 const offlineBuilt = await buildSdc4OfflineFileDelivery(active.channelId, '', [descriptor]);
+                offlineBuilt.selfHistorySendContext = fileSendContext;
                 offlineRecipientDeviceIds = offlineBuilt.recipientDeviceIds.slice();
                 if (offlineBuilt?.multiMessageFanout === true) {
-                  await enqueueHybridAsyncMultiDeviceFanout(active.channelId, offlineBuilt, 'secure-input-long-file-offline');
+                  this.assertSecureFileSubmitContext(transactionContext);
+                  this.assertOfflineTextFileFallbackContext(active, data);
+                  await enqueueHybridAsyncMultiDeviceFanout(active.channelId, offlineBuilt, 'secure-input-long-file-offline',
+                    this.capturePendingNativeReplyContext(active.channelId));
                   transport = encodeSdc4FileFsDetachedCarrier(offlineBuilt.batchId);
                 } else {
                   transport = String(offlineBuilt.wire || '') + ' `🔒`';
                 }
               }
               if (!transport) throw new Error('No LIVE SDC4 or authenticated SDC4Q/SDC4QF file-key delivery path is available for forward-secret message.txt');
+              const primaryWire = selfHistoryWireFromTransport(transport);
+              if (primaryWire) transport = (await appendInlineSelfHistoryCapsules(active.channelId, transport, primaryWire, null, 1950, fileSendContext)).transport;
             } else {
               // Lot 3D: public/GROUP long-text file fallback keeps plaintext inside
               // the opaque iframe. The parent receives only the random per-file CEK
@@ -70137,6 +74682,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 }
                 const senderId = canonicalDiscordSnowflake(Discord.getCurrentUser()?.id, 'GROUP long-file sender account id');
                 const wrapped = await wrapGroupFileFsCek(epoch, fileKey, active.channelId, senderId, Number(groupMeta.generation), logicalId);
+                this.assertSecureFileSubmitContext(transactionContext);
                 groupFileFsDescriptor = { v: 1, g: Number(groupMeta.generation), i: logicalId, w: wrapped };
                 const carrierMessage = { content: '', tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
                 await handleSend(active.channelId, carrierMessage, true, false, null, null, [groupFileFsDescriptor]);
@@ -70153,6 +74699,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               }
             }
 
+            this.assertSecureFileSubmitContext(transactionContext);
+            this.assertOfflineTextFileFallbackContext(active, data);
             const result = await this.uploadSecureCiphertextFile(
               active.channelId,
               encryptedFilename,
@@ -70164,8 +74712,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               offlineRecipientDeviceIds
             );
 
-            this.encryptedDrafts.delete(active.channelId);
-            this.frameCommand('sent');
+            this.assertSecureFileSubmitContext(transactionContext);
+            fileSubmitSucceeded = true;
+            clearEncryptedDraftForActive();
+            frameCommandForActive('sent');
             this.log('send-complete', {
               channelId: active.channelId,
               mode: result.mode,
@@ -70174,11 +74724,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               longTextEditable: false,
             });
           } catch (error) {
-            this.frameCommand('failed');
-            this.frameCommand('focus');
+            if (this.isSecureFileSubmitContextCurrent(transactionContext)) {
+              frameCommandForActive('failed');
+              frameCommandForActive('focus');
+            }
             this.warn('secure-file-send-failed', {
               channelId: active.channelId,
-              reason: error?.message || String(error),
+              ...sdcDiscordSendFailureDetails(error),
             });
             this.toast(
               'SDC Secure Input : envoi du fichier chiffré impossible. Le brouillon sécurisé est conservé.',
@@ -70186,6 +74738,13 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             );
           } finally {
             try { fileKey?.fill?.(0); } catch (_) {}
+            if (fileSubmitPinned) {
+              active.nativeSecureFileSubmitInProgress = false;
+              active.nativeSecureFileSubmitStartedAt = 0;
+              if (!fileSubmitSucceeded) active.nativeAttachmentDomIgnoreUntil = 0;
+              active.offlineTextFileFallbackRequestId = null;
+              this.RefreshSoon(0);
+            }
           }
           return;
         }
@@ -70242,11 +74801,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               }
             );
 
-            this.frameCommand(
+            frameCommandForActive(
               'failed'
             );
 
-            this.frameCommand(
+            frameCommandForActive(
               'focus'
             );
 
@@ -70297,7 +74856,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 discordTransportLimit: this.getDiscordMessageContentLimit(),
                 groupFileEpochEligible: hasActiveGroupFileFsEpoch(String(Utils.GetChannelConfig(active.channelId)?.k || '')),
               });
-              this.frameCommand('send-pending-as-file');
+              frameCommandForActive('send-pending-as-file');
               return;
             }
 
@@ -70307,12 +74866,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 readyTransport
               );
 
-            this.encryptedDrafts.delete(
-              active.channelId
-            );
+            clearEncryptedDraftForActive();
 
             // Native Discord editor was never used for ordinary text sends.
-            this.frameCommand(
+            frameCommandForActive(
               'sent'
             );
 
@@ -70328,11 +74885,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               }
             );
           } catch (error) {
-            this.frameCommand(
+            frameCommandForActive(
               'failed'
             );
 
-            this.frameCommand(
+            frameCommandForActive(
               'focus'
             );
 
@@ -70341,9 +74898,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               {
                 channelId:
                   active.channelId,
-                reason:
-                  error?.message ||
-                  String(error)
+                ...sdcDiscordSendFailureDetails(error),
               }
             );
 
@@ -70370,7 +74925,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             this.RefreshSoon(0);
           }
 
-          this.frameCommand(
+          frameCommandForActive(
             'failed'
           );
 
@@ -70418,6 +74973,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       this.mutationObserver = new MutationObserver(() => {
         this.perf.globalMutationCallbacks++;
+        this.scheduleNativeDiscordLinkPreviewRepair();
+
+        if (HiddenSdcAuxiliaryTransportMessageIds.size) syncHiddenSdcAuxiliaryTransportRows();
 
         // v69.0.4: message rows can be recycled while the bottom composer remains
         // perfectly healthy. The old early-return therefore missed local-echo DOM
@@ -70435,8 +74993,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           if (replyPending && !active.nativeReplyPendingLast) {
             active.nativeReplyPendingLast = true;
             this.forceSecureReplyFocus('app-mutation');
-          } else if (!replyPending) {
+          } else if (!replyPending && active.nativeReplyPendingLast) {
             active.nativeReplyPendingLast = false;
+            this.reconcileSecureReplySurface(active);
           }
         }
 
@@ -70475,10 +75034,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       // Discord's message DOM, so re-anchor them explicitly on scroll/resize.
       this.localEchoViewportHandler = () => {
         if (!this.started || this.localEchoPending.size === 0) return;
-        this.scheduleVisibleLocalEchoRepair(0);
+        if (this.localEchoViewportFrame != null) return;
+        if (typeof requestAnimationFrame !== 'function') { this.scheduleVisibleLocalEchoRepair(0); return; }
+        this.localEchoViewportFrame = requestAnimationFrame(() => {
+          this.localEchoViewportFrame = null;
+          if (this.started) this.scheduleVisibleLocalEchoRepair(0);
+        });
       };
       document.addEventListener('scroll', this.localEchoViewportHandler, true);
+      document.addEventListener('load', this.localEchoViewportHandler, true);
       window.addEventListener('resize', this.localEchoViewportHandler, false);
+      window.visualViewport?.addEventListener?.('resize', this.localEchoViewportHandler);
+      window.visualViewport?.addEventListener?.('scroll', this.localEchoViewportHandler);
+      try { this.localEchoGeometryObserver = new ResizeObserver(this.localEchoViewportHandler); } catch (_) {}
 
       this.RefreshSoon(0);
 
@@ -70753,7 +75321,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
               ).length
             : 0,
         longTextPolicy:
-          'lossless-pre-AEAD-compression-if-smaller; premium-aware-final-wire-preflight; oversized-v4-single-or-fanout=encrypted-message.txt; oversized-sdcd1=independent-decoy-encrypted-message.txt; typed>10000=send-blocked',
+          'lossless-pre-AEAD-compression-if-smaller; standard-account-1950-final-wire-preflight; oversized-v4-single-or-fanout=encrypted-message.txt; oversized-sdcd1=independent-decoy-encrypted-message.txt; typed>10000=send-blocked',
         sdc4TextWireFormat: 'compact-binary-v3/v4/v5/v6-braille-write + base64url-read-compat',
         sdc4TextWireCompatibility: 'legacy-base64url-read; braille-write/read; v3/v4/v5/v6 data planes unchanged',
         sdc4CompactOneByteDiscordCharacters: 1,
@@ -70782,6 +75350,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           wireEncoding: 'BRAILLE_1_BYTE_PER_DISCORD_CHARACTER',
           legacyBase64urlRead: true,
           premiumAwareTextLimit: this.getDiscordMessageContentLimit(),
+          premiumTransportExpansion: false,
+          standardAccountTransportLimit: this.getDiscordMessageContentLimit(),
+          nativeCapabilityMarginCharacters: 50,
+          transportUtf8ContentBudget: 6000,
           oversizedTextFallback: 'encrypted-message.txt',
         },
         unavailableReason: this.unavailableReason,
@@ -70911,7 +75483,10 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     },
 
     Stop() {
+      clearSdc4FileFsRuntimeVaults();
+      invalidateSelfHistoryRuntime();
       this.started = false;
+      this.sentPresentationEpoch = Number(this.sentPresentationEpoch || 0) + 1;
 
       clearTimeout(this.refreshTimer);
       clearTimeout(this.visibilityTimer);
@@ -70943,9 +75518,18 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
 
       if (this.localEchoViewportHandler) {
         try { document.removeEventListener('scroll', this.localEchoViewportHandler, true); } catch (_) {}
+        try { document.removeEventListener('load', this.localEchoViewportHandler, true); } catch (_) {}
         try { window.removeEventListener('resize', this.localEchoViewportHandler, false); } catch (_) {}
+        try { window.visualViewport?.removeEventListener?.('resize', this.localEchoViewportHandler); } catch (_) {}
+        try { window.visualViewport?.removeEventListener?.('scroll', this.localEchoViewportHandler); } catch (_) {}
       }
       this.localEchoViewportHandler = null;
+      if (this.localEchoViewportFrame != null) { try { cancelAnimationFrame(this.localEchoViewportFrame); } catch (_) {} }
+      this.localEchoViewportFrame = null;
+      try { this.localEchoGeometryObserver?.disconnect(); } catch (_) {}
+      this.localEchoGeometryObserver = null;
+      this.localEchoGeometryNodes.clear();
+      this.localEchoVisibleContentIndex = null;
 
       this.unmount('plugin-unload');
 
@@ -70961,6 +75545,14 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       for (const record of this.sdc4qSandboxReservations.values()) { try { record?.contentKey?.fill?.(0); } catch (_) {} try { record?.contentAad?.fill?.(0); } catch (_) {} }
       this.sdc4qSandboxReservations.clear();
       this.localEchoPending.clear();
+      this.cachedSentPresentationHydrations?.clear();
+      this.discordLocalLinkPreviewCache = null;
+      this.discordMessageLinkReadCache?.clear();
+      this.authenticatedDiscordPreviewMessages = new WeakMap();
+      if (this.discordLinkPreviewRepairTimer) clearTimeout(this.discordLinkPreviewRepairTimer);
+      this.discordLinkPreviewRepairTimer = null;
+      for (const echoId of this.discordLinkPreviewFrames.keys()) this.removeNativeDiscordLinkPreviewFrame(echoId);
+      this.discordLinkPreviewPending.clear();
       for (const timer of this.localEchoMountTimers.values()) {
         try { clearTimeout(timer); } catch (_) {}
       }
@@ -70974,6 +75566,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
       this.channelReadinessProbeTimers.clear();
       for (const record of this.localEchoFrames.values()) {
+        this.restoreLocalEchoNativePresentation(record, true);
+        this.restoreNativeEditedMarker(record);
         try { record?.iframe?.remove?.(); } catch (_) {}
       }
       this.localEchoFrames.clear();
@@ -71206,7 +75800,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     const encoded = encodeSdc4FileFsOfflinePlaintext('caption', [sampleFull]);
     const decoded = decodeSdc4FileFsOfflinePlaintext(encoded);
     const source = String(handleSend || '');
-    const receiveSource = String(decryptHybridAsyncPrekeyMessage || '');
+    const receiveSource = String(decryptHybridAsyncPrekeyMessageCore || '');
     const detachedSource = String(processMessage || '');
     const secureComposerSource = String(SecureComposer?.Start || '');
     const frameSource = String(SECURE_COMPOSER_FRAME_HTML || '');
@@ -71294,7 +75888,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     };
     return {
       lot: 'LOT_3E_GROUP_RATCHET_FINALIZED_AND_FROZEN',
-      build: 'v70.10.12',
+      build: 'v70.11.3',
       ok: Object.values(gates).every(Boolean),
       groupStackFrozen: SDC_GROUP_STACK_FROZEN,
       gates,
@@ -71426,7 +76020,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.12',
+      build: 'v70.11.3',
       ok: versionComparisonSelfTest && signedAdvertisementInstalled && recipientMembershipScopedVersionCheck && sdcClientVersionMeetsMinimum(SDC_PUBLIC_RELEASE_VERSION),
       localVersion: SDC_PUBLIC_RELEASE_VERSION,
       minimumSupportedVersion: SDC_MINIMUM_SUPPORTED_VERSION,
@@ -71452,7 +76046,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcUiCorrectiveStatus = () => ({
-    build: 'v70.10.12',
+    build: 'v70.11.3',
     ok: true,
     minimumVersionBlockingModal: true,
     deviceManagerActionFromBlockingModal: typeof MenuBar?.OpenDeviceManager === 'function',
@@ -71490,11 +76084,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     frozenHybridWirePrefixesUnchanged:
       SDC_HYBRID_ASYNC_WIRE_PREFIX === 'SDC4Q:' && SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX === 'SDC4QF:',
     durableOwnSdc4EchoPreferredBeforeEphemeral:
-      String(decryptRatchetV4TextMessageCore || '').indexOf("getSdc4HistoryRecord(localEchoId, 'sent')") <
+      String(decryptRatchetV4TextMessageCore || '').indexOf("getSdc4HistoryRecord(localEchoId, 'sent', selfHistoryBinding)") <
       String(decryptRatchetV4TextMessageCore || '').indexOf('canUseEphemeralLocalEcho(localEchoId'),
     portableDatabaseDeviceReconvergence:
       typeof ensurePortableImportConvergenceForChannel === 'function' &&
-      String(ensurePortableImportConvergenceForChannel || '').includes('sendDeviceAnnouncement(channel, true)') &&
+      String(ensurePortableImportConvergenceForChannel || '').includes('sendDeviceAnnouncement(channel, true, { userIntent })') &&
       String(ensurePortableImportConvergenceForChannel || '').includes('ensureRatchetV4Live'),
     portableExportOmitsInstallationReconvergenceMarker:
       String(Utils.DownloadDb || '').includes('delete exportData.portableImportConvergence'),
@@ -71541,10 +76135,19 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       }
     } catch (_) {}
     return {
-      build: 'v70.10.12',
+      build: 'v70.11.3',
       portableAccountIdentity: true,
-      portableDevicePrivateKey: false,
-      portableMutableRatchetState: false,
+      portableDevicePrivateKey: true,
+      portableMutableRatchetState: true,
+      importedArchiveUsedForSending: false,
+      encryptedBackupFormat: 2,
+      privateRecoveryArchivePresent: !!DataBase?.portablePrivateRecovery,
+      recoveryDiagnostics: privateRecoveryRatchetStatus(),
+      readableHistoryAutomaticDeletion: false,
+      exportIncludesRetainedSameIdentityStores: true,
+      paddedPasswordSlots: 2,
+      backupKdf: { ...SDC_BACKUP_KDF },
+      backupCipher: "AES-256-GCM",
       portablePqPendingOrDeferredAckState: false,
       automaticQuietCapabilityReadvertisementAfterImport: true,
       encryptedReadableHistoryPortableWhenExported: true,
@@ -71554,8 +76157,8 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
       currentChannel,
       behavior: 'FIRST PROTECTED DM SEND AFTER IMPORT -> NEW INSTALLATION DEVICE -> SIGNED QUIET CAPABILITY BEFORE CRYPTO BUILD -> AUTOMATIC REQUIRED SDC4 COVERAGE RECONSTRUCTION',
       note: SdcUiI18n.pick(
-        'A portable backup restores the account identity and encrypted keys/history, but never clones an installation device private key or live ratchet state.',
-        'Une sauvegarde portable restaure l’identité de compte ainsi que les clés/l’historique chiffrés, mais ne clone jamais la clé privée d’un appareil ni un état ratchet actif.'
+        'The encrypted .dat includes private keys and retained ratchet checkpoints for read-only recovery. Every import creates a fresh sending device and keeps available recovery history from the same identity.',
+        'Le .dat chiffré contient les clés privées et les checkpoints ratchet conservés pour la lecture. Chaque import crée un nouvel appareil d’envoi et conserve les archives disponibles de la même identité.'
       ),
     };
   };
@@ -71659,7 +76262,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     };
     return {
-      build: 'v70.10.12',
+      build: 'v70.11.3',
       ok: Object.values(gates).every(Boolean),
       policy: 'QUIET_PQ_ZERO_TOUCH_DIRECT_FINAL_OFFLINE_SAFE',
       backgroundNetworkMaintenance: false,
@@ -71676,7 +76279,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   };
 
   window.SdcProtocolFreezeStatus = () => ({
-    build: 'v70.10.12',
+    build: 'v70.11.3',
     ok: SDC_CLASSICAL_STACK_FROZEN === true && SDC_PQ_STACK_FROZEN === true && SDC_GROUP_STACK_FROZEN === true,
     classical: SDC_CLASSICAL_STACK_FROZEN === true,
     postQuantum: SDC_PQ_STACK_FROZEN === true,
@@ -71847,7 +76450,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
     pruneSdc3OwnOutboundAdmissions(Date.now());
     return {
       lot: 'LOT_3_SDC3_REPLAY_OWN_ECHO_CORRECTIVE',
-      build: 'v70.10.12',
+      build: 'v70.11.3',
       ok: String(Discord.detour_enqueue || '').includes('rememberSdc3OwnOutboundTransport'),
       policy: {
         remoteDifferentMessageIdReplayRejected: true,
@@ -72167,7 +76770,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           n: safeFilename,
           z: encryptedBuffer.byteLength,
         };
-        rememberSdc4FileFsKey(channelId, descriptor);
+        await rememberSdc4FileFsKey(channelId, descriptor);
         const encryptedFilename = 'sdc4fs_' + logicalId;
         const encryptedFile = new File([encryptedBuffer], encryptedFilename, { type: 'application/octet-stream' });
         markSdcEncryptedAttachment(channelId, encryptedFile, null, encryptedFilename, descriptor);
@@ -72214,7 +76817,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           };
           const wrapped = await wrapGroupFileFsCek(epoch, fileKey, channelId, senderId, Number(groupMeta.generation), logicalId);
           const groupDescriptor = { v: 1, g: Number(groupMeta.generation), i: logicalId, w: wrapped };
-          rememberSdc4FileFsKey(channelId, fullDescriptor);
+          await rememberSdc4FileFsKey(channelId, fullDescriptor);
           const encryptedFilename = 'sdcgfs_' + logicalId;
           const encryptedFile = new File([encryptedBuffer], encryptedFilename, { type: 'application/octet-stream' });
           markSdcEncryptedAttachment(channelId, encryptedFile, null, encryptedFilename, fullDescriptor, groupDescriptor);
@@ -73687,12 +78290,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function Load() {
+    Sdc4FileFsVaultRunning = true;
     scheduleStartupChannelCacheRecovery(0);
 
     Discord.detour_enqueue = function () {
       // Capturer le contexte et les arguments avant d'entrer dans l'async
       const self = this;
       const args = arguments;
+      let secureQueueToken = null;
+      let secureQueueRecord = null;
+      let secureQueueComposer = null;
+      let selfHistoryContext = null;
+      let selfHistoryPrimary = null;
+      let selfHistoryChannel = null;
+      let selfHistoryEnqueued = false;
 
       // Discord s'attend à recevoir une Promise, il faut la retourner
       return (async () => {
@@ -73726,17 +78337,31 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         }
 
         if (channelId && message) {
+          selfHistoryChannel = channelId;
+          if (!TrustedSystemMessageObjects.has(message)) {
+            const token = /^NOENC:SDCSECURE:([0-9a-f]{24}):/.exec(String(message.content || ''));
+            selfHistoryContext = token ? SecureComposer.sendTokens.get(token[1])?.selfHistoryContext : null;
+            selfHistoryContext = selfHistoryContext || SelfHistoryMessageContexts.get(message) || captureSelfHistorySendContext(channelId);
+            SelfHistoryMessageContexts.set(message, selfHistoryContext);
+          }
           // v69.2.9: an explicit SDC4Q probe is produced by the authenticated
           // production builder and may cross the Discord queue exactly once without
           // being re-encrypted by handleSend. The exact object identity is the
           // capability; arbitrary text cannot opt into this path.
           if (TrustedFinalEncryptedMessageObjects.has(message)) {
             TrustedFinalEncryptedMessageObjects.delete(message);
+            assertSdcDiscordTransportBudget(
+              String(message.content || ''), SecureComposer.getDiscordMessageContentLimit()
+            );
             console.debug('[SDC][PQ][v69.2.10] trusted final hybrid terminal message queued', {
               channelId,
               transport: String(message?.content || '').startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX) ? 'SDC4QF' : (String(message?.content || '').startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ? 'SDC4Q' : 'UNKNOWN'),
             });
-            await preparePqQuietControlsBeforeUserEnqueue(channelId, message, 'trusted-final-hybrid-before-original-enqueue');
+            await preparePqQuietControlsBeforeUserEnqueue(channelId, message, 'trusted-final-hybrid-before-original-enqueue', selfHistoryContext.userIntent);
+            selfHistoryContext = await selfHistorySendContextForTransport(channelId, message.content, selfHistoryContext);
+            await assertSelfHistoryOutboundAuthorization(channelId, message.content, selfHistoryContext);
+            selfHistoryPrimary = SelfHistoryBatchMessages.has(message) ? null : String(message.content);
+            selfHistoryEnqueued = true;
             return Discord.original_enqueue.apply(Discord.enqueueTarget, args);
           }
 
@@ -73744,6 +78369,12 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           // bypass Secure Input/application encryption entirely. The WeakSet
           // capability prevents a user-entered marker from gaining this path.
           if (TrustedSystemMessageObjects.has(message)) {
+            const siblingContext = SelfHistoryMessageContexts.get(message);
+            if (siblingContext) assertSelfHistorySendContext(siblingContext);
+            // Repeat at the final transport boundary: status may have changed
+            // while signing/preparing/enqueuing the control asynchronously.
+            assertSdcControlSendAllowed(channelId, SdcControlMessageIntents.get(message));
+            SdcControlMessageIntents.delete(message);
             TrustedSystemMessageObjects.delete(message);
             if (message._sdc_system_message) delete message._sdc_system_message;
             if (message._sdc_suppress_notifications) delete message._sdc_suppress_notifications;
@@ -73797,6 +78428,20 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             V701MediaRuntime.stickerFailures += 1;
             V701MediaRuntime.lastStickerError = error?.message || String(error);
             throw error;
+          }
+
+          // Capture only the first submission of a valid local token before
+          // ObserveOutgoing's attachment/crypto checks can throw. A duplicate
+          // callback must never settle the transaction that is already pending.
+          const secureTokenMatch = /^NOENC:SDCSECURE:([0-9a-f]{24}):/.exec(String(message.content || ''));
+          const secureTokenRecord = secureTokenMatch
+            ? SecureComposer.sendTokens.get(secureTokenMatch[1])
+            : null;
+          if (secureTokenRecord && !secureTokenRecord.sent &&
+              secureTokenRecord.nativeMode !== 'edit') {
+            secureQueueToken = secureTokenMatch[1];
+            secureQueueRecord = secureTokenRecord;
+            secureQueueComposer = SecureComposer.active;
           }
 
           const secureOutgoing =
@@ -73975,30 +78620,66 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           await preparePqQuietControlsBeforeUserEnqueue(
             channelId,
             message,
-            'MessageQueue-immediately-before-original-enqueue'
+            'MessageQueue-immediately-before-original-enqueue', selfHistoryContext?.userIntent
           );
         }
 
         // Appeler la fonction originale et retourner sa Promise.
+        if (channelId && typeof message?.content === 'string' &&
+            (message.content.startsWith(SDC4_WIRE_PREFIX) ||
+             message.content.startsWith(SDC_ASYNC_PREKEY_WIRE_PREFIX) ||
+             message.content.startsWith(SDC_HYBRID_ASYNC_WIRE_PREFIX) ||
+             message.content.startsWith(SDC_HYBRID_ASYNC_FANOUT_WIRE_PREFIX))) {
+          assertSdcDiscordTransportBudget(
+            message.content, SecureComposer.getDiscordMessageContentLimit()
+          );
+        }
+
         // v68.4.4: once Discord accepted this terminal user-message enqueue, the
         // pending encrypted-attachment binding has been consumed by the SDC4 wire
         // and may be released. Do this only after successful queue completion so a
         // rejected send does not destroy the retry binding.
+        const consumedAttachmentRecords = channelId && message
+          ? (SecureComposer.getNativeEncryptedAttachmentBinding(channelId)?.records || []).slice()
+          : [];
+        if (selfHistoryContext && selfHistoryWireFromTransport(message?.content)) {
+          selfHistoryContext = await selfHistorySendContextForTransport(channelId, message.content, selfHistoryContext);
+          await assertSelfHistoryOutboundAuthorization(channelId, message.content, selfHistoryContext);
+          selfHistoryPrimary = SelfHistoryBatchMessages.has(message) ? null : String(message.content);
+        }
+        selfHistoryEnqueued = true;
         const result = Discord.original_enqueue.apply(Discord.enqueueTarget, args);
 
         if (channelId && message && !TrustedSystemMessageObjects.has(message)) {
           Promise.resolve(result).then(() => {
             try {
+              if (secureQueueRecord &&
+                  (SecureComposer.sendTokens.get(secureQueueToken) !== secureQueueRecord ||
+                   SecureComposer.active !== secureQueueComposer))
+                return;
               SecureComposer.clearNativeEncryptedAttachmentBindings(
                 channelId,
-                'message-enqueue-complete'
+                'message-enqueue-complete',
+                consumedAttachmentRecords
               );
             } catch (_) {}
           }).catch(() => {});
         }
 
         return result;
-      })();
+      })().then(async (result) => {
+        if (selfHistoryPrimary && selfHistoryEnqueued) await completeSelfHistoryOutboundTransport(selfHistoryChannel, selfHistoryPrimary, true, selfHistoryContext);
+        if (secureQueueToken) {
+          SecureComposer.CompleteNativeQueueSubmission(secureQueueToken, true, result, null, secureQueueRecord);
+        }
+        return result;
+      }, async (error) => {
+        if (selfHistoryPrimary) await completeSelfHistoryOutboundTransport(selfHistoryChannel, selfHistoryPrimary, false, selfHistoryContext);
+        if (secureQueueToken) {
+          SecureComposer.CompleteNativeQueueSubmission(secureQueueToken, false, null, error, secureQueueRecord);
+        }
+        throw error;
+      });
     };
 
     if (Discord.detour_editMessage != null) {
@@ -74142,7 +78823,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
                 true,
                 preservedEditAttachmentScopedKeyId,
                 preservedEditAttachmentFileFsDescriptors,
-                preservedEditAttachmentGroupFileFsDescriptors
+                preservedEditAttachmentGroupFileFsDescriptors,
+                null,
+                false
               );
             }
 
@@ -74162,6 +78845,9 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
             typeof contentContainer?.content === 'string' &&
             contentContainer.content.startsWith(SDC4_WIRE_PREFIX)
           ) {
+            assertSdcDiscordTransportBudget(
+              contentContainer.content, SecureComposer.getDiscordMessageContentLimit()
+            );
             assertRatchetV4OutboundWireRecipientSetCurrent(
               channelId,
               contentContainer.content,
@@ -74680,7 +79366,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
           'Per-installation device identities + SDC4 readiness',
           `<div class="SDC_EXPERT_INFO">
             <p><strong>Local device:</strong> <code>${HtmlEscape(local.deviceId)}</code></p>
-            <p>The portable SDC database keeps the account identity and keys, but <strong>does not export this device private key</strong>. Importing the same account database on another installation therefore creates a distinct per-installation device identity while preserving the same SDC account identity.</p>
+            <p>The encrypted .dat backup includes this device’s private recovery keys, retained history and ratchet checkpoints. Imported private checkpoints are used only to read old messages. Every import creates a distinct device for new sends, while preserving the SDC account identity.</p>
             <p>SDC4 Double Ratchet is enabled per device. v68.4 additionally publishes an identity-signed rotating async prekey. Once a peer/device prekey has been observed, a new installation can send a short encrypted bootstrap message while that peer is offline; normal SDC4 converges when the peer returns. With multiple eligible devices, LIVE SDC4 remains all-or-nothing fan-out.</p><p>Device/prekey announcement is lazy: opening a DM sends nothing. It is emitted only for actual encrypted/KEX activity when the current prekey epoch has not yet been advertised; the manual button remains an expert recovery/refresh control.</p>
             ${dmSummary}
             <p><button type="button" class="sdc-btn SDC_DEVICE_ANNOUNCE_NOW">Announce this device in current channel</button></p>
@@ -74693,7 +79379,7 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
         MenuBar.infoPopup?.querySelector('.SDC_DEVICE_ANNOUNCE_NOW')?.addEventListener('click', async () => {
           try {
             if (!Cache.channelId) throw new Error('Select a channel first');
-            await sendDeviceAnnouncement(Cache.channelId, true);
+            await sendDeviceAnnouncement(Cache.channelId, true, { userIntent: createSdcControlUserIntent(Cache.channelId, 'manual-device-announce') });
             SecureComposer.toast('SDC device announcement sent', 'success');
           } catch (error) {
             console.error('[SDC][DEVICE][v67.1.110] manual announcement failed', error);
@@ -74966,6 +79652,11 @@ ${HeaderBarSelector}, ${HeaderBarChildrenSelector}, ${HeaderBarSelectors.join(',
   }
 
   function Unload() {
+    Sdc4FileFsVaultRunning = false;
+    Sdc4FileFsVaultEpoch++;
+    clearSdc4FileFsRuntimeVaults();
+    invalidateSelfHistoryRuntime();
+    try { SdcBackupOperationUi.cancelCurrent(); } catch (_) {}
     try { AutoLockManager.stop(); } catch (_) {}
     const restoreFunction = (moduleName, functionName) => {
       Discord[`detour_${functionName}`] = Discord[`original_${functionName}`];
